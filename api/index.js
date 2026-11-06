@@ -6,6 +6,23 @@ import { seedRemote } from '../shared/dump.js';
 import { crypto } from '../shared/node-crypto.js';
 
 let ready;
+// Diagnostics for /api/_mode?check=1: raw HTTP calls to the database, and the token's shape (never its value).
+async function probe() {
+  const url = dbUrl().replace(/^libsql:/, 'https:').replace(/\/+$/, '');
+  const tok = dbToken();
+  const out = {
+    host: url.replace(/^https?:\/\//, '').replace(/\?.*$/, ''),
+    token_shape: { length: tok.length, parts: tok.split('.').length, starts_ey: tok.startsWith('ey'), has_space: /\s/.test(tok), has_quote: /["']/.test(tok), has_bearer: /^bearer/i.test(tok) },
+  };
+  const body = JSON.stringify({ requests: [{ type: 'execute', stmt: { sql: 'SELECT 1' } }, { type: 'close' }] });
+  for (const [k, path, opt] of [['health', '/health', {}], ['v2', '/v2/pipeline', { method: 'POST', body }], ['v3', '/v3/pipeline', { method: 'POST', body }]]) {
+    try {
+      const r = await fetch(url + path, { ...opt, headers: { 'content-type': 'application/json', ...(tok ? { authorization: `Bearer ${tok}` } : {}) } });
+      out[k] = `${r.status} ${(await r.text()).slice(0, 300)}`;
+    } catch (e) { out[k] = 'ERR ' + e.message; }
+  }
+  return out;
+}
 // Accept common spellings (TURSO_DATABASE_URL, TURSO_URL, LIBSQL_URL, ... and stray spaces/case in the name).
 function envFind(re) {
   for (const [k, v] of Object.entries(process.env)) if (re.test(k.trim()) && v && v.trim()) return v.trim();
@@ -13,7 +30,7 @@ function envFind(re) {
 }
 const withScheme = (u) => (u && !/^[a-z]+:/i.test(u) ? `libsql://${u.replace(/^\/+/, '')}` : u);
 const dbUrl = () => withScheme(envFind(/^(TURSO|LIBSQL)_?(DATABASE|DB)?_?URL$/i) || envFind(/^DATABASE_URL$/i).replace(/^(?!libsql:|https?:|wss?:|file:).*$/, ''));
-const dbToken = () => envFind(/^(TURSO|LIBSQL)_?(AUTH)?_?TOKEN$/i);
+const dbToken = () => envFind(/^(TURSO|LIBSQL)_?(AUTH)?_?TOKEN$/i).replace(/^bearer\s+/i, '').replace(/^["']|["']$/g, '').replace(/\s+/g, '');
 async function getApi() {
   if (!dbUrl()) throw new Error('TURSO_DATABASE_URL ortam değişkeni tanımlı değil.');
   const db = libsqlDb(dbUrl(), dbToken());
@@ -45,7 +62,7 @@ export default async function handler(req, res) {
     const info = { db: !!dbUrl(), token: !!dbToken() };
     if (/check=1/.test(req.url) && info.db) {
       try { ready ||= getApi().catch((e) => { ready = null; throw e; }); await ready; info.connected = true; }
-      catch (e) { info.connected = false; info.error = e.message; }
+      catch (e) { info.connected = false; info.error = e.message; info.probe = await probe().catch((x) => String(x)); }
     }
     return res.end(JSON.stringify({ ...info, env: Object.keys(process.env).filter((k) => /turso|libsql|database/i.test(k)) }));
   }
