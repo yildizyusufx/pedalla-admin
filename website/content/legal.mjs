@@ -27,10 +27,10 @@ export function legalPage(name, SITE, V) {
     <h2>7. Speicherdauer</h2><p>Wir löschen Ihre Daten, sobald sie für den Zweck nicht mehr erforderlich sind, spätestens nach Ablauf der gesetzlichen Aufbewahrungsfristen (z. B. 10 Jahre für Rechnungen nach § 147 AO).</p>
     <h2>8. Ihre Rechte</h2><p>Sie haben das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung, Datenübertragbarkeit und Widerspruch (Art. 15–21 DSGVO) sowie das Recht auf Beschwerde bei einer Aufsichtsbehörde, z. B. dem Hamburgischen Beauftragten für Datenschutz und Informationsfreiheit.</p>`;
   return `<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${name === 'impressum' ? 'Impressum' : 'Datenschutz'} – Pedalla</title><meta name="robots" content="noindex"><link rel="icon" href="/img/favicon.png">
-<link rel="stylesheet" href="/site.css?v=${V}"></head><body class="legal">
-<header class="top"><div class="wrap top-in"><a class="logo" href="/"><img src="/img/logo.png" alt="Pedalla" width="160" height="29"></a><div class="top-r"><a class="btn sm ghost" href="/">← pedalla.bike</a></div></div></header>
+<title>${name === 'impressum' ? 'Impressum' : 'Datenschutz'} – Pedalla</title><meta name="robots" content="noindex"><link rel="icon" href="img/favicon.png">
+<link rel="stylesheet" href="site.css?v=${V}"></head><body class="legal">
+<header class="top"><div class="wrap top-in"><a class="logo" href="./${process.env.PREVIEW ? 'index.html' : ''}"><img src="img/logo.png" alt="Pedalla" width="160" height="29"></a><div class="top-r"><a class="btn sm ghost" href="./${process.env.PREVIEW ? 'index.html' : ''}">← pedalla.bike</a></div></div></header>
 <main class="wrap legal-body">${body}</main>
-<footer class="foot"><div class="wrap foot-b">© ${new Date().getFullYear()} Pedalla · <a href="/impressum">Impressum</a> · <a href="/datenschutz">Datenschutz</a></div></footer>
+<footer class="foot"><div class="wrap foot-b">© ${new Date().getFullYear()} Pedalla · <a href="impressum${process.env.PREVIEW ? '.html' : ''}">Impressum</a> · <a href="datenschutz${process.env.PREVIEW ? '.html' : ''}">Datenschutz</a></div></footer>
 </body></html>`;
 }

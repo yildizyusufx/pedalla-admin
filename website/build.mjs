@@ -14,6 +14,9 @@ rmSync(OUT, { recursive: true, force: true });
 mkdirSync(OUT);
 cpSync('src', OUT, { recursive: true });
 
+// PREVIEW=1: explicit index.html / .html links for hosts without clean URLs
+const IDX = process.env.PREVIEW ? 'index.html' : '';
+const EXT = process.env.PREVIEW ? '.html' : '';
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const base = (lang) => (lang === 'de' ? '/' : `/${lang}/`);
 const price = (n) => (SITE.priceMode === 'gross' ? Math.round(n * (1 + SITE.vat)) : n);
@@ -69,7 +72,7 @@ function page(lang) {
   };
   const runtime = {
     lang, api: SITE.api, portal: SITE.portal, whatsapp: SITE.whatsapp, priceMode: SITE.priceMode, vat: SITE.vat, durations: SITE.durations,
-    stations: SITE.stations, area: SITE.area, privacy: `${pre}datenschutz`, pre,
+    stations: SITE.stations, area: SITE.area, privacy: `${pre}datenschutz${EXT}`, pre,
     models: MODELS.map((m) => ({ sub: m.sub[lang], id: m.id, match: m.match.source, flags: m.match.flags, adminType: m.adminType, name: m.name, image: m.image, price: m.fallbackPrice, deposit: m.fallbackDeposit, tag: m.tag?.[lang] || '', desc: m.desc[lang], specs: m.specs[lang] })),
     generic: { sub: GENERIC.sub[lang], image: GENERIC.image, desc: GENERIC.desc[lang] },
     t,
@@ -106,12 +109,12 @@ function page(lang) {
       <nav class="nav" id="nav">
         <a href="#modelle">${t.nav_models}</a><a href="#so-gehts">${t.nav_how}</a><a href="#karte">${t.nav_map}</a><a href="#business">${t.nav_business}</a><a class="nav-x" href="#faq">${t.nav_faq}</a>
         <a class="nav-x" href="${SITE.portal}?lang=${lang}">${t.nav_login}</a>
-        <div class="nav-x nav-lang">${Object.keys(LANGS).map((l) => `<a href="${l === lang ? '#' : (lang === 'de' ? '' : '../') + (l === 'de' ? '' : l + '/')}" class="${l === lang ? 'on' : ''}" hreflang="${l}">${LANGS[l]}</a>`).join('')}</div>
+        <div class="nav-x nav-lang">${Object.keys(LANGS).map((l) => `<a href="${l === lang ? '#' : (lang === 'de' ? '' : '../') + (l === 'de' ? '' : l + '/') + IDX}" class="${l === lang ? 'on' : ''}" hreflang="${l}">${LANGS[l]}</a>`).join('')}</div>
       </nav>
     </div>
     <a class="logo" href="${base(lang)}" aria-label="Pedalla"><img src="${pre}img/logo.png" alt="Pedalla" width="160" height="29"></a>
     <div class="top-r">
-      <div class="lang" role="navigation" aria-label="Language">${Object.keys(LANGS).map((l) => `<a href="${l === lang ? '#' : (lang === 'de' ? '' : '../') + (l === 'de' ? '' : l + '/')}" class="${l === lang ? 'on' : ''}" hreflang="${l}" lang="${l}" title="${LANGS[l]}">${l.toUpperCase()}</a>`).join('')}</div>
+      <div class="lang" role="navigation" aria-label="Language">${Object.keys(LANGS).map((l) => `<a href="${l === lang ? '#' : (lang === 'de' ? '' : '../') + (l === 'de' ? '' : l + '/') + IDX}" class="${l === lang ? 'on' : ''}" hreflang="${l}" lang="${l}" title="${LANGS[l]}">${l.toUpperCase()}</a>`).join('')}</div>
       <div class="contact hide-m"><a class="pillbtn" href="https://wa.me/${SITE.whatsapp}" target="_blank" rel="noopener">${t.foot_contact}</a><a class="round light" href="tel:${SITE.phone.replace(/\s/g, '')}" aria-label="${SITE.phone}">${ic('phone')}</a></div>
       <button class="rentbtn" data-rent=""><span>${t.cta_rent}</span><i>${ic('bike')}</i></button>
     </div>
@@ -207,7 +210,7 @@ function page(lang) {
     <div><img src="${pre}img/logo-light.png" alt="Pedalla" width="150" height="27"><p>${t.foot_tag}</p></div>
     <div><h4>${t.foot_contact}</h4><p>${esc(SITE.address.street)}<br>${SITE.address.zip} ${SITE.address.city}</p><p><a href="tel:${SITE.phone.replace(/\s/g, '')}">${SITE.phone}</a><br><a href="https://wa.me/${SITE.whatsapp}" target="_blank" rel="noopener">WhatsApp</a> · <a href="mailto:${SITE.email}">${SITE.email}</a></p></div>
     <div><h4>Pedalla</h4><p><a href="#modelle">${t.nav_models}</a><br><a href="#business">${t.nav_business}</a><br><a href="${SITE.portal}?lang=${lang}">${t.nav_login}</a></p></div>
-    <div><h4>${t.foot_legal}</h4><p><a href="${pre}impressum">${t.foot_imprint}</a><br><a href="${pre}datenschutz">${t.foot_privacy}</a></p></div>
+    <div><h4>${t.foot_legal}</h4><p><a href="${pre}impressum${EXT}">${t.foot_imprint}</a><br><a href="${pre}datenschutz${EXT}">${t.foot_privacy}</a></p></div>
   </div>
   <div class="wrap foot-b">© ${new Date().getFullYear()} Pedalla. ${t.foot_rights}</div>
 </footer>
