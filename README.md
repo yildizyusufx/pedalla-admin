@@ -4,7 +4,7 @@ Kargo bisikleti / e-bike kiralama işi için uçtan uca yönetim sistemi: filo, 
 
 ## Çalıştırma
 
-Gereken tek şey **Node.js 22.13 veya üstü** (ek paket kurulumu yok, `npm install` gerekmez).
+Gereken tek şey **Node.js 22.13 veya üstü**. Yerel çalıştırmak için `npm install` gerekmez; tek bağımlılık olan `@libsql/client` yalnızca Vercel/Turso için kullanılır.
 
 ```bash
 cd pedalla-admin
@@ -26,18 +26,23 @@ npm start            # http://localhost:3000
 
 ## Yayına alma (deploy)
 
-Sistem iki şekilde çalışabilir:
+### Vercel + Turso (ücretsiz, önerilen)
 
-| Seçenek | Veriler | Nerede |
-|---|---|---|
-| **Tam sürüm** (`server.js` + SQLite dosyası) | Sunucuda kalıcı, tüm kullanıcılar aynı veriyi görür | Kalıcı diski olan herhangi bir Node sunucusu: **Render**, **Railway**, **Fly.io**, kendi VPS'iniz |
-| **Statik demo** (`dist/`, tarayıcı içi SQLite) | Her tarayıcıda ayrı, kalıcı değil | Vercel, Netlify, GitHub Pages |
+Vercel sürekli çalışan bir sunucu ve yerel veritabanı dosyası desteklemediği için veriler ücretsiz **Turso** bulut veritabanında (SQLite uyumlu) tutulur. API, `api/index.js` üzerinden Vercel fonksiyonu olarak çalışır.
 
-**Vercel:** Vercel sürekli çalışan bir Node sunucusunu ve yerel veritabanı dosyasını desteklemez. Bu yüzden `vercel.json` Vercel'de statik demo sürümünü yayınlar (`node scripts/build-static.mjs` → `dist/`). Bu sürüm tanıtım ve test içindir. Gerçek kullanımda veriler tarayıcıda kalır, ekip arasında paylaşılmaz.
+1. [turso.tech](https://turso.tech) adresinde ücretsiz hesap açın ve bir veritabanı oluşturun. Bölge olarak Frankfurt (`fra`) seçin.
+2. Veritabanı sayfasından **URL** (`libsql://...turso.io`) ve **token** değerlerini alın.
+3. Vercel → proje → *Settings → Environment Variables* bölümüne şunları ekleyin:
+   * `TURSO_DATABASE_URL` = libsql://… adresi
+   * `TURSO_AUTH_TOKEN` = token
+   * (isteğe bağlı) örnek veriler olmadan başlamak için `NO_SEED=1`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`
+4. *Deployments → Redeploy* deyin. İlk istekte tablolar oluşturulur ve (NO_SEED yoksa) örnek veriler yüklenir.
 
-**Render (önerilen, kod değişikliği yok):** repo kökündeki `render.yaml` hazır. Render'da *New → Blueprint* seçip bu repoyu gösterin. 1 GB kalıcı disk tanımlıdır; disk için ücretli "Starter" planı gerekir.
+`TURSO_DATABASE_URL` tanımlı değilse Vercel tarayıcı içi demo sürümünü yayınlar. Bu sürümde veriler her tarayıcıda ayrı tutulur.
 
-**Railway / Fly.io / Docker:** `Dockerfile` hazır. Veritabanı `/data/pedalla.db` içinde durur; bu klasöre kalıcı bir volume bağlayın.
+### Kendi sunucunuz / Render / Railway / Docker
+
+`npm start` ile çalışan tam sürüm verileri yerel SQLite dosyasında tutar. Bunun için kalıcı diski olan bir sunucu gerekir: `render.yaml` (Render, ücretli disk) ve `Dockerfile` hazırdır. Veritabanı `DB_PATH` ile gösterilen dosyadadır.
 
 ## Marka
 
@@ -86,7 +91,9 @@ Toplu gönderim için `{"key":"…","points":[{…},{…}]}`. `tracker_id`, bisi
 ## Dosya yapısı
 
 ```
-server.js          HTTP sunucusu, SQLite bağlantısı, şifreleme (scrypt)
+server.js          HTTP sunucusu (yerel / Render / Docker), SQLite dosyası
+api/index.js       Vercel fonksiyonu (Turso veritabanı)
+shared/db-libsql.js, shared/dump.js, shared/node-crypto.js  Turso bağlantısı, ilk veri yükleme, şifreleme (scrypt)
 shared/meta.js     Modül alanları, durumlar, roller, varsayılan ayarlar
 shared/schema.js   Veritabanı tabloları
 shared/api.js      Tüm iş kuralları ve REST API (sunucu ve demo ortak kullanır)

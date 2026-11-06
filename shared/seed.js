@@ -1,7 +1,8 @@
 // Demo data (fictional). Run once on an empty database.
+// Uses a synchronous db adapter (node:sqlite or sql.js); for remote databases see shared/dump.js.
 import { today, addDays } from './api.js';
 
-export function seed(api, hashPassword) {
+export async function seed(api, hashPassword) {
   const { db } = api;
   if (db.get('SELECT COUNT(*) AS n FROM users').n > 0) return false;
   let s = 42; const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
@@ -9,7 +10,7 @@ export function seed(api, hashPassword) {
   const T = today();
   const ins = (sql, p) => db.run(sql, p).lastId;
 
-  db.tx(() => {
+  await db.tx(async () => {
     // users
     const users = [
       ['Yusuf Yıldız', 'admin@pedalla.bike', 'admin'],
@@ -126,7 +127,7 @@ export function seed(api, hashPassword) {
 
     // rentals: history + active
     const planFor = (type, period) => plans.find((p) => p.type === type && p.period === period) || plans.find((p) => p.type === type);
-    const mkRental = ({ bike, cust, rider, start, end, period, status, returned, damage, condition, depositPaid = true }) => {
+    const mkRental = async ({ bike, cust, rider, start, end, period, status, returned, damage, condition, depositPaid = true }) => {
       const plan = planFor(bike.type, period);
       const year = start.slice(0, 4);
       const n = (db.get("SELECT COUNT(*) AS n FROM rentals WHERE contract_no LIKE ?", [`K-${year}-%`]).n || 0) + 1;
@@ -134,7 +135,7 @@ export function seed(api, hashPassword) {
         VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, [`K-${year}-${String(n).padStart(4, '0')}`, customers[cust], rider, bike.id, plan.id, start, end, plan.period, plan.price, plan.deposit,
         depositPaid ? 'alındı' : 'bekliyor', 'aktif', 500, 100, 'Kilit x1, şarj cihazı x1, yağmur brandası x1', users[1]]);
       if (depositPaid) db.run("INSERT INTO deposits(rental_id,customer_id,date,type,amount,notes) VALUES(?,?,?,'tahsil',?,'Teslimde alındı')", [id, customers[cust], start, plan.deposit]);
-      api.billRental(id, null, returned || T);
+      await api.billRental(id, null, returned || T);
       if (status === 'tamamlandı') {
         db.run("UPDATE rentals SET status='tamamlandı', returned_at=?, end_km=?, return_condition=?, damage_fee=?, deposit_status='iade edildi' WHERE id=?", [returned, 500 + Math.round(rnd() * 900), condition || 'Sorunsuz iade', damage || 0, id]);
         db.run("INSERT INTO deposits(rental_id,customer_id,date,type,amount,notes) VALUES(?,?,?,'iade',?,'İadede geri ödendi')", [id, customers[cust], returned, plan.deposit]);
@@ -149,7 +150,7 @@ export function seed(api, hashPassword) {
       const start = addDays(T, -330 + k * 15); const period = ci >= 5 && ci !== 7 ? 'hafta' : 'ay';
       const end = addDays(start, period === 'hafta' ? 27 : 89);
       const returned = k === 4 ? addDays(end, 3) : end;
-      mkRental({ bike, cust: ci, rider: pick(ridersOf(ci)), start, end, period, status: 'tamamlandı', returned, damage: k === 6 ? 180 : 0, condition: k === 6 ? 'Kargo kutusu kapağı kırık' : null });
+      await mkRental({ bike, cust: ci, rider: pick(ridersOf(ci)), start, end, period, status: 'tamamlandı', returned, damage: k === 6 ? 180 : 0, condition: k === 6 ? 'Kargo kutusu kapağı kırık' : null });
       if (k === 6) ins('INSERT INTO invoices(invoice_no,rental_id,customer_id,issue_date,due_date,description,net,vat_rate,vat,total,status) VALUES(?,?,?,?,?,?,?,19,?,?,?)',
         [`F-${returned.slice(0, 4)}-H${k}`, null, customers[ci], returned, addDays(returned, 14), 'Hasar bedeli: kargo kutusu kapağı', 180, 34.2, 214.2, 'açık']);
     }
@@ -164,7 +165,7 @@ export function seed(api, hashPassword) {
     const activeIds = [];
     for (const [ci, bIdx, s0, e0, period] of active) {
       const bike = bikes[bIdx]; const rs = ridersOf(ci);
-      const id = mkRental({ bike, cust: ci, rider: rs[activeIds.length % rs.length], start: addDays(T, s0), end: addDays(T, e0), period, status: 'aktif', depositPaid: !(ci === 7) });
+      const id = await mkRental({ bike, cust: ci, rider: rs[activeIds.length % rs.length], start: addDays(T, s0), end: addDays(T, e0), period, status: 'aktif', depositPaid: !(ci === 7) });
       activeIds.push(id);
       const sp = spots[(bIdx * 7) % spots.length];
       const lat = sp[1] + (rnd() - 0.5) * 0.01; const lng = sp[2] + (rnd() - 0.5) * 0.016;
@@ -239,7 +240,7 @@ export function seed(api, hashPassword) {
     const y = T.slice(0, 4);
     for (const [p, n] of [['K', 40], ['S', 40]]) db.run('INSERT OR REPLACE INTO settings(key,value) VALUES(?,?)', [`seq_${p}_${y}`, String(n)]);
     db.run("INSERT OR REPLACE INTO settings(key,value) VALUES('telemetry_key','demo-tracker-key')");
-    api.audit({ id: users[0] }, 'kurulum', 'system', null, 'Demo verileri yüklendi');
+    await api.audit({ id: users[0] }, 'kurulum', 'system', null, 'Demo verileri yüklendi');
   });
   return true;
 }

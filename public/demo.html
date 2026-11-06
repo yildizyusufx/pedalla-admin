@@ -36,24 +36,24 @@
       get(sql, p = []) { return db.all(sql, p)[0]; },
       run(sql, p = []) { sdb.run(sql, norm(p)); return { changes: sdb.getRowsModified(), lastId: sdb.exec('SELECT last_insert_rowid()')[0].values[0][0] }; },
       exec(sql) { sdb.exec(sql); },
-      tx(fn) {
-        if (depth++) { try { return fn(); } finally { depth--; } }
-        sdb.exec('BEGIN'); try { const r = fn(); sdb.exec('COMMIT'); return r; } catch (e) { sdb.exec('ROLLBACK'); throw e; } finally { depth--; }
+      async tx(fn) {
+        if (depth++) { try { return await fn(); } finally { depth--; } }
+        sdb.exec('BEGIN'); try { const r = await fn(); sdb.exec('COMMIT'); return r; } catch (e) { sdb.exec('ROLLBACK'); throw e; } finally { depth--; }
       },
     };
     // demo-only password check (the real server uses scrypt)
     const h = (s) => { let x = 2166136261; for (const c of s) { x ^= c.codePointAt(0); x = Math.imul(x, 16777619) >>> 0; } return 'demo:' + x.toString(16); };
-    const api = createApi(db, { hashPassword: h, verifyPassword: (pw, st) => h(pw) === st, randomToken: () => crypto.getRandomValues(new Uint32Array(4)).join('-') });
-    seed(api, h);
+    const api = await createApi(db, { hashPassword: h, verifyPassword: (pw, st) => h(pw) === st, randomToken: () => crypto.getRandomValues(new Uint32Array(4)).join('-') });
+    await seed(api, h);
     const persist = () => { try { const bytes = sdb.export(); let s = ''; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000)); localStorage.setItem(KEY, btoa(s)); } catch {} };
     setTransport(async (method, url, body, token) => {
       const u = new URL(url, location.href);
-      const out = api.handle({ method, path: u.pathname.slice(u.pathname.indexOf('/api/')), query: Object.fromEntries(u.searchParams), body: body || {}, token });
+      const out = await api.handle({ method, path: u.pathname.slice(u.pathname.indexOf('/api/')), query: Object.fromEntries(u.searchParams), body: body || {}, token });
       if (method !== 'GET') persist();
       return JSON.parse(JSON.stringify(out));
     });
     persist();
-    if (!session.token) { const r = api.handle({ method: 'POST', path: '/api/login', body: { email: 'admin@pedalla.bike', password: 'pedalla123' } }); if (r.status === 200) setToken(r.body.token); }
+    if (!session.token) { const r = await api.handle({ method: 'POST', path: '/api/login', body: { email: 'admin@pedalla.bike', password: 'pedalla123' } }); if (r.status === 200) setToken(r.body.token); }
     await boot();
     const bar = document.createElement('div'); bar.className = 'demo-bar';
     bar.innerHTML = 'Demo modu · veriler yalnızca bu tarayıcıda <button>Sıfırla</button>';
