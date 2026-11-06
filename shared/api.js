@@ -1,6 +1,6 @@
 // Pedalla Admin – API core. Runs on Node (node:sqlite) and in the browser demo (sql.js).
 // db adapter: { all(sql, p), get(sql, p), run(sql, p) -> {changes, lastId}, exec(sql), tx(fn) }
-import { RESOURCES, DEFAULT_ROLE_PERMS, DEFAULT_SETTINGS, PERMS, ROLES, REQUEST_TYPES, RIDER_REQUIRED_DOCS } from './meta.js';
+import { RESOURCES, DEFAULT_ROLE_PERMS, DEFAULT_SETTINGS, PERMS, ROLES, REQUEST_TYPES, RIDER_REQUIRED_DOCS, ID_TYPES } from './meta.js';
 import { SCHEMA, INTAKE_CHECKLIST, MIGRATIONS } from './schema.js';
 
 export class ApiError extends Error { constructor(status, msg) { super(msg); this.status = status; } }
@@ -594,6 +594,8 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
       add('warn', 'fleet', 'Sigorta bitiyor', `${b.code}: ${b.insurance_until}`, `#/bikes/${b.id}`);
     for (const s of await db.all("SELECT s.*, b.code FROM service_orders s JOIN bikes b ON b.id=s.bike_id WHERE s.status NOT IN ('teslim edildi','iptal') AND s.estimated_ready < ?", [t]))
       add('warn', 'service', 'Servis gecikti', `${s.order_no} · ${s.code} · tahmini ${s.estimated_ready}`, `#/service/${s.id}`);
+    for (const x of await db.all("SELECT id, name, created_at FROM riders WHERE self_registered=1 AND id_checked=0 AND active=1 ORDER BY id DESC LIMIT 30"))
+      add('info', 'customers', 'Yeni sürücü kaydı', `${x.name} · ${String(x.created_at || '').slice(0, 10)} · kimlik kontrolü bekliyor`, `#/riders/${x.id}`);
     for (const q of await db.all("SELECT q.*, rd.name AS rn, b.code FROM portal_requests q LEFT JOIN riders rd ON rd.id=q.rider_id LEFT JOIN bikes b ON b.id=q.bike_id WHERE q.status='yeni' ORDER BY q.id"))
       add('info', 'rentals', 'Yeni sürücü talebi', `${q.rn} · ${q.type}${q.code ? ' · ' + q.code : ''}${q.preferred_date ? ' · ' + q.preferred_date : ''}`, `#/portal_requests/${q.id}`);
     const rank = { danger: 0, warn: 1, info: 2 };
@@ -743,7 +745,7 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
     r.requests = await list('portal_requests', { rider_id: id, limit: 50 });
     r.invoices = await db.all(`SELECT * FROM (${baseSql('invoices')}) AS t WHERE rental_id IN (SELECT id FROM rentals WHERE rider_id=?) ORDER BY issue_date DESC, id DESC`, [id]);
     r.deposits = await db.all('SELECT d.*, x.contract_no FROM deposits d JOIN rentals x ON x.id=d.rental_id WHERE x.rider_id=? ORDER BY d.date DESC, d.id DESC', [id]);
-    if (user && !can(user, 'finance')) { r.invoices = []; r.deposits = []; for (const k of ['balance', 'open_balance', 'overdue', 'deposit_held', 'deposit_pending']) r[k] = null; }
+    if (user && !can(user, 'finance')) { r.invoices = []; r.deposits = []; for (const k of ['balance', 'open_balance', 'overdue', 'due_soon', 'pay_state', 'deposit_held', 'deposit_pending']) r[k] = null; }
     return r;
   }
   async function invoiceDetail(id) {
@@ -799,7 +801,7 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
     const payments = payer ? await db.all('SELECT p.date, p.amount, p.method, i.invoice_no FROM payments p LEFT JOIN invoices i ON i.id=p.invoice_id WHERE p.customer_id=? ORDER BY p.date DESC, p.id DESC LIMIT 30', [cust.id]) : [];
     const services = await db.all(`SELECT s.id, s.order_no, s.type, s.status, s.received_at, s.estimated_ready, s.delivered_at, s.complaint, b.code AS bike_code
       FROM service_orders s JOIN bikes b ON b.id=s.bike_id WHERE s.brought_by_rider_id=? OR s.rental_id IN (${inList(rentalIds)}) ORDER BY s.id DESC LIMIT 20`, [r.id]);
-    const requests = await db.all('SELECT q.id, q.type, q.status, q.preferred_date, q.preferred_time, q.notes, q.admin_note, q.created_at, q.handled_at, b.code AS bike_code FROM portal_requests q LEFT JOIN bikes b ON b.id=q.bike_id WHERE q.rider_id=? ORDER BY q.id DESC LIMIT 30', [r.id]);
+    const requests = await db.all('SELECT q.id, q.type, q.status, q.preferred_date, q.preferred_time, q.notes, q.admin_note, q.bike_type, q.period, q.duration, q.created_at, q.handled_at, b.code AS bike_code FROM portal_requests q LEFT JOIN bikes b ON b.id=q.bike_id WHERE q.rider_id=? ORDER BY q.id DESC LIMIT 30', [r.id]);
     const documents = await listDocuments('rider', r.id);
     for (const d of documents) delete d.uploaded_by_name;
     const have = new Set(documents.map((d) => d.doc_type));
@@ -833,10 +835,40 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
       summary: { open_balance: r2(open.reduce((a, i) => a + i.balance, 0)), overdue: r2(open.filter((i) => i.days_late > 0).reduce((a, i) => a + i.balance, 0)), next_due: open.slice().sort((a, b) => (a.due_date < b.due_date ? -1 : 1))[0] || null },
       company: { name: setting('company_name'), phone: setting('company_phone'), email: setting('company_email'), address: setting('company_address'), iban: setting('company_iban') },
       request_types: PORTAL_REQ,
+      bike_types: String(setting('bike_types') || '').split(/\r?\n|,/).map((x) => x.trim()).filter(Boolean),
+      plans: await db.all('SELECT bike_type, period, price, deposit FROM pricing_plans WHERE active=1 ORDER BY bike_type, price'),
+      vat_rate: vatRate, self_registered: !!r.self_registered,
     };
   }
   async function portalHandle(seg, method, body, token) {
     const [, b, c] = seg;
+    if (b === 'config' && method === 'GET') return ok({ signup: setting('portal_signup') !== '0', company: setting('company_name'), id_types: ID_TYPES });
+    if (b === 'signup' && method === 'POST') {
+      // self-registration from the rider screen: creates a rider + an individual customer; staff checks the ID before renting
+      if (setting('portal_signup') === '0') err(403, 'Kayıt şu an kapalı. Lütfen bizimle iletişime geçin.');
+      if (body.website) err(400, 'Geçersiz istek.'); // honeypot for bots
+      const s = (k, n = 120) => String(body[k] ?? '').trim().slice(0, n);
+      const email = s('email').toLowerCase();
+      if (s('name').length < 3 || !/\s/.test(s('name'))) err(400, 'Ad ve soyadınızı yazın.');
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) err(400, 'Geçerli bir e-posta yazın.');
+      if (String(body.password || '').length < 6) err(400, 'Şifre en az 6 karakter olmalı.');
+      if (s('phone').replace(/\D/g, '').length < 6) err(400, 'Telefon numaranızı yazın.');
+      if (!body.consent) err(400, 'Devam etmek için bilgilendirmeyi onaylayın.');
+      if (await db.get('SELECT 1 FROM riders WHERE lower(portal_email)=?', [email])) err(409, 'Bu e-posta ile zaten bir hesap var. Giriş yapın.');
+      const recent = (await db.get("SELECT COUNT(*) AS n FROM riders WHERE self_registered=1 AND created_at > datetime('now','-1 hour')"))?.n || 0;
+      if (recent > 30) err(429, 'Çok fazla kayıt denemesi. Lütfen daha sonra tekrar deneyin.');
+      const lang = ['tr', 'de', 'en'].includes(body.lang) ? body.lang : 'de';
+      const p = { name: s('name'), phone: s('phone', 40), email, address: s('address', 300) || null, id_no: s('id_no', 40) || null, doc_lang: lang === 'tr' ? 'de' : lang };
+      const sys = { id: null };
+      const cid = await directCustomer(p, sys);
+      const x = await db.run(`INSERT INTO riders(customer_id,name,phone,email,address,birth_date,nationality,id_type,id_no,active,trained,id_checked,portal_email,portal_password_hash,portal_active,lang,self_registered)
+        VALUES(?,?,?,?,?,?,?,?,?,1,0,0,?,?,1,?,1)`, [cid, p.name, p.phone, email, p.address, s('birth_date', 10) || null, s('nationality', 60) || null, ID_TYPES.includes(body.id_type) ? body.id_type : null, p.id_no, email, hashPassword(String(body.password)), lang]);
+      await audit({ id: null }, 'sürücü kaydı', 'riders', x.lastId, `${p.name} sürücü ekranından kayıt oldu`);
+      const tok = randomToken(); const exp = new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 19).replace('T', ' ');
+      await db.run('INSERT INTO rider_sessions(token,rider_id,expires) VALUES(?,?,?)', [tok, x.lastId, exp]);
+      await db.run('UPDATE riders SET portal_last_login=? WHERE id=?', [nowTs(), x.lastId]);
+      return ok({ token: tok });
+    }
     if (b === 'login' && method === 'POST') {
       const r = await db.get('SELECT * FROM riders WHERE lower(portal_email)=lower(?)', [String(body.email || '').trim()]);
       if (!r || !r.portal_active || !r.active || !r.portal_password_hash || !verifyPassword(body.password || '', r.portal_password_hash)) err(401, 'E-posta veya şifre hatalı.');
@@ -874,9 +906,15 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
       else if (body.type !== 'yeni kiralama') rental = await db.get("SELECT * FROM rentals WHERE rider_id=? AND status IN ('aktif','rezervasyon') ORDER BY status='aktif' DESC, id DESC LIMIT 1", [r.id]);
       if (body.type !== 'yeni kiralama' && !rental) err(400, 'Aktif kiralamanız yok.');
       if (body.preferred_date && body.preferred_date < today()) err(400, 'Geçmiş bir tarih seçilemez.');
-      if (['servis randevusu', 'iade randevusu', 'kiralama uzatma'].includes(body.type) && !body.preferred_date) err(400, 'Tarih seçin.');
-      const x = await db.run('INSERT INTO portal_requests(rider_id,customer_id,rental_id,bike_id,type,preferred_date,preferred_time,notes) VALUES(?,?,?,?,?,?,?,?)',
-        [r.id, rental?.customer_id || r.customer_id, rental?.id || null, rental?.bike_id || null, body.type, body.preferred_date || null, String(body.preferred_time || '').slice(0, 20) || null, String(body.notes || '').slice(0, 1000) || null]);
+      if (['servis randevusu', 'iade randevusu', 'kiralama uzatma', 'yeni kiralama'].includes(body.type) && !body.preferred_date) err(400, 'Tarih seçin.');
+      let rent = {};
+      if (body.type === 'yeni kiralama') {
+        const types = String(setting('bike_types') || '').split(/\r?\n|,/).map((x) => x.trim()).filter(Boolean);
+        rent = { bike_type: types.includes(body.bike_type) ? body.bike_type : null, period: ['gün', 'hafta', 'ay'].includes(body.period) ? body.period : 'ay', duration: Math.min(52, Math.max(1, Math.round(Number(body.duration) || 1))) };
+        if (await db.get("SELECT 1 FROM portal_requests WHERE rider_id=? AND type='yeni kiralama' AND status='yeni'", [r.id])) err(409, 'Bekleyen bir kiralama talebiniz zaten var.');
+      }
+      const x = await db.run('INSERT INTO portal_requests(rider_id,customer_id,rental_id,bike_id,type,preferred_date,preferred_time,notes,bike_type,period,duration) VALUES(?,?,?,?,?,?,?,?,?,?,?)',
+        [r.id, rental?.customer_id || r.customer_id, rental?.id || null, rental?.bike_id || null, body.type, body.preferred_date || null, String(body.preferred_time || '').slice(0, 20) || null, String(body.notes || '').slice(0, 1000) || null, rent.bike_type ?? null, rent.period ?? null, rent.duration ?? null]);
       await audit(portalUser(r), 'sürücü talebi', 'portal_requests', x.lastId, `${r.name}: ${body.type}`);
       return ok(await portalData(r));
     }
@@ -1079,7 +1117,7 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
       if (method === 'GET') {
         need(user, meta.perm);
         const out = b ? await getOne(a, Number(b)) : await list(a, query);
-        if (a === 'riders' && !can(user, 'finance')) for (const x of [out].flat()) for (const k of ['balance', 'open_balance', 'overdue', 'deposit_held', 'deposit_pending']) delete x[k];
+        if (a === 'riders' && !can(user, 'finance')) for (const x of [out].flat()) for (const k of ['balance', 'open_balance', 'overdue', 'due_soon', 'pay_state', 'deposit_held', 'deposit_pending']) delete x[k];
         return ok(out);
       }
       need(user, meta.perm, 'w');

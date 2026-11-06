@@ -4,6 +4,7 @@ import { DOC_TYPES } from './shared/meta.js';
 
 const L = {
   tr: {
+    no_account: 'Hesabınız yok mu?', signup: 'Kayıt ol', signup_h: 'Sürücü kaydı', signup_sub: 'Bilgilerinizi girin, hesabınızı oluşturun ve hemen kiralama talebi gönderin.', have_account: 'Zaten hesabınız var mı?', full_name: 'Ad soyad', birth: 'Doğum tarihi', nationality: 'Uyruk', address: 'Adres', id_type: 'Kimlik türü', id_no: 'Kimlik / pasaport no', pw_hint: 'En az 6 karakter', consent: 'Bilgilerimin kiralama ve sözleşme için Pedalla tarafından işlenmesini kabul ediyorum. Kimliğimin aslını teslimde göstereceğim.', create_acc: 'Hesabı oluştur', email_taken: 'Bu e-posta ile zaten bir hesap var. Giriş yapın.', welcome_new: 'Hesabınız oluşturuldu. Şimdi kiralama talebi gönderebilir ve kimlik belgelerinizi yükleyebilirsiniz.', rent_cta: 'Bisiklet kiralamak ister misiniz?', rent_btn: 'Kiralama talebi gönder', bike_type: 'Bisiklet tipi', any_type: 'Fark etmez', period: 'Kiralama süresi birimi', duration: 'Süre', p_day: 'Gün', p_week: 'Hafta', p_month: 'Ay', start: 'Başlangıç tarihi', price_from: 'Tarife', deposit_l: 'depozito', vat_note: '+ KDV', optional: '(isteğe bağlı)', signup_closed: 'Yeni kayıt şu an kapalı. Lütfen bizimle iletişime geçin.',
     loc_h: 'Konum paylaşımı', loc_text: 'Bisikletin güvenliği ve hızlı yardım için, bu ekran açıkken telefonunuzun konumu Pedalla ile paylaşılır. İstediğiniz zaman Profil\'den kapatabilirsiniz.', loc_allow: 'Konumu paylaş', loc_later: 'Şimdi değil', loc_on: 'Konum paylaşılıyor', loc_off: 'Konum paylaşılmıyor', loc_stop: 'Paylaşımı durdur', loc_denied: 'Konum izni verilmedi. Telefon ayarlarından tarayıcıya konum izni verin.', loc_last: 'son gönderim',
     title: 'Sürücü ekranı', login_h: 'Sürücü girişi', login_sub: 'Pedalla\'nın size verdiği e-posta ve şifre ile giriş yapın.', email: 'E-posta', password: 'Şifre', login: 'Giriş yap',
     logout: 'Çıkış yap', hello: 'Merhaba', home: 'Ana sayfa', requests: 'Talepler', payments: 'Ödemeler', docs: 'Belgeler', profile: 'Profil',
@@ -37,6 +38,7 @@ const L = {
     n_service_ready: '{bike} bisikletiniz servisten hazır ({no}). Teslim alabilirsiniz.',
   },
   de: {
+    no_account: 'Noch kein Konto?', signup: 'Registrieren', signup_h: 'Fahrer-Registrierung', signup_sub: 'Daten eingeben, Konto anlegen und direkt eine Mietanfrage senden.', have_account: 'Schon ein Konto?', full_name: 'Vor- und Nachname', birth: 'Geburtsdatum', nationality: 'Staatsangehörigkeit', address: 'Adresse', id_type: 'Ausweisart', id_no: 'Ausweis- / Passnummer', pw_hint: 'Mindestens 6 Zeichen', consent: 'Ich bin einverstanden, dass Pedalla meine Daten für Miete und Vertrag verarbeitet. Meinen Ausweis zeige ich bei der Übergabe im Original.', create_acc: 'Konto anlegen', email_taken: 'Mit dieser E-Mail gibt es bereits ein Konto. Bitte anmelden.', welcome_new: 'Ihr Konto wurde angelegt. Sie können jetzt eine Mietanfrage senden und Ihre Ausweisdokumente hochladen.', rent_cta: 'Möchten Sie ein Fahrrad mieten?', rent_btn: 'Mietanfrage senden', bike_type: 'Fahrradtyp', any_type: 'Egal', period: 'Mieteinheit', duration: 'Dauer', p_day: 'Tag', p_week: 'Woche', p_month: 'Monat', start: 'Startdatum', price_from: 'Tarif', deposit_l: 'Kaution', vat_note: '+ MwSt.', optional: '(optional)', signup_closed: 'Neue Registrierungen sind derzeit geschlossen. Bitte kontaktieren Sie uns.',
     loc_h: 'Standortfreigabe', loc_text: 'Zur Sicherheit des Fahrrads und für schnelle Hilfe wird der Standort Ihres Handys mit Pedalla geteilt, solange diese Seite geöffnet ist. Sie können es jederzeit im Profil ausschalten.', loc_allow: 'Standort teilen', loc_later: 'Nicht jetzt', loc_on: 'Standort wird geteilt', loc_off: 'Standort wird nicht geteilt', loc_stop: 'Freigabe beenden', loc_denied: 'Keine Standortberechtigung. Bitte in den Handy-Einstellungen dem Browser den Standort erlauben.', loc_last: 'zuletzt gesendet',
     title: 'Fahrerbereich', login_h: 'Fahrer-Login', login_sub: 'Melde dich mit der E-Mail und dem Passwort an, die du von Pedalla bekommen hast.', email: 'E-Mail', password: 'Passwort', login: 'Anmelden',
     logout: 'Abmelden', hello: 'Hallo', home: 'Start', requests: 'Anfragen', payments: 'Zahlungen', docs: 'Dokumente', profile: 'Profil',
@@ -70,6 +72,7 @@ const L = {
     n_service_ready: 'Dein Rad {bike} ist fertig ({no}) und kann abgeholt werden.',
   },
   en: {
+    no_account: 'No account yet?', signup: 'Sign up', signup_h: 'Rider sign-up', signup_sub: 'Enter your details, create your account and send a rental request right away.', have_account: 'Already have an account?', full_name: 'Full name', birth: 'Date of birth', nationality: 'Nationality', address: 'Address', id_type: 'ID type', id_no: 'ID / passport no.', pw_hint: 'At least 6 characters', consent: 'I agree that Pedalla processes my data for the rental and contract. I will show my original ID at handover.', create_acc: 'Create account', email_taken: 'An account with this e-mail already exists. Please log in.', welcome_new: 'Your account has been created. You can now send a rental request and upload your ID documents.', rent_cta: 'Would you like to rent a bike?', rent_btn: 'Send rental request', bike_type: 'Bike type', any_type: 'Any', period: 'Rental unit', duration: 'Duration', p_day: 'Day', p_week: 'Week', p_month: 'Month', start: 'Start date', price_from: 'Rate', deposit_l: 'deposit', vat_note: '+ VAT', optional: '(optional)', signup_closed: 'New sign-ups are closed right now. Please contact us.',
     loc_h: 'Location sharing', loc_text: 'For the bike\'s safety and quick help, your phone\'s location is shared with Pedalla while this screen is open. You can turn it off any time in Profile.', loc_allow: 'Share location', loc_later: 'Not now', loc_on: 'Location is being shared', loc_off: 'Location is not shared', loc_stop: 'Stop sharing', loc_denied: 'Location permission denied. Allow location for your browser in the phone settings.', loc_last: 'last sent',
     title: 'Rider area', login_h: 'Rider login', login_sub: 'Sign in with the e-mail and password you received from Pedalla.', email: 'E-mail', password: 'Password', login: 'Sign in',
     logout: 'Sign out', hello: 'Hi', home: 'Home', requests: 'Requests', payments: 'Payments', docs: 'Documents', profile: 'Profile',
@@ -162,14 +165,42 @@ function loginView() {
     <h1>${t('login_h')}</h1><p class="muted">${t('login_sub')}</p>
     <form id="lf"><label class="field"><span>${t('email')}</span><input name="email" type="email" autocomplete="username" required inputmode="email"></label>
     <label class="field"><span>${t('password')}</span><input name="password" type="password" autocomplete="current-password" required></label>
-    <button class="btn primary p-big">${t('login')}</button></form></div></div>`;
+    <button class="btn primary p-big">${t('login')}</button></form><p class="p-alt" id="su" hidden>${t('no_account')} <a href="#signup">${t('signup')}</a></p></div></div>`;
   bindLang(root());
+  api('GET', 'config').then((c) => { cfg = c; const el = root().querySelector('#su'); if (el && c.signup) el.hidden = false; }).catch(() => {});
   root().querySelector('#lf').onsubmit = guard(async (e) => {
     e.preventDefault(); const f = new FormData(e.target);
     const r = await api('POST', 'login', { email: f.get('email'), password: f.get('password') }); setToken(r.token); await load();
   });
 }
 
+let cfg = null;
+function signupView() {
+  const types = cfg?.id_types || [];
+  root().innerHTML = `<div class="p-login"><div class="p-login-card">${langSw()}<img class="p-logo" src="img/logo.png" alt="pedalla">
+    <h1>${t('signup_h')}</h1><p class="muted">${t('signup_sub')}</p>
+    ${cfg && !cfg.signup ? `<div class="p-card p-empty">${t('signup_closed')}</div>` : `<form id="sgf" autocomplete="on">
+    <label class="field"><span>${t('full_name')} *</span><input name="name" required minlength="3" autocomplete="name"></label>
+    <label class="field"><span>${t('email')} *</span><input name="email" type="email" required autocomplete="email" inputmode="email"></label>
+    <label class="field"><span>${t('phone')} *</span><input name="phone" type="tel" required autocomplete="tel"></label>
+    <label class="field"><span>${t('password')} *</span><input name="password" type="password" required minlength="6" autocomplete="new-password" placeholder="${esc(t('pw_hint'))}"></label>
+    <div class="p-row"><label class="field"><span>${t('birth')}</span><input name="birth_date" type="date" max="${todayISO()}" autocomplete="bday"></label>
+    <label class="field"><span>${t('nationality')}</span><input name="nationality" autocomplete="country-name"></label></div>
+    <label class="field"><span>${t('address')}</span><input name="address" autocomplete="street-address"></label>
+    <div class="p-row"><label class="field"><span>${t('id_type')}</span><select name="id_type"><option value="">—</option>${types.map((x) => `<option value="${esc(x)}">${esc(v(x))}</option>`).join('')}</select></label>
+    <label class="field"><span>${t('id_no')}</span><input name="id_no"></label></div>
+    <input name="website" class="p-hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+    <label class="p-check"><input type="checkbox" name="consent" required><span>${t('consent')}</span></label>
+    <button class="btn primary p-big">${t('create_acc')}</button></form>`}
+    <p class="p-alt">${t('have_account')} <a href="#login">${t('login')}</a></p></div></div>`;
+  bindLang(root());
+  root().querySelector('#sgf')?.addEventListener('submit', guard(async (e) => {
+    e.preventDefault(); const f = Object.fromEntries(new FormData(e.target)); f.consent = !!f.consent; f.lang = lang;
+    try { const r = await api('POST', 'signup', f); setToken(r.token); fresh = true; history.replaceState(null, '', '#home'); tab = 'home'; await load(); }
+    catch (x) { throw new Error(/zaten bir hesap/.test(x.message) ? t('email_taken') : x.message); }
+  }));
+}
+let fresh = false;
 function notice(n) {
   const p = { ...n, n: n.days, when: n.days != null ? when(n.days) : '', date: date(n.date), amount: n.amount != null ? money(n.amount) : '', type: v(n.type), bike: `<b>${esc(n.bike)}</b>`, no: `<b>${esc(n.no)}</b>` };
   if (n.code === 'docs_missing') p.docs = n.docs.map(v).join(', ');
@@ -189,8 +220,9 @@ function bikeCard(x) {
 function homeView() {
   const d = data; const act = d.rentals.filter((x) => ['aktif', 'rezervasyon'].includes(x.status));
   const nd = d.summary.next_due; const nc = d.rentals.find((x) => x.next_charge)?.next_charge;
-  return `${!store.get(LOC_KEY) && navigator.geolocation ? `<section class="p-card p-loc"><b>📍 ${t('loc_h')}</b><p class="muted">${t('loc_text')}</p><div class="p-row"><button class="btn primary" data-loc="on">${t('loc_allow')}</button><button class="btn ghost" data-loc="off">${t('loc_later')}</button></div></section>` : ''}<section><h2 class="p-h">${t('notices')}</h2>${d.notifications.length ? d.notifications.map(notice).join('') : `<div class="p-card p-empty">${ic('check')} ${t('no_notices')}</div>`}</section>
-  <section><h2 class="p-h">${t('my_bike')}</h2>${act.length ? act.map(bikeCard).join('') : `<div class="p-card p-empty">${t('no_rental')}</div>`}</section>
+  return `${locDenied && store.get(LOC_KEY) !== 'off' && navigator.geolocation ? `<section class="p-card p-loc"><b>📍 ${t('loc_h')}</b><p class="muted">${t('loc_denied')}</p><div class="p-row"><button class="btn primary" data-loc="on">${t('loc_allow')}</button><button class="btn ghost" data-loc="off">${t('loc_later')}</button></div></section>` : ''}<section><h2 class="p-h">${t('notices')}</h2>${d.notifications.length ? d.notifications.map(notice).join('') : `<div class="p-card p-empty">${ic('check')} ${t('no_notices')}</div>`}</section>
+  ${fresh || (d.self_registered && !d.rentals.length && !d.requests.length) ? `<div class="p-card p-welcome">${ic('check')} ${t('welcome_new')}</div>` : ''}
+  <section><h2 class="p-h">${t('my_bike')}</h2>${act.length ? act.map(bikeCard).join('') : `<div class="p-card p-empty">${t('no_rental')}${d.requests.some((q) => q.type === 'yeni kiralama' && q.status === 'yeni') ? '' : `<p><b>${t('rent_cta')}</b></p><button class="btn primary p-big" data-new="yeni kiralama">${ic('bike')} ${t('rent_btn')}</button>`}</div>`}</section>
   ${act.length ? `<section><h2 class="p-h">${t('quick')}</h2><div class="p-quick">
     <button data-new="servis randevusu">${ic('wrench')}<span>${t('q_service')}</span></button><button data-new="arıza bildirimi">${ic('alert')}<span>${t('q_fault')}</span></button>
     <button data-new="iade randevusu">${ic('back')}<span>${t('q_return')}</span></button><button data-new="kiralama uzatma">${ic('plus')}<span>${t('q_extend')}</span></button></div></section>` : ''}
@@ -204,10 +236,15 @@ function requestsView(pre) {
     <label class="field"><span>${t('req_type')}</span><select name="type">${types.map((x) => `<option value="${esc(x)}" ${x === pre ? 'selected' : ''}>${esc(cv(x))}</option>`).join('')}</select></label>
     <div class="p-row"><label class="field"><span>${t('date')}</span><input name="preferred_date" type="date" min="${min}" value="${addDays(min, 1)}"></label>
     <label class="field"><span>${t('time')}</span><select name="preferred_time"><option value="">${t('any_time')}</option>${['09:00–12:00', '12:00–15:00', '15:00–18:00'].map((x) => `<option>${x}</option>`).join('')}</select></label></div>
+    <div class="rent-only" ${pre === 'yeni kiralama' || (!pre && types[0] === 'yeni kiralama') ? '' : 'hidden'}>
+      <label class="field"><span>${t('bike_type')}</span><select name="bike_type"><option value="">${t('any_type')}</option>${(d.bike_types || []).map((x) => `<option value="${esc(x)}">${esc(v(x))}</option>`).join('')}</select></label>
+      <div class="p-row"><label class="field"><span>${t('period')}</span><select name="period"><option value="gün">${t('p_day')}</option><option value="hafta">${t('p_week')}</option><option value="ay" selected>${t('p_month')}</option></select></label>
+      <label class="field"><span>${t('duration')}</span><input name="duration" type="number" min="1" max="52" value="1"></label></div>
+      <div class="p-price muted" id="pprice"></div></div>
     <label class="field"><span>${t('note')}</span><textarea name="notes" rows="3" placeholder="${esc(t('note_ph'))}"></textarea></label>
     <button class="btn primary p-big">${t('send')}</button></form></section>
   <section><h2 class="p-h">${t('my_reqs')}</h2>${d.requests.length ? d.requests.map((q) => `<div class="p-card p-item"><div class="p-item-h"><b>${esc(cv(q.type))}</b>${badge(q.status)}</div>
-    <div class="muted">${q.bike_code ? esc(q.bike_code) + ' · ' : ''}${q.preferred_date ? date(q.preferred_date) : ''}${q.preferred_time ? ' · ' + esc(q.preferred_time) : ''}</div>
+    <div class="muted">${q.bike_code ? esc(q.bike_code) + ' · ' : ''}${q.preferred_date ? date(q.preferred_date) : ''}${q.preferred_time ? ' · ' + esc(q.preferred_time) : ''}${q.type === 'yeni kiralama' ? ` · ${esc(v(q.bike_type) || t('any_type'))} · ${q.duration || 1} × ${t({ 'gün': 'p_day', hafta: 'p_week', ay: 'p_month' }[q.period] || 'p_month')}` : ''}</div>
     ${q.notes ? `<p>${esc(q.notes)}</p>` : ''}${q.admin_note ? `<p class="p-reply"><b>${t('reply')}:</b> ${esc(q.admin_note)}</p>` : ''}
     ${q.status === 'yeni' ? `<button class="btn sm ghost" data-cancel="${q.id}">${t('cancel')}</button>` : ''}</div>`).join('') : `<div class="p-card p-empty">${t('no_reqs')}</div>`}</section>
   <section><h2 class="p-h">${t('services')}</h2>${d.services.length ? d.services.map((s) => `<div class="p-card p-item"><div class="p-item-h"><b>${esc(s.order_no)} · ${esc(s.bike_code)}</b>${badge(s.status)}</div>
@@ -273,6 +310,15 @@ function bind() {
     e.preventDefault(); const f = Object.fromEntries(new FormData(e.target)); if (f.type === 'arıza bildirimi' && !f.preferred_date) delete f.preferred_date;
     data = await api('POST', 'requests', f); toast(t('sent')); shell();
   }));
+  const rf = el.querySelector('#rf');
+  if (rf) {
+    const price = () => {
+      const pl = (data.plans || []).filter((x) => x.period === rf.period.value && (!rf.bike_type.value || x.bike_type === rf.bike_type.value)).sort((a, b) => a.price - b.price)[0];
+      el.querySelector('#pprice').innerHTML = pl ? `${t('price_from')}: <b>${money(pl.price)}</b> / ${t({ 'gün': 'p_day', hafta: 'p_week', ay: 'p_month' }[pl.period])} ${t('vat_note')} · ${t('deposit_l')} ${money(pl.deposit)}` : '';
+    };
+    const tog = () => { el.querySelector('.rent-only').hidden = rf.type.value !== 'yeni kiralama'; price(); };
+    rf.type.addEventListener('change', tog); rf.bike_type.addEventListener('change', price); rf.period.addEventListener('change', price); tog();
+  }
   el.querySelectorAll('[data-cancel]').forEach((b) => (b.onclick = guard(async () => { data = await api('POST', `requests/${b.dataset.cancel}/cancel`); toast(t('cancelled')); shell(); })));
   const fi = el.querySelector('#df input[type=file]');
   if (fi) fi.onchange = () => { el.querySelector('#fname').textContent = fi.files[0]?.name || t('take_photo'); };
@@ -292,7 +338,7 @@ function bind() {
   })));
   el.querySelector('#pf')?.addEventListener('submit', guard(async (e) => { e.preventDefault(); data = await api('PUT', 'me', { phone: e.target.phone.value }); toast(t('saved')); shell(); }));
   el.querySelector('#pw')?.addEventListener('submit', guard(async (e) => { e.preventDefault(); data = await api('PUT', 'me', Object.fromEntries(new FormData(e.target))); toast(t('saved')); shell(); }));
-  el.querySelectorAll('[data-loc]').forEach((b) => (b.onclick = () => { store.set(LOC_KEY, b.dataset.loc); if (b.dataset.loc === 'on') startLoc(true); else stopLoc(); shell(); }));
+  el.querySelectorAll('[data-loc]').forEach((b) => (b.onclick = () => { store.set(LOC_KEY, b.dataset.loc); if (b.dataset.loc === 'on') { locDenied = false; startLoc(true); } else stopLoc(); shell(); }));
   el.querySelector('#lo')?.addEventListener('click', guard(async () => { await api('POST', 'logout').catch(() => {}); stopLoc(); setToken(null); render(); }));
 }
 // photos are resized in the browser so uploads stay small on mobile data
@@ -312,28 +358,32 @@ async function fileToData(file) {
 
 // ---- location sharing (only while this screen is open; the browser asks the rider for permission) ----
 const LOC_KEY = 'pedalla_rider_loc';
-const locOn = () => store.get(LOC_KEY) === 'on';
-let locWatch = null; let locLast = 0; let locSent = '';
-function startLoc(ask) {
-  if (!navigator.geolocation || locWatch != null || !token) return;
-  locWatch = navigator.geolocation.watchPosition(async (p) => {
-    if (Date.now() - locLast < 60000) return; // at most once a minute
-    locLast = Date.now();
-    try { await api('POST', 'location', { lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy }); locSent = new Date().toTimeString().slice(0, 5); } catch {}
-  }, (e) => { if (e.code === 1) { store.set(LOC_KEY, 'off'); stopLoc(); if (ask) toast(t('loc_denied'), 'err'); if (data) shell(); } }, { enableHighAccuracy: true, maximumAge: 30000, timeout: 30000 });
+// asked automatically after login (the browser shows its own permission popup); then sent again every 5 minutes while open
+const locOn = () => store.get(LOC_KEY) !== 'off' && !locDenied;
+let locTimer = null; let locSent = ''; let locDenied = false;
+function sendLoc(ask) {
+  navigator.geolocation.getCurrentPosition(async (p) => {
+    locDenied = false;
+    try { await api('POST', 'location', { lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy }); locSent = new Date().toTimeString().slice(0, 5); if (data && tab === 'me') shell(); } catch {}
+  }, (e) => { if (e.code === 1) { locDenied = true; stopLoc(); if (ask) toast(t('loc_denied'), 'err'); if (data) shell(); } }, { enableHighAccuracy: true, maximumAge: 60000, timeout: 30000 });
 }
-function stopLoc() { if (locWatch != null) navigator.geolocation.clearWatch(locWatch); locWatch = null; }
+function startLoc(ask) {
+  if (!navigator.geolocation || !token) return;
+  sendLoc(ask);
+  if (locTimer == null) locTimer = setInterval(() => { if (document.visibilityState === 'visible') sendLoc(false); }, 5 * 60000);
+}
+function stopLoc() { clearInterval(locTimer); locTimer = null; }
 async function load() {
   root().innerHTML = '<div class="loading"><div class="spin"></div></div>';
   data = await api('GET', 'me');
-  if (locOn()) startLoc(false);
+  if (store.get(LOC_KEY) !== 'off') startLoc(false);
   if (!store.get('pedalla_rider_lang') && data.rider.lang && L[data.rider.lang]) { lang = data.rider.lang; document.documentElement.lang = lang; }
   if (data.rider.lang && data.rider.lang !== lang && store.get('pedalla_rider_lang')) api('PUT', 'me', { lang }).catch(() => {});
   render();
 }
-function render() { document.title = `Pedalla · ${t('title')}`; if (!token) return loginView(); if (!data) return load().catch((e) => { if (e.message !== 'login') { toast(e.message, 'err'); } }); shell(); }
+function render() { document.title = `Pedalla · ${t('title')}`; if (!token) return location.hash === '#signup' ? (cfg ? signupView() : api('GET', 'config').then((c) => { cfg = c; signupView(); }).catch(() => signupView())) : loginView(); if (!data) return load().catch((e) => { if (e.message !== 'login') { toast(e.message, 'err'); } }); shell(); }
 export function boot() {
   document.documentElement.lang = lang;
-  window.addEventListener('hashchange', () => { tab = location.hash.slice(1) || 'home'; if (data) { shell(); window.scrollTo(0, 0); } });
+  window.addEventListener('hashchange', () => { tab = location.hash.slice(1) || 'home'; if (!token) return render(); if (data) { shell(); window.scrollTo(0, 0); } });
   render();
 }

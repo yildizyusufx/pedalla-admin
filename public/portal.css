@@ -69,3 +69,9 @@ section:first-of-type .p-h { margin-top: 6px; }
 .p-top .p-lang button { padding: 5px 8px; font-size: 12px; }
 @media (max-width: 440px) { .p-top-tag { display: none; } .p-top-logo { height: 22px; } }
 .p-loc { margin-bottom: 16px; border: 1px solid color-mix(in srgb, var(--brand, #EB4056) 30%, transparent); } .p-loc p { margin: 6px 0 12px; }
+.p-alt { text-align: center; margin-top: 16px; font-size: 14px; } .p-alt a { font-weight: 700; }
+.p-hp { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
+.p-check { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; line-height: 1.4; margin: 10px 0 14px; } .p-check input { width: 20px; height: 20px; flex: 0 0 20px; margin-top: 1px; }
+.p-welcome { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 14px; border-left: 4px solid #1f9d55; }
+.p-price { margin: -4px 0 10px; font-size: 14px; }
+.p-empty .btn { margin-top: 10px; }

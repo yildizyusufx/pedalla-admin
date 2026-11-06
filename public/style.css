@@ -347,3 +347,8 @@ tr.off td { opacity: .45; }
 .rchip-row { margin: 8px 0 4px; } #rchip { display: inline-flex; } #rchip[hidden] { display: none; } #rchip b { margin-left: 4px; }
 .bal-big { font-size: 28px; font-weight: 800; } .bal p { margin: 4px 0 10px; }
 .sub-h { font-size: 13px; margin: 16px 0 6px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.pstate { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 8px; font-size: 12px; font-weight: 700; white-space: nowrap; border: 1px solid transparent; }
+.ps-late { background: #fde8ea; color: #b4232f; border-color: #f5b5bc; }
+.ps-soon { background: #fff1e0; color: #b45a00; border-color: #f8cf9d; }
+.ps-ok { background: #e3f6ea; color: #1b7a43; border-color: #a9dfbf; }
+@media (prefers-color-scheme: dark) { .ps-late { background: #4a1b20; color: #ffb3bb; } .ps-soon { background: #4a3214; color: #ffd29a; } .ps-ok { background: #173d27; color: #9fe0b8; } }

@@ -343,11 +343,29 @@ export const UI = {
   "Toplam (net)": ["Summe (netto)", "Total (net)"],
   "Kaldır (stoğa geri al)": ["Entfernen (zurück ins Lager)", "Remove (back to stock)"],
   "parça kullanımı": ["Teileverbrauch", "parts used"],
+  // ---- rider sign-up, payment status
+  "Sürücüler sürücü ekranından kendi hesabını oluşturabilsin": ["Fahrer dürfen im Fahrerbereich selbst ein Konto anlegen", "Riders can create their own account on the rider screen"],
+  "Kapalı": ["Aus", "Off"],
+  "İstenen kiralama": ["Gewünschte Miete", "Requested rental"],
+  "tip fark etmez": ["Typ egal", "any type"],
+  "Kiralama oluştur": ["Mietvertrag anlegen", "Create rental"],
+  "sürücü ekranından kayıt oldu": ["im Fahrerbereich registriert", "signed up on rider screen"],
+  "Yeni sürücü kaydı": ["Neue Fahrer-Registrierung", "New rider sign-up"],
+  "İstenen bisiklet tipi": ["Gewünschter Fahrradtyp", "Requested bike type"],
+  "Ödeme durumu": ["Zahlungsstatus", "Payment status"],
+  "Gecikmiş": ["Überfällig", "Overdue"],
+  "Yaklaşan ödeme": ["Zahlung fällig bald", "Payment due soon"],
+  "Düzenli ödüyor": ["Zahlt pünktlich", "Pays on time"],
+  "gecikmiş": ["überfällig", "overdue"],
+  "yaklaşan": ["bald fällig", "due soon"],
+  "düzenli": ["pünktlich", "on time"],
 };
 
 // Texts with a variable part (names, numbers) – tried after the exact lookups.
 // Each entry: [regex, (match, translate) => [german, english] | null]
 export const PATTERNS = [
+  [/^(Gecikmiş|Yaklaşan ödeme) · (.+)$/, (m) => [`${m[1] === 'Gecikmiş' ? 'Überfällig' : 'Bald fällig'} · ${m[2]}`, `${m[1] === 'Gecikmiş' ? 'Overdue' : 'Due soon'} · ${m[2]}`]],
+  [/^(.+) · (\d{4}-\d{2}-\d{2}) · kimlik kontrolü bekliyor$/, (m) => [`${m[1]} · ${m[2]} · Ausweisprüfung offen`, `${m[1]} · ${m[2]} · ID check pending`]],
   [/^İşçilik \((.+) sa × (.+)\)$/, (m) => [`Arbeit (${m[1]} Std. × ${m[2]})`, `Labour (${m[1]} h × ${m[2]})`]],
   [/^Bu kayda bağlı (.+) olduğu için silinemiyor\.$/, (m, tr) => [`Kann nicht gelöscht werden: verknüpfte ${tr(m[1][0].toUpperCase() + m[1].slice(1))} vorhanden.`, `Cannot be deleted: linked ${tr(m[1][0].toUpperCase() + m[1].slice(1)).toLowerCase()} exist.`]],
   [/^%(-?\d+) amorti etti$/, (m) => [`${m[1]} % amortisiert`, `${m[1]}% paid back`]],
