@@ -6,9 +6,17 @@ import { seedRemote } from '../shared/dump.js';
 import { crypto } from '../shared/node-crypto.js';
 
 let ready;
+// Accept common spellings (TURSO_DATABASE_URL, TURSO_URL, LIBSQL_URL, ... and stray spaces/case in the name).
+function envFind(re) {
+  for (const [k, v] of Object.entries(process.env)) if (re.test(k.trim()) && v && v.trim()) return v.trim();
+  return '';
+}
+const withScheme = (u) => (u && !/^[a-z]+:/i.test(u) ? `libsql://${u.replace(/^\/+/, '')}` : u);
+const dbUrl = () => withScheme(envFind(/^(TURSO|LIBSQL)_?(DATABASE|DB)?_?URL$/i) || envFind(/^DATABASE_URL$/i).replace(/^(?!libsql:|https?:|wss?:|file:).*$/, ''));
+const dbToken = () => envFind(/^(TURSO|LIBSQL)_?(AUTH)?_?TOKEN$/i);
 async function getApi() {
-  if (!process.env.TURSO_DATABASE_URL) throw new Error('TURSO_DATABASE_URL ortam değişkeni tanımlı değil.');
-  const db = libsqlDb(process.env.TURSO_DATABASE_URL, process.env.TURSO_AUTH_TOKEN);
+  if (!dbUrl()) throw new Error('TURSO_DATABASE_URL ortam değişkeni tanımlı değil.');
+  const db = libsqlDb(dbUrl(), dbToken());
   const api = await createApi(db, crypto);
   if ((await db.get('SELECT COUNT(*) AS n FROM users')).n === 0) {
     if (process.env.NO_SEED === '1') {
@@ -32,7 +40,7 @@ export default async function handler(req, res) {
   if (/[?&]__path=_mode\b|\/api\/_mode\b/.test(req.url)) {
     res.setHeader('content-type', 'application/json; charset=utf-8');
     res.setHeader('cache-control', 'no-store');
-    return res.end(JSON.stringify({ db: !!process.env.TURSO_DATABASE_URL, token: !!process.env.TURSO_AUTH_TOKEN }));
+    return res.end(JSON.stringify({ db: !!dbUrl(), token: !!dbToken(), env: Object.keys(process.env).filter((k) => /turso|libsql|database/i.test(k)) }));
   }
   try {
     ready ||= getApi().catch((e) => { ready = null; throw e; });
