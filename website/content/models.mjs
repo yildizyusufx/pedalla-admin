@@ -9,6 +9,7 @@ export const MODELS = [
   {
     id: 'fat', match: /^e-?bike|fat|city/i, adminType: 'E-Bike', image: 'img/ebike-fat.webp', fallbackPrice: 129, fallbackDeposit: 300,
     name: 'Pedalla Fat',
+    sub: { de: 'Fatbike-Pedelec', en: 'Fat-tyre pedelec', tr: 'Fat-tyre e-bisiklet' },
     tag: { de: 'Bestseller', en: 'Bestseller', tr: 'En çok tercih edilen' },
     desc: {
       de: 'Kompaktes Fatbike-Pedelec mit Frontkorb und Gepäckträger. Stabil auf Kopfsteinpflaster, wendig im Stadtverkehr.',
@@ -24,6 +25,7 @@ export const MODELS = [
   {
     id: 'cargo-e', match: /e-?(kargo|cargo)/i, adminType: 'E-Kargo bisikleti', image: 'img/cargo.svg', fallbackPrice: 349, fallbackDeposit: 750,
     name: 'Pedalla Cargo E',
+    sub: { de: 'E-Lastenrad', en: 'Electric cargo bike', tr: 'Elektrikli kargo bisikleti' },
     tag: { de: 'Für Lieferdienste', en: 'For delivery', tr: 'Kuryeler için' },
     desc: {
       de: 'Elektrisches Lastenrad mit großer Transportbox. Gebaut für den täglichen Lieferalltag – Schicht für Schicht.',
@@ -39,6 +41,7 @@ export const MODELS = [
   {
     id: 'cargo', match: /lasten|kargo|cargo/i, adminType: 'Kargo bisikleti (Lastenrad)', image: 'img/cargo.svg', fallbackPrice: 289, fallbackDeposit: 500,
     name: 'Pedalla Lastenrad',
+    sub: { de: 'Lastenrad', en: 'Cargo bike', tr: 'Kargo bisikleti' },
     tag: { de: 'Viel Platz', en: 'Lots of space', tr: 'Geniş hacim' },
     desc: {
       de: 'Robustes Lastenrad für Einkäufe, Werkzeug oder Pakete. Viel Stauraum zum fairen Monatspreis.',
@@ -54,6 +57,7 @@ export const MODELS = [
 ];
 // used for bike types that have no entry above
 export const GENERIC = {
+  sub: { de: 'E-Bike', en: 'E-bike', tr: 'E-bisiklet' },
   image: 'img/ebike.svg',
   desc: {
     de: 'Zuverlässiges Rad aus unserer Hamburger Flotte – gewartet, versichert und startklar.',

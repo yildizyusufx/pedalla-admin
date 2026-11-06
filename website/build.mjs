@@ -70,8 +70,8 @@ function page(lang) {
   const runtime = {
     lang, api: SITE.api, portal: SITE.portal, whatsapp: SITE.whatsapp, priceMode: SITE.priceMode, vat: SITE.vat, durations: SITE.durations,
     stations: SITE.stations, area: SITE.area, privacy: `${pre}datenschutz`, pre,
-    models: MODELS.map((m) => ({ id: m.id, match: m.match.source, flags: m.match.flags, adminType: m.adminType, name: m.name, image: m.image, price: m.fallbackPrice, deposit: m.fallbackDeposit, tag: m.tag?.[lang] || '', desc: m.desc[lang], specs: m.specs[lang] })),
-    generic: { image: GENERIC.image, desc: GENERIC.desc[lang] },
+    models: MODELS.map((m) => ({ sub: m.sub[lang], id: m.id, match: m.match.source, flags: m.match.flags, adminType: m.adminType, name: m.name, image: m.image, price: m.fallbackPrice, deposit: m.fallbackDeposit, tag: m.tag?.[lang] || '', desc: m.desc[lang], specs: m.specs[lang] })),
+    generic: { sub: GENERIC.sub[lang], image: GENERIC.image, desc: GENERIC.desc[lang] },
     t,
   };
   const steps = [['bike', 'how1'], ['user', 'how2'], ['key', 'how3'], ['bolt', 'how4']];
@@ -101,41 +101,43 @@ function page(lang) {
 <a class="skip" href="#main">Skip</a>
 <header class="top" id="top">
   <div class="wrap top-in">
+    <div class="top-l">
+      <button class="round dark" id="burger" aria-label="${t.menu}" aria-expanded="false" aria-controls="nav">${ic('menu')}</button>
+      <nav class="nav" id="nav">
+        <a href="#modelle">${t.nav_models}</a><a href="#so-gehts">${t.nav_how}</a><a href="#karte">${t.nav_map}</a><a href="#business">${t.nav_business}</a><a class="nav-x" href="#faq">${t.nav_faq}</a>
+        <a class="nav-x" href="${SITE.portal}?lang=${lang}">${t.nav_login}</a>
+        <div class="nav-x nav-lang">${Object.keys(LANGS).map((l) => `<a href="${l === lang ? '#' : (lang === 'de' ? '' : '../') + (l === 'de' ? '' : l + '/')}" class="${l === lang ? 'on' : ''}" hreflang="${l}">${LANGS[l]}</a>`).join('')}</div>
+      </nav>
+    </div>
     <a class="logo" href="${base(lang)}" aria-label="Pedalla"><img src="${pre}img/logo.png" alt="Pedalla" width="160" height="29"></a>
-    <nav class="nav" id="nav">
-      <a href="#modelle">${t.nav_models}</a><a href="#so-gehts">${t.nav_how}</a><a href="#karte">${t.nav_map}</a><a href="#business">${t.nav_business}</a><a href="#faq">${t.nav_faq}</a>
-      <a class="nav-login" href="${SITE.portal}?lang=${lang}">${t.nav_login}</a>
-    </nav>
     <div class="top-r">
       <div class="lang" role="navigation" aria-label="Language">${Object.keys(LANGS).map((l) => `<a href="${l === lang ? '#' : (lang === 'de' ? '' : '../') + (l === 'de' ? '' : l + '/')}" class="${l === lang ? 'on' : ''}" hreflang="${l}" lang="${l}" title="${LANGS[l]}">${l.toUpperCase()}</a>`).join('')}</div>
-      <a class="btn sm ghost hide-m" href="${SITE.portal}?lang=${lang}">${t.nav_login}</a>
-      <button class="btn sm red" data-rent="">${t.cta_rent}</button>
-      <button class="burger" id="burger" aria-label="${t.menu}" aria-expanded="false">${ic('menu')}</button>
+      <div class="contact hide-m"><a class="pillbtn" href="https://wa.me/${SITE.whatsapp}" target="_blank" rel="noopener">${t.foot_contact}</a><a class="round light" href="tel:${SITE.phone.replace(/\s/g, '')}" aria-label="${SITE.phone}">${ic('phone')}</a></div>
+      <button class="rentbtn" data-rent=""><span>${t.cta_rent}</span><i>${ic('bike')}</i></button>
     </div>
   </div>
 </header>
 
 <main id="main">
 <section class="hero wrap">
-  <div class="hero-box">
-    <div class="hero-motif" aria-hidden="true"><i></i><i></i></div>
-    <div class="hero-copy">
-      <span class="eyebrow"><span class="dot"></span>${t.hero_eyebrow}</span>
-      <h1>${t.hero_h1a}<br><span class="red">${t.hero_h1b}</span> ${t.hero_h1c}</h1>
-      <p class="lead">${t.hero_sub}</p>
-      <div class="hero-cta">
-        <button class="btn red lg" data-rent="">${t.cta_rent} ${ic('arrow')}</button>
-        <a class="btn ghost lg" href="#modelle">${t.hero_cta2}</a>
-      </div>
-      <ul class="chips">
-        <li>${ic('wrench')}${t.chip_service}</li><li>${ic('shield')}${t.chip_ins}</li><li>${ic('check')}${t.chip_fees}</li>
-      </ul>
+  <div class="hero-box" id="hero">
+    <div class="stage" aria-hidden="true"><i class="st-main"></i><i class="st-tab"></i><i class="st-join"></i><i class="st-notch"></i><i class="st-c1"></i><i class="st-c2"></i></div>
+    <h1 class="hero-h"><span>${t.hero_h1a}</span><span class="badges" aria-hidden="true"><i class="bd-img"><img src="${pre}img/mark.png" alt=""></i><i class="bd-bolt">${ic('bolt')}</i></span><br><span class="red">${t.hero_h1b}</span> ${t.hero_h1c}</h1>
+    <div class="hero-live" id="heroFree">
+      <div class="stack">${MODELS.slice(0, 2).map((m) => `<i><img src="${pre}${m.image}" alt=""></i>`).join('')}<i class="plus">+</i></div>
+      <p><b class="lv1">${t.chip_service} · ${t.chip_ins}</b><span class="lv2">${t.chip_fees}</span></p>
     </div>
-    <div class="hero-visual">
-      <div class="hero-disc" aria-hidden="true"></div>
-      <img class="hero-bike" src="${pre}${fat.image}" alt="Pedalla Fat E-Bike" width="1069" height="1100" fetchpriority="high">
-      <div class="float f1" id="heroFree" hidden><b class="n">–</b><span>${t.hero_free}<small>${t.hero_free_sub}</small></span></div>
-      <button class="float f2" data-rent="${fat.id}"><span class="f2-img"><img src="${pre}${fat.image}" alt=""></span><span><b>${fat.name}</b><small>${t.hero_card_sub}</small><em>${t.hero_from} <b data-from="${fat.id}">€${price(fat.fallbackPrice)}</b>${t.per_month}</em></span><span class="f2-go">${ic('arrow')}</span></button>
+    <img class="hero-bike" id="heroBike" src="${pre}${fat.image}" alt="${esc(fat.name)}" width="1069" height="1100" fetchpriority="high">
+    <div class="spot" id="spot">
+      <h2 class="spot-name">${esc(fat.name)}</h2>
+      <span class="spot-sub">${esc(fat.sub[lang])}</span>
+      <p class="spot-desc">${esc(fat.desc[lang])}</p>
+      <p class="spot-price">${t.starting_from} <b data-from="${fat.id}">€${price(fat.fallbackPrice)}</b>${t.per_month} · <a href="#" data-details="${fat.id}">${t.more_details}</a></p>
+    </div>
+    <button class="btn red lg hero-cta-m" data-rent="">${t.cta_rent} ${ic('arrow')}</button>
+    <button class="hero-go" data-rent="${fat.id}" aria-label="${t.cta_rent}">${ic('arrow')}</button>
+    <div class="hero-models" id="heroModels" role="tablist" aria-label="${t.nav_models}">
+      ${MODELS.slice(0, 2).map((m, i) => `<button class="hm ${i === 0 ? 'on' : ''}" data-hero="${m.id}" role="tab" aria-selected="${i === 0}"><span class="hm-img"><img src="${pre}${m.image}" alt=""></span><span><b>${esc(m.name)}</b><small>€${price(m.fallbackPrice)}${t.per_month}</small></span></button>`).join('')}
     </div>
   </div>
 </section>

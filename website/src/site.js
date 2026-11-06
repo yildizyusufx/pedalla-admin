@@ -21,7 +21,7 @@
       let m = marketing(x.name); if (m && used.has(m.id)) m = null; if (m) used.add(m.id);
       return {
         id: m?.id || 'type-' + x.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'), type: x.name, name: m?.name || x.name, tag: m?.tag || '',
-        desc: m?.desc || P.generic.desc, specs: m?.specs || [], image: x.image || m?.image || P.generic.image,
+        sub: m?.sub || P.generic.sub, desc: m?.desc || P.generic.desc, specs: m?.specs || [], image: x.image || m?.image || P.generic.image,
         price: x.price, deposit: x.deposit, period: x.period || 'ay', available: x.available,
       };
     }).sort((a, b) => (b.available > 0) - (a.available > 0) || a.price - b.price);
@@ -39,6 +39,34 @@
     $('#bikes').innerHTML = models.map(cardHtml).join('');
     const hero = models.find((m) => m.id === 'fat') || models[0];
     $$('[data-from]').forEach((el) => { const m = byId(el.dataset.from) || hero; if (m) el.textContent = money(m.price); });
+    renderHeroModels();
+  }
+
+  // ---------- hero: model switcher ----------
+  let heroId = 'fat';
+  function renderHeroModels() {
+    const box = $('#heroModels'); if (!box) return;
+    if (!byId(heroId)) heroId = (models.find((m) => m.id === 'fat') || models[0])?.id;
+    box.innerHTML = models.slice(0, 3).map((m) => `<button class="hm ${m.id === heroId ? 'on' : ''}" data-hero="${esc(m.id)}" role="tab" aria-selected="${m.id === heroId}"><span class="hm-img"><img src="${esc(img(m.image))}" alt=""></span><span><b>${esc(m.name)}</b><small>${money(m.price)}${per(m.period)}</small></span></button>`).join('');
+    const st = $('#heroFree .stack'); if (st) st.innerHTML = models.slice(0, 3).map((m) => `<i><img src="${esc(img(m.image))}" alt=""></i>`).join('') + '<i class="plus">+</i>';
+    showHero(heroId, true);
+  }
+  function showHero(id, instant) {
+    const m = byId(id); if (!m) return; heroId = id;
+    $$('#heroModels .hm').forEach((b) => { const on = b.dataset.hero === id; b.classList.toggle('on', on); b.setAttribute('aria-selected', on); });
+    const bike = $('#heroBike'); const spot = $('#spot');
+    const apply = () => {
+      if (bike.getAttribute('src') !== img(m.image)) bike.src = img(m.image);
+      bike.alt = m.name;
+      $('.spot-name', spot).textContent = m.name;
+      $('.spot-sub', spot).textContent = m.sub || P.generic.sub;
+      $('.spot-desc', spot).textContent = m.desc;
+      const pr = $('.spot-price', spot); const pb = $('b', pr); pb.textContent = money(m.price); pb.dataset.from = m.id; $('a', pr).dataset.details = m.id;
+      $('.hero-go').dataset.rent = m.id;
+      bike.classList.remove('swap');
+    };
+    if (instant) return apply();
+    bike.classList.add('swap'); setTimeout(apply, 220);
   }
 
   async function api(path, opt = {}) {
@@ -90,7 +118,7 @@
       if (live.length) { models = live; renderCards(); $('#liveNote').hidden = false; }
       const free = (catalog.fleet || []).length; const freeAll = catalog.types.reduce((s, x) => s + (x.available || 0), 0);
       $('#freeCount').textContent = freeAll;
-      if (freeAll > 0) { const f = $('#heroFree'); f.hidden = false; $('.n', f).textContent = freeAll; }
+      if (freeAll > 0) { const f = $('#heroFree'); $('.lv1', f).innerHTML = `<span class="g">${freeAll}</span> ${esc(T.hero_free)}`; $('.lv2', f).textContent = T.hero_free_sub; }
       drawFleet();
     } catch (e) {
       $('#mapOff').hidden = false; $('#freeCount').textContent = '–';
@@ -224,7 +252,9 @@
   document.addEventListener('click', (e) => {
     const r = e.target.closest('[data-rent]'); if (r) { e.preventDefault(); return rent(r.dataset.rent); }
     const d = e.target.closest('[data-details]'); if (d) { const m = byId(d.dataset.details); if (m) details(m); return; }
+    const h = e.target.closest('[data-hero]'); if (h) return showHero(h.dataset.hero);
     const a = e.target.closest('.nav a'); if (a) toggleNav(false);
+    if (nav.classList.contains('open') && !e.target.closest('#nav, #burger')) toggleNav(false);
   });
 
   // header: shadow on scroll + mobile menu
