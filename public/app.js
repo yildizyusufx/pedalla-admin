@@ -820,7 +820,13 @@ async function settingsPage() {
   setMain(`${head('Ayarlar', 'Şirket bilgileri, finans kuralları ve belge metinleri.')}<form id="stf">${SETTINGS_FORM.map(([g, fs]) => card(g, `<div class="grid-form">${fs.map(([k, l, t, o]) => inputHtml({ k, l, t: t || 'text', step: 'any', o }, s[k], { disabled: !w })).join('')}</div>${g.startsWith('WhatsApp') ? '<p class="muted">Kullanılabilecek alanlar: {name} {invoice_no} {amount} {due_date} {iban} {company}. Müşterinin belge diline göre Almanca veya İngilizce mesaj seçilir.</p>' : ''}`)).join('')}
   ${card('GPS takip cihazı entegrasyonu', `<p>Takip cihazları konumlarını şu adrese <code>POST</code> eder. Cihaz ID'si bisiklet kartındaki "GPS takip cihazı ID" alanıyla eşleşir.</p><pre class="code">POST ${location.origin}/api/telemetry
 {"key":"${esc(s.telemetry_key || '…')}","tracker_id":"TRK-4101","lat":53.5503,"lng":9.9353,"battery":76,"speed":14}</pre>`)}
-  ${w ? '<div class="form-actions"><button class="btn primary">Ayarları kaydet</button></div>' : ''}</form>`);
+  ${w ? '<div class="form-actions"><button class="btn primary">Ayarları kaydet</button></div>' : ''}</form>
+  ${w ? card('Veri temizliği', `<p>Müşteriler, sürücüler, bisikletler, tarifeler, kiralamalar, faturalar, ödemeler, depozitolar, kasa, servis, parça/stok, evraklar, konum geçmişi ve işlem geçmişi kalıcı olarak silinir. Ayarlar, rol yetkileri ve sizin hesabınız kalır. Fatura/sözleşme numaraları baştan başlar.</p><label class="inline"><input type="checkbox" id="wipeKeepUsers"> Diğer kullanıcı hesaplarını sakla</label><div class="form-actions"><button class="btn danger" id="wipeBtn">Tüm verileri sil</button></div>`) : ''}`);
+  $('#wipeBtn')?.addEventListener('click', () => {
+    const keepUsers = $('#wipeKeepUsers').checked;
+    const b = modal('Tüm verileri sil', `<form class="grid-form"><p class="span2">Bu işlem geri alınamaz. Onaylamak için <b>SİL</b> yazın.</p><label class="field span2"><span>Onay</span><input name="confirm" autocomplete="off" required></label><div class="form-actions span2"><button class="btn danger">Kalıcı olarak sil</button></div></form>`);
+    b.querySelector('form').onsubmit = guard(async (e) => { e.preventDefault(); await POST('wipe', { ...readForm(e.target), keep_users: keepUsers }); closeModal(); clearLookups(); toast('Tüm veriler silindi', 'ok'); location.hash = '#/'; route(); });
+  });
   $('#stf').onsubmit = guard(async (e) => { e.preventDefault(); session.settings = await PUT('settings', readForm(e.target)); toast('Ayarlar kaydedildi'); });
 }
 

@@ -699,6 +699,29 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
         }
         const s = await getSettings(); return ok(Object.fromEntries(Object.entries(s).filter(([k]) => !k.startsWith('seq_') && k !== 'role_perms')));
       }
+      if (a === 'wipe' && method === 'POST') {
+        // removes all business data (sample/test data); keeps settings, roles and the signed-in admin
+        need(user, 'admin', 'w');
+        if (!/^s[iıİI]l$/i.test(String(body.confirm || '').trim())) err(400, 'Onay için SİL yazın.');
+        const keep = new Set(['settings', 'users', 'sessions']);
+        const tables = (await db.all("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")).map((t) => t.name).filter((t) => !keep.has(t));
+        const deps = {};
+        for (const t of tables) deps[t] = (await db.all(`PRAGMA foreign_key_list(${t})`)).map((f) => f.table).filter((x) => x !== t && tables.includes(x));
+        const order = []; const seen = new Set();
+        const visit = (t) => { if (seen.has(t)) return; seen.add(t); deps[t].forEach(visit); order.push(t); };
+        tables.forEach(visit);
+        const counts = {};
+        await db.tx(async () => {
+          for (const t of order.reverse()) counts[t] = (await db.run(`DELETE FROM ${t}`)).changes;
+          await db.run("DELETE FROM settings WHERE key LIKE 'seq\\_%' ESCAPE '\\'");
+          if (body.keep_users !== true) {
+            await db.run('DELETE FROM sessions WHERE user_id <> ?', [user.id]);
+            counts.users = (await db.run('DELETE FROM users WHERE id <> ?', [user.id])).changes;
+          }
+        });
+        await audit(user, 'veri silme', 'system', null, 'Tüm örnek/test verileri silindi');
+        return ok({ deleted: counts });
+      }
       if (a === 'roles') {
         if (method === 'PUT') {
           need(user, 'admin', 'w');
