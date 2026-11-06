@@ -17,13 +17,15 @@ const dbToken = () => envFind(/^(TURSO|LIBSQL)_?(AUTH)?_?TOKEN$/i);
 async function getApi() {
   if (!dbUrl()) throw new Error('TURSO_DATABASE_URL ortam değişkeni tanımlı değil.');
   const db = libsqlDb(dbUrl(), dbToken());
-  const api = await createApi(db, crypto);
-  if ((await db.get('SELECT COUNT(*) AS n FROM users')).n === 0) {
+  const step = async (name, fn) => { try { return await fn(); } catch (e) { throw new Error(`[${name}] ${e.message}${e.cause?.message ? ' / ' + e.cause.message : ''}`); } };
+  await step('bağlantı', () => db.get('SELECT 1 AS ok'));
+  const api = await step('tablolar', () => createApi(db, crypto));
+  if ((await step('kullanıcı sayısı', () => db.get('SELECT COUNT(*) AS n FROM users'))).n === 0) {
     if (process.env.NO_SEED === '1') {
       const email = process.env.ADMIN_EMAIL || 'admin@pedalla.bike';
       await db.run("INSERT INTO users(name,email,role,password_hash) VALUES('Yönetici',?,'admin',?)", [email, crypto.hashPassword(process.env.ADMIN_PASSWORD || 'pedalla123')]);
     } else {
-      await seedRemote(db, crypto);
+      await step('örnek veriler', () => seedRemote(db, crypto));
     }
   }
   return api;
@@ -40,7 +42,12 @@ export default async function handler(req, res) {
   if (/[?&]__path=_mode\b|\/api\/_mode\b/.test(req.url)) {
     res.setHeader('content-type', 'application/json; charset=utf-8');
     res.setHeader('cache-control', 'no-store');
-    return res.end(JSON.stringify({ db: !!dbUrl(), token: !!dbToken(), env: Object.keys(process.env).filter((k) => /turso|libsql|database/i.test(k)) }));
+    const info = { db: !!dbUrl(), token: !!dbToken() };
+    if (/check=1/.test(req.url) && info.db) {
+      try { ready ||= getApi().catch((e) => { ready = null; throw e; }); await ready; info.connected = true; }
+      catch (e) { info.connected = false; info.error = e.message; }
+    }
+    return res.end(JSON.stringify({ ...info, env: Object.keys(process.env).filter((k) => /turso|libsql|database/i.test(k)) }));
   }
   try {
     ready ||= getApi().catch((e) => { ready = null; throw e; });

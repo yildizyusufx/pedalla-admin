@@ -19,6 +19,12 @@ export async function seedRemote(remoteDb, crypto) {
   const api = await createApi(db, crypto);
   await seed(api, crypto.hashPassword);
   const tables = db.all("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name <> 'sessions'").map((t) => t.name);
+  // parents before children (foreign keys may be enforced remotely)
+  const deps = Object.fromEntries(tables.map((t) => [t, db.all(`PRAGMA foreign_key_list(${t})`).map((f) => f.table).filter((x) => x !== t && tables.includes(x))]));
+  const order = []; const seen = new Set();
+  const visit = (t) => { if (seen.has(t)) return; seen.add(t); deps[t].forEach(visit); order.push(t); };
+  tables.forEach(visit);
+  tables.length = 0; tables.push(...order);
   const stmts = ['PRAGMA foreign_keys = OFF;', 'BEGIN;'];
   for (const t of tables) {
     for (const row of db.all(`SELECT * FROM ${t}`)) {
