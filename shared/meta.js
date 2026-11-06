@@ -1,0 +1,337 @@
+// Pedalla Admin – shared metadata (used by server, browser demo and UI)
+// Field types: text, textarea, number, money, date, datetime, select, ref, bool, email, tel, password
+
+export const BIKE_STATUS = ['müsait', 'kirada', 'rezerve', 'serviste', 'arızalı', 'kayıp/çalıntı', 'hizmet dışı'];
+export const BIKE_TYPES = ['Kargo bisikleti (Lastenrad)', 'E-Kargo bisikleti', 'E-Bike', 'Klasik bisiklet'];
+export const RENTAL_STATUS = ['rezervasyon', 'aktif', 'tamamlandı', 'iptal'];
+export const INVOICE_STATUS = ['açık', 'kısmi', 'ödendi', 'iptal'];
+export const SERVICE_STATUS = ['kabul edildi', 'teşhis', 'parça bekliyor', 'onarımda', 'hazır', 'teslim edildi', 'iptal'];
+export const SERVICE_TYPES = ['periyodik bakım', 'arıza', 'hasar', 'garanti', 'kaza'];
+export const PAY_METHODS = ['banka havalesi', 'SEPA otomatik ödeme', 'kredi kartı', 'nakit', 'PayPal', 'depozitodan mahsup'];
+export const PERIODS = ['gün', 'hafta', 'ay'];
+export const PART_CATEGORIES = ['fren', 'lastik/jant', 'zincir/aktarma', 'batarya', 'motor/elektrik', 'ışık', 'kargo kutusu', 'gidon/sele', 'aksesuar', 'diğer'];
+
+export const ROLES = {
+  admin: 'Yönetici',
+  operasyon: 'Operasyon',
+  servis: 'Servis teknisyeni',
+  muhasebe: 'Muhasebe',
+};
+
+// Permission groups
+export const PERMS = {
+  dashboard: 'Özet ekranı',
+  fleet: 'Filo / bisikletler / harita',
+  rentals: 'Kiralamalar / sözleşmeler',
+  customers: 'Müşteriler / sürücüler',
+  finance: 'Faturalar / ödemeler / depozitolar',
+  service: 'Servis / bakım',
+  stock: 'Yedek parça / stok / tedarikçi',
+  reports: 'Raporlar',
+  admin: 'Kullanıcılar / roller / ayarlar / log',
+};
+
+// default role → perm → 'r' | 'w' | ''
+export const DEFAULT_ROLE_PERMS = {
+  admin: Object.fromEntries(Object.keys(PERMS).map((p) => [p, 'w'])),
+  operasyon: { dashboard: 'r', fleet: 'w', rentals: 'w', customers: 'w', finance: 'r', service: 'w', stock: 'r', reports: 'r', admin: '' },
+  servis: { dashboard: 'r', fleet: 'r', rentals: 'r', customers: 'r', finance: '', service: 'w', stock: 'w', reports: '', admin: '' },
+  muhasebe: { dashboard: 'r', fleet: 'r', rentals: 'r', customers: 'w', finance: 'w', service: 'r', stock: 'r', reports: 'r', admin: '' },
+};
+
+const opt = (arr) => arr.map((v) => ({ v, l: v }));
+
+export const RESOURCES = {
+  bikes: {
+    label: 'Bisikletler', single: 'Bisiklet', perm: 'fleet', order: 'code', search: ['code', 'brand', 'model', 'frame_no', 'gps_tracker_id'],
+    title: (r) => `${r.code} · ${r.brand || ''} ${r.model || ''}`,
+    fields: [
+      { k: 'code', l: 'Filo kodu', req: 1, list: 1 },
+      { k: 'type', l: 'Tip', t: 'select', o: opt(BIKE_TYPES), list: 1 },
+      { k: 'brand', l: 'Marka', list: 1 },
+      { k: 'model', l: 'Model', list: 1 },
+      { k: 'status', l: 'Durum', t: 'select', o: opt(BIKE_STATUS), def: 'müsait', list: 1, badge: 1 },
+      { k: 'frame_no', l: 'Şasi no' },
+      { k: 'battery_no', l: 'Batarya seri no' },
+      { k: 'gps_tracker_id', l: 'GPS takip cihazı ID' },
+      { k: 'color', l: 'Renk' },
+      { k: 'year', l: 'Model yılı', t: 'number' },
+      { k: 'purchase_date', l: 'Alış tarihi', t: 'date' },
+      { k: 'purchase_price', l: 'Alış fiyatı', t: 'money' },
+      { k: 'location_name', l: 'Konum / depo', list: 1 },
+      { k: 'lat', l: 'Enlem', t: 'number', step: 'any' },
+      { k: 'lng', l: 'Boylam', t: 'number', step: 'any' },
+      { k: 'battery_level', l: 'Batarya %', t: 'number', list: 1 },
+      { k: 'odometer_km', l: 'Kilometre', t: 'number', list: 1 },
+      { k: 'insurance_no', l: 'Sigorta poliçe no' },
+      { k: 'insurance_until', l: 'Sigorta bitiş', t: 'date' },
+      { k: 'last_service_date', l: 'Son servis', t: 'date' },
+      { k: 'next_service_date', l: 'Sonraki bakım', t: 'date', list: 1 },
+      { k: 'notes', l: 'Notlar', t: 'textarea' },
+    ],
+  },
+  customers: {
+    label: 'Müşteriler', single: 'Müşteri', perm: 'customers', order: 'name', search: ['name', 'company_name', 'email', 'phone', 'tax_no'],
+    title: (r) => r.company_name || r.name,
+    fields: [
+      { k: 'type', l: 'Müşteri tipi', t: 'select', o: opt(['kurumsal', 'bireysel']), def: 'kurumsal', list: 1 },
+      { k: 'name', l: 'Ad soyad / yetkili', req: 1, list: 1 },
+      { k: 'company_name', l: 'Firma adı', list: 1 },
+      { k: 'tax_no', l: 'Vergi no / USt-IdNr' },
+      { k: 'id_no', l: 'Kimlik / pasaport no' },
+      { k: 'email', l: 'E-posta', t: 'email', list: 1 },
+      { k: 'phone', l: 'Telefon', t: 'tel', list: 1 },
+      { k: 'address', l: 'Adres', t: 'textarea' },
+      { k: 'city', l: 'Şehir', list: 1 },
+      { k: 'iban', l: 'IBAN (SEPA)' },
+      { k: 'id_verified', l: 'Kimlik doğrulandı', t: 'bool' },
+      { k: 'blacklisted', l: 'Kara liste', t: 'bool', list: 1 },
+      { k: 'notes', l: 'Notlar', t: 'textarea' },
+    ],
+  },
+  riders: {
+    label: 'Sürücüler (bisiklet kullanıcıları)', single: 'Sürücü', perm: 'customers', order: 'name', search: ['name', 'phone', 'email', 'customer_label'],
+    title: (r) => r.name,
+    listSql: `SELECT r.*, COALESCE(c.company_name,c.name) AS customer_label,
+      (SELECT b.code FROM rentals x JOIN bikes b ON b.id=x.bike_id WHERE x.rider_id=r.id AND x.status='aktif' LIMIT 1) AS current_bike
+      FROM riders r LEFT JOIN customers c ON c.id=r.customer_id`,
+    fields: [
+      { k: 'customer_id', l: 'Bağlı müşteri', t: 'ref', ref: 'customers', req: 1, list: 1, show: 'customer_label' },
+      { k: 'name', l: 'Ad soyad', req: 1, list: 1 },
+      { k: 'phone', l: 'Telefon', t: 'tel', list: 1 },
+      { k: 'email', l: 'E-posta', t: 'email' },
+      { k: 'id_no', l: 'Kimlik no' },
+      { k: 'trained', l: 'Kargo bisikleti eğitimi aldı', t: 'bool', list: 1 },
+      { k: 'active', l: 'Aktif', t: 'bool', def: 1, list: 1 },
+      { k: 'current_bike', l: 'Şu anki bisiklet', ro: 1, list: 1 },
+      { k: 'notes', l: 'Notlar', t: 'textarea' },
+    ],
+  },
+  pricing_plans: {
+    label: 'Tarifeler', single: 'Tarife', perm: 'rentals', order: 'bike_type, period', search: ['name'],
+    title: (r) => r.name,
+    fields: [
+      { k: 'name', l: 'Tarife adı', req: 1, list: 1 },
+      { k: 'bike_type', l: 'Bisiklet tipi', t: 'select', o: opt(BIKE_TYPES), list: 1 },
+      { k: 'period', l: 'Periyot', t: 'select', o: opt(PERIODS), def: 'ay', list: 1 },
+      { k: 'price', l: 'Periyot ücreti (net)', t: 'money', req: 1, list: 1 },
+      { k: 'deposit', l: 'Depozito', t: 'money', list: 1 },
+      { k: 'km_included', l: 'Dahil km (0 = sınırsız)', t: 'number' },
+      { k: 'active', l: 'Aktif', t: 'bool', def: 1, list: 1 },
+    ],
+  },
+  rentals: {
+    label: 'Kiralamalar', single: 'Kiralama', perm: 'rentals', order: 'id DESC', search: ['contract_no', 'customer_label', 'bike_code', 'rider_name'],
+    title: (r) => r.contract_no,
+    listSql: `SELECT r.*, b.code AS bike_code, COALESCE(c.company_name,c.name) AS customer_label, rd.name AS rider_name,
+      CASE WHEN r.status='aktif' AND r.end_date < date('now') THEN 1 ELSE 0 END AS is_late,
+      (SELECT COALESCE(SUM(i.total + i.late_fee - i.paid_amount),0) FROM invoices i WHERE i.rental_id=r.id AND i.status IN ('açık','kısmi')) AS open_balance
+      FROM rentals r LEFT JOIN bikes b ON b.id=r.bike_id LEFT JOIN customers c ON c.id=r.customer_id LEFT JOIN riders rd ON rd.id=r.rider_id`,
+    noCreate: 1, // custom flow
+    fields: [
+      { k: 'contract_no', l: 'Sözleşme no', ro: 1, list: 1 },
+      { k: 'customer_id', l: 'Müşteri', t: 'ref', ref: 'customers', req: 1, list: 1, show: 'customer_label' },
+      { k: 'rider_id', l: 'Sürücü (kullanıcı)', t: 'ref', ref: 'riders', list: 1, show: 'rider_name' },
+      { k: 'bike_id', l: 'Bisiklet', t: 'ref', ref: 'bikes', req: 1, list: 1, show: 'bike_code' },
+      { k: 'plan_id', l: 'Tarife', t: 'ref', ref: 'pricing_plans' },
+      { k: 'start_date', l: 'Başlangıç', t: 'date', req: 1, list: 1 },
+      { k: 'end_date', l: 'Planlanan dönüş', t: 'date', req: 1, list: 1 },
+      { k: 'returned_at', l: 'İade tarihi', t: 'date', ro: 1 },
+      { k: 'period', l: 'Faturalama periyodu', t: 'select', o: opt(PERIODS), def: 'ay' },
+      { k: 'rate', l: 'Periyot ücreti (net)', t: 'money', req: 1, list: 1 },
+      { k: 'deposit_amount', l: 'Depozito', t: 'money', list: 1 },
+      { k: 'deposit_status', l: 'Depozito durumu', t: 'select', o: opt(['bekliyor', 'alındı', 'iade edildi', 'kısmi iade', 'mahsup edildi']), ro: 1 },
+      { k: 'status', l: 'Durum', t: 'select', o: opt(RENTAL_STATUS), list: 1, badge: 1, ro: 1 },
+      { k: 'start_km', l: 'Teslim km', t: 'number' },
+      { k: 'end_km', l: 'İade km', t: 'number', ro: 1 },
+      { k: 'start_battery', l: 'Teslim batarya %', t: 'number' },
+      { k: 'accessories', l: 'Teslim edilen aksesuarlar', t: 'textarea' },
+      { k: 'return_condition', l: 'İade durumu', t: 'textarea', ro: 1 },
+      { k: 'damage_fee', l: 'Hasar bedeli', t: 'money', ro: 1 },
+      { k: 'notes', l: 'Notlar', t: 'textarea' },
+    ],
+  },
+  invoices: {
+    label: 'Faturalar', single: 'Fatura', perm: 'finance', order: 'issue_date DESC, id DESC', search: ['invoice_no', 'customer_label', 'contract_no'],
+    title: (r) => r.invoice_no,
+    listSql: `SELECT i.*, COALESCE(c.company_name,c.name) AS customer_label, r.contract_no,
+      CASE WHEN i.status IN ('açık','kısmi') AND i.due_date < date('now') THEN CAST(julianday('now') - julianday(i.due_date) AS INTEGER) ELSE 0 END AS days_late,
+      (i.total + i.late_fee - i.paid_amount) AS balance
+      FROM invoices i LEFT JOIN customers c ON c.id=i.customer_id LEFT JOIN rentals r ON r.id=i.rental_id`,
+    fields: [
+      { k: 'invoice_no', l: 'Fatura no', ro: 1, list: 1 },
+      { k: 'customer_id', l: 'Müşteri', t: 'ref', ref: 'customers', req: 1, list: 1, show: 'customer_label' },
+      { k: 'rental_id', l: 'Kiralama', t: 'ref', ref: 'rentals', show: 'contract_no', list: 1 },
+      { k: 'issue_date', l: 'Fatura tarihi', t: 'date', req: 1, list: 1 },
+      { k: 'due_date', l: 'Vade', t: 'date', req: 1, list: 1 },
+      { k: 'period_start', l: 'Dönem başı', t: 'date' },
+      { k: 'period_end', l: 'Dönem sonu', t: 'date' },
+      { k: 'description', l: 'Açıklama', req: 1 },
+      { k: 'net', l: 'Net tutar', t: 'money', req: 1 },
+      { k: 'vat_rate', l: 'KDV %', t: 'number', def: 19 },
+      { k: 'total', l: 'Toplam (brüt)', t: 'money', ro: 1, list: 1 },
+      { k: 'late_fee', l: 'Gecikme bedeli', t: 'money', ro: 1 },
+      { k: 'paid_amount', l: 'Ödenen', t: 'money', ro: 1, list: 1 },
+      { k: 'balance', l: 'Kalan', t: 'money', ro: 1, list: 1 },
+      { k: 'days_late', l: 'Gecikme (gün)', t: 'number', ro: 1, list: 1 },
+      { k: 'status', l: 'Durum', t: 'select', o: opt(INVOICE_STATUS), ro: 1, list: 1, badge: 1 },
+    ],
+  },
+  payments: {
+    label: 'Ödemeler', single: 'Ödeme', perm: 'finance', order: 'date DESC, id DESC', search: ['reference', 'invoice_no', 'customer_label'],
+    title: (r) => `Ödeme #${r.id}`,
+    listSql: `SELECT p.*, i.invoice_no, COALESCE(c.company_name,c.name) AS customer_label FROM payments p
+      LEFT JOIN invoices i ON i.id=p.invoice_id LEFT JOIN customers c ON c.id=p.customer_id`,
+    fields: [
+      { k: 'invoice_id', l: 'Fatura', t: 'ref', ref: 'invoices', req: 1, list: 1, show: 'invoice_no' },
+      { k: 'customer_label', l: 'Müşteri', ro: 1, list: 1 },
+      { k: 'date', l: 'Tarih', t: 'date', req: 1, list: 1 },
+      { k: 'amount', l: 'Tutar', t: 'money', req: 1, list: 1 },
+      { k: 'method', l: 'Yöntem', t: 'select', o: opt(PAY_METHODS), list: 1 },
+      { k: 'reference', l: 'Referans / dekont no', list: 1 },
+      { k: 'notes', l: 'Not', t: 'textarea' },
+    ],
+  },
+  deposits: {
+    label: 'Depozito hareketleri', single: 'Depozito hareketi', perm: 'finance', order: 'date DESC, id DESC', search: ['contract_no', 'customer_label', 'notes'],
+    title: (r) => `Depozito #${r.id}`,
+    listSql: `SELECT d.*, r.contract_no, COALESCE(c.company_name,c.name) AS customer_label FROM deposits d
+      LEFT JOIN rentals r ON r.id=d.rental_id LEFT JOIN customers c ON c.id=d.customer_id`,
+    fields: [
+      { k: 'rental_id', l: 'Kiralama', t: 'ref', ref: 'rentals', req: 1, list: 1, show: 'contract_no' },
+      { k: 'customer_label', l: 'Müşteri', ro: 1, list: 1 },
+      { k: 'date', l: 'Tarih', t: 'date', req: 1, list: 1 },
+      { k: 'type', l: 'Hareket', t: 'select', o: opt(['tahsil', 'iade', 'kesinti']), req: 1, list: 1, badge: 1 },
+      { k: 'amount', l: 'Tutar', t: 'money', req: 1, list: 1 },
+      { k: 'notes', l: 'Açıklama', list: 1 },
+    ],
+  },
+  service_orders: {
+    label: 'Servis kayıtları', single: 'Servis kaydı', perm: 'service', order: 'id DESC', search: ['order_no', 'bike_code', 'complaint', 'customer_label'],
+    title: (r) => r.order_no,
+    noCreate: 1,
+    listSql: `SELECT s.*, b.code AS bike_code, u.name AS technician_name, COALESCE(c.company_name,c.name) AS customer_label,
+      (SELECT COALESCE(SUM(qty*unit_price),0) FROM service_parts sp WHERE sp.service_id=s.id) AS parts_total
+      FROM service_orders s LEFT JOIN bikes b ON b.id=s.bike_id LEFT JOIN users u ON u.id=s.technician_id LEFT JOIN customers c ON c.id=s.customer_id`,
+    fields: [
+      { k: 'order_no', l: 'Servis no', ro: 1, list: 1 },
+      { k: 'bike_id', l: 'Bisiklet', t: 'ref', ref: 'bikes', req: 1, list: 1, show: 'bike_code' },
+      { k: 'type', l: 'Servis tipi', t: 'select', o: opt(SERVICE_TYPES), list: 1 },
+      { k: 'status', l: 'Durum', t: 'select', o: opt(SERVICE_STATUS), list: 1, badge: 1 },
+      { k: 'received_at', l: 'Kabul tarihi', t: 'datetime', list: 1 },
+      { k: 'customer_id', l: 'Getiren müşteri', t: 'ref', ref: 'customers', show: 'customer_label' },
+      { k: 'brought_by', l: 'Teslim eden kişi' },
+      { k: 'km', l: 'Kabul km', t: 'number' },
+      { k: 'battery_level', l: 'Kabul batarya %', t: 'number' },
+      { k: 'complaint', l: 'Şikayet / talep', t: 'textarea', req: 1 },
+      { k: 'visual_condition', l: 'Görsel durum / mevcut hasarlar', t: 'textarea' },
+      { k: 'accessories', l: 'Bırakılan aksesuarlar (şarj aleti, kilit, anahtar…)', t: 'textarea' },
+      { k: 'estimated_cost', l: 'Tahmini maliyet', t: 'money' },
+      { k: 'estimated_ready', l: 'Tahmini hazır olma', t: 'date' },
+      { k: 'technician_id', l: 'Teknisyen', t: 'ref', ref: 'users', list: 1, show: 'technician_name' },
+      { k: 'diagnosis', l: 'Teşhis', t: 'textarea' },
+      { k: 'work_done', l: 'Yapılan işlemler', t: 'textarea' },
+      { k: 'labor_hours', l: 'İşçilik (saat)', t: 'number', step: '0.25' },
+      { k: 'labor_rate', l: 'Saatlik işçilik ücreti', t: 'money' },
+      { k: 'parts_total', l: 'Parça toplamı', t: 'money', ro: 1, list: 1 },
+      { k: 'billable', l: 'Müşteriye faturalanacak', t: 'bool' },
+      { k: 'signature_name', l: 'Kabul formunu imzalayan' },
+      { k: 'delivered_at', l: 'Teslim tarihi', t: 'datetime', ro: 1 },
+    ],
+  },
+  parts: {
+    label: 'Yedek parçalar', single: 'Yedek parça', perm: 'stock', order: 'name', search: ['sku', 'name', 'compatible', 'location'],
+    title: (r) => `${r.sku} · ${r.name}`,
+    listSql: `SELECT p.*, s.name AS supplier_name, CASE WHEN p.stock <= p.min_stock THEN 1 ELSE 0 END AS low FROM parts p LEFT JOIN suppliers s ON s.id=p.supplier_id`,
+    fields: [
+      { k: 'sku', l: 'Stok kodu', req: 1, list: 1 },
+      { k: 'name', l: 'Parça adı', req: 1, list: 1 },
+      { k: 'category', l: 'Kategori', t: 'select', o: opt(PART_CATEGORIES), list: 1 },
+      { k: 'compatible', l: 'Uyumlu modeller' },
+      { k: 'unit', l: 'Birim', def: 'adet' },
+      { k: 'cost', l: 'Alış fiyatı', t: 'money', list: 1 },
+      { k: 'price', l: 'Satış / servis fiyatı', t: 'money', list: 1 },
+      { k: 'stock', l: 'Stok', t: 'number', list: 1, ro: 1 },
+      { k: 'min_stock', l: 'Min. stok (uyarı)', t: 'number', def: 2, list: 1 },
+      { k: 'location', l: 'Raf / konum', list: 1 },
+      { k: 'supplier_id', l: 'Tedarikçi', t: 'ref', ref: 'suppliers', show: 'supplier_name', list: 1 },
+      { k: 'notes', l: 'Notlar', t: 'textarea' },
+    ],
+  },
+  stock_moves: {
+    label: 'Stok hareketleri', single: 'Stok hareketi', perm: 'stock', order: 'date DESC, id DESC', search: ['part_name', 'sku', 'ref'],
+    title: (r) => `Hareket #${r.id}`,
+    listSql: `SELECT m.*, p.sku, p.name AS part_name, u.name AS user_name FROM stock_moves m LEFT JOIN parts p ON p.id=m.part_id LEFT JOIN users u ON u.id=m.user_id`,
+    noEdit: 1,
+    fields: [
+      { k: 'part_id', l: 'Parça', t: 'ref', ref: 'parts', req: 1, list: 1, show: 'part_name' },
+      { k: 'date', l: 'Tarih', t: 'date', req: 1, list: 1 },
+      { k: 'type', l: 'Hareket', t: 'select', o: opt(['giriş', 'çıkış', 'sayım düzeltme']), req: 1, list: 1, badge: 1 },
+      { k: 'qty', l: 'Miktar (düzeltmede yeni stok)', t: 'number', req: 1, list: 1 },
+      { k: 'unit_cost', l: 'Birim maliyet', t: 'money' },
+      { k: 'ref', l: 'Belge / referans', list: 1 },
+      { k: 'user_name', l: 'Kullanıcı', ro: 1, list: 1 },
+      { k: 'notes', l: 'Not' },
+    ],
+  },
+  suppliers: {
+    label: 'Tedarikçiler', single: 'Tedarikçi', perm: 'stock', order: 'name', search: ['name', 'contact', 'email'],
+    title: (r) => r.name,
+    fields: [
+      { k: 'name', l: 'Firma', req: 1, list: 1 },
+      { k: 'contact', l: 'Yetkili', list: 1 },
+      { k: 'phone', l: 'Telefon', t: 'tel', list: 1 },
+      { k: 'email', l: 'E-posta', t: 'email', list: 1 },
+      { k: 'lead_days', l: 'Teslim süresi (gün)', t: 'number' },
+      { k: 'notes', l: 'Notlar', t: 'textarea' },
+    ],
+  },
+  users: {
+    label: 'Kullanıcılar', single: 'Kullanıcı', perm: 'admin', order: 'name', search: ['name', 'email'],
+    title: (r) => r.name,
+    listSql: `SELECT id, name, email, role, active, last_login, created_at FROM users`,
+    fields: [
+      { k: 'name', l: 'Ad soyad', req: 1, list: 1 },
+      { k: 'email', l: 'E-posta (giriş)', t: 'email', req: 1, list: 1 },
+      { k: 'role', l: 'Rol', t: 'select', o: Object.entries(ROLES).map(([v, l]) => ({ v, l })), req: 1, list: 1, badge: 1 },
+      { k: 'password', l: 'Şifre (değiştirmek için doldurun)', t: 'password' },
+      { k: 'active', l: 'Aktif', t: 'bool', def: 1, list: 1 },
+      { k: 'last_login', l: 'Son giriş', t: 'datetime', ro: 1, list: 1 },
+    ],
+  },
+  audit_log: {
+    label: 'İşlem geçmişi', single: 'Kayıt', perm: 'admin', order: 'id DESC', search: ['action', 'entity', 'details', 'user_name'],
+    readonly: 1,
+    listSql: `SELECT a.*, u.name AS user_name FROM audit_log a LEFT JOIN users u ON u.id=a.user_id`,
+    fields: [
+      { k: 'ts', l: 'Zaman', t: 'datetime', list: 1 },
+      { k: 'user_name', l: 'Kullanıcı', list: 1 },
+      { k: 'action', l: 'İşlem', list: 1, badge: 1 },
+      { k: 'entity', l: 'Kayıt tipi', list: 1 },
+      { k: 'entity_id', l: 'ID', list: 1 },
+      { k: 'details', l: 'Detay', list: 1 },
+    ],
+  },
+};
+
+export const DEFAULT_SETTINGS = {
+  company_name: 'Pedalla GmbH',
+  company_address: 'Stresemannstraße 250–252, 22769 Hamburg',
+  company_phone: '+49 176 72241488',
+  company_email: 'info@pedalla.bike',
+  company_tax_no: '',
+  company_iban: '',
+  currency: 'EUR',
+  vat_rate: '19',
+  payment_terms_days: '14',
+  late_fee_per_day: '2.50',
+  late_return_fee_per_day: '25',
+  service_interval_days: '90',
+  service_interval_km: '1500',
+  labor_rate: '55',
+  low_battery_alert: '20',
+  map_center_lat: '53.5600',
+  map_center_lng: '9.9500',
+  contract_terms: 'Kiracı, bisikleti özenle kullanmayı, yalnızca sözleşmede adı geçen sürücülere kullandırmayı ve her hasarı derhal bildirmeyi kabul eder. Bakım, onarım ve sigorta kiralama bedeline dahildir; kullanıcı hatasından kaynaklanan hasarlar ve kayıp/çalıntı durumunda muafiyet tutarı kiracıya faturalanır. Geciken iadelerde günlük gecikme bedeli uygulanır. Depozito, bisikletin eksiksiz ve hasarsız iadesinden sonra 7 iş günü içinde iade edilir.',
+  service_terms: 'Servise bırakılan bisiklet için tahmini maliyet bilgilendirme amaçlıdır; tahmini tutarın %20 üzerine çıkacak işlemler için müşteri onayı alınır. Hazır olduğu bildirildikten sonra 14 gün içinde teslim alınmayan bisikletler için depolama ücreti uygulanabilir.',
+};

@@ -1,0 +1,14 @@
+/* ==========================================================
+   PEDALLA MARKA AYARLARI
+   Sitenin kesin renk kodlarını buraya yazmanız yeterli;
+   tüm panel bu değişkenlerden beslenir.
+   ========================================================== */
+:root {
+  --brand: #0f6b48;        /* ana marka rengi (yeşil) */
+  --brand-d: #0a4a32;      /* koyu ton: kenar çubuğu, başlıklar */
+  --brand-l: #e5f2ec;      /* açık ton: arka plan vurguları */
+  --accent: #c6f04b;       /* vurgu (lime) */
+  --accent-d: #8fbf1a;     /* grafiklerde ikinci seri */
+  --font: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --radius: 14px;
+}

@@ -1,0 +1,12 @@
+{
+  "name": "pedalla-admin",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Pedalla bisiklet kiralama yönetim paneli",
+  "engines": { "node": ">=22.13" },
+  "scripts": {
+    "start": "node --no-warnings server.js",
+    "reset": "rm -f data/pedalla.db* && node --no-warnings server.js"
+  }
+}
