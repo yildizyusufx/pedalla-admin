@@ -28,6 +28,12 @@ async function readBody(req) {
 }
 
 export default async function handler(req, res) {
+  // The page asks this first: is a shared database configured? (no -> it opens the browser demo)
+  if (/[?&]__path=_mode\b|\/api\/_mode\b/.test(req.url)) {
+    res.setHeader('content-type', 'application/json; charset=utf-8');
+    res.setHeader('cache-control', 'no-store');
+    return res.end(JSON.stringify({ db: !!process.env.TURSO_DATABASE_URL, token: !!process.env.TURSO_AUTH_TOKEN }));
+  }
   try {
     ready ||= getApi().catch((e) => { ready = null; throw e; });
     const api = await ready;

@@ -38,7 +38,7 @@ Vercel sürekli çalışan bir sunucu ve yerel veritabanı dosyası desteklemedi
    * (isteğe bağlı) örnek veriler olmadan başlamak için `NO_SEED=1`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`
 4. *Deployments → Redeploy* deyin. İlk istekte tablolar oluşturulur ve (NO_SEED yoksa) örnek veriler yüklenir.
 
-`TURSO_DATABASE_URL` tanımlı değilse Vercel tarayıcı içi demo sürümünü yayınlar. Bu sürümde veriler her tarayıcıda ayrı tutulur.
+Sayfa açılırken `/api/_mode` adresine sorar: sunucuda `TURSO_DATABASE_URL` tanımlıysa ortak veritabanı kullanılır, değilse tarayıcı içi demo (`demo.html`, sağ altta "Demo modu" yazısı) açılır. Bu sürümde veriler her tarayıcıda ayrı tutulur. Ortam değişkeni ekledikten sonra yeni bir deploy yeterlidir; `https://<siteniz>/api/_mode` adresinde `{"db":true,"token":true}` görünmelidir.
 
 ### Kendi sunucunuz / Render / Railway / Docker
 

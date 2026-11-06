@@ -15,8 +15,12 @@
 <body>
   <div class="loading"><div class="spin"></div></div>
   <script type="module">
-    import { boot } from './app.js';
-    boot();
+    // On a static host without a database (no /api/_mode, or no TURSO_DATABASE_URL), open the browser demo.
+    // On the local server (server.js) /api/_mode is answered with db:true.
+    let mode = null;
+    try { const r = await fetch('api/_mode', { cache: 'no-store' }); if (r.ok) mode = await r.json(); } catch {}
+    if (!mode || !mode.db) { location.replace('demo.html' + location.hash); }
+    else { const { boot } = await import('./app.js'); boot(); }
   </script>
 </body>
 </html>

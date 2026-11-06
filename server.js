@@ -41,6 +41,7 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; cha
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
   try {
+    if (url.pathname === '/api/_mode') { res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' }); return res.end('{"db":true}'); }
     if (url.pathname.startsWith('/api/')) {
       let raw = ''; for await (const ch of req) { raw += ch; if (raw.length > 2e6) throw new Error('too large'); }
       let body = {}; if (raw) { try { body = JSON.parse(raw); } catch { body = {}; } }
