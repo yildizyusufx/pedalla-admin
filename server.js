@@ -43,7 +43,7 @@ const server = http.createServer(async (req, res) => {
   try {
     if (url.pathname === '/api/_mode') { res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' }); return res.end('{"db":true}'); }
     if (url.pathname.startsWith('/api/')) {
-      let raw = ''; for await (const ch of req) { raw += ch; if (raw.length > 2e6) throw new Error('too large'); }
+      let raw = ''; for await (const ch of req) { raw += ch; if (raw.length > 6e6) throw new Error('too large'); }
       let body = {}; if (raw) { try { body = JSON.parse(raw); } catch { body = {}; } }
       const token = (req.headers.authorization || '').replace(/^Bearer /, '') || null;
       const out = await api.handle({ method: req.method, path: url.pathname, query: Object.fromEntries(url.searchParams), body, token });

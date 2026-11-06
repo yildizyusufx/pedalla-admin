@@ -59,6 +59,14 @@ CREATE TABLE IF NOT EXISTS service_orders (
   invoice_id INTEGER, created_at TEXT DEFAULT (datetime('now')));
 CREATE TABLE IF NOT EXISTS service_parts (
   id INTEGER PRIMARY KEY, service_id INTEGER REFERENCES service_orders(id), part_id INTEGER REFERENCES parts(id), qty REAL, unit_price REAL);
+CREATE TABLE IF NOT EXISTS documents (
+  id INTEGER PRIMARY KEY, owner_type TEXT NOT NULL, owner_id INTEGER NOT NULL, doc_type TEXT, name TEXT, mime TEXT, size INTEGER,
+  data TEXT, notes TEXT, uploaded_by INTEGER, created_at TEXT DEFAULT (datetime('now')));
+CREATE INDEX IF NOT EXISTS ix_doc_owner ON documents(owner_type, owner_id);
+CREATE TABLE IF NOT EXISTS cash_moves (
+  id INTEGER PRIMARY KEY, date TEXT NOT NULL, type TEXT NOT NULL, amount REAL NOT NULL, category TEXT, description TEXT,
+  payment_id INTEGER, deposit_id INTEGER, rental_id INTEGER, user_id INTEGER, created_at TEXT DEFAULT (datetime('now')));
+CREATE INDEX IF NOT EXISTS ix_cash_date ON cash_moves(date);
 CREATE TABLE IF NOT EXISTS audit_log (
   id INTEGER PRIMARY KEY, ts TEXT DEFAULT (datetime('now')), user_id INTEGER, action TEXT, entity TEXT, entity_id INTEGER, details TEXT);
 `;
@@ -73,5 +81,7 @@ export const INTAKE_CHECKLIST = [
 export const MIGRATIONS = {
   riders: { id_type: 'TEXT', id_expiry: 'TEXT', birth_date: 'TEXT', nationality: 'TEXT', address: 'TEXT', license_no: 'TEXT', id_checked: 'INTEGER DEFAULT 0' },
   service_orders: { brought_by_rider_id: 'INTEGER' },
+  customers: { doc_lang: "TEXT DEFAULT 'de'" },
+  deposits: { method: 'TEXT' },
 };
 export const ID_TYPES = ['Kimlik kartı (Personalausweis)', 'Pasaport', 'Oturum izni (Aufenthaltstitel)', 'Ehliyet'];

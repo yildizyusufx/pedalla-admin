@@ -95,7 +95,16 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
   function validate(res, body, partial) {
     for (const f of RESOURCES[res].fields) if (f.req && !partial && (body[f.k] === undefined || body[f.k] === '' || body[f.k] === null)) err(400, `"${f.l}" zorunludur.`);
   }
+  // a rider without a company becomes a direct (individual) customer
+  async function directCustomer(p, user) {
+    if (!p?.name) err(400, 'Sürücünün adı zorunludur.');
+    const r = await db.run("INSERT INTO customers(type,name,phone,email,id_no,address,id_verified,doc_lang) VALUES('bireysel',?,?,?,?,?,?,?)",
+      [p.name, p.phone || null, p.email || null, p.id_no || null, p.address || null, p.id_checked ? 1 : 0, p.doc_lang || setting('doc_lang') || 'de']);
+    await audit(user, 'oluşturma', 'customers', r.lastId, `${p.name} (doğrudan müşteri)`);
+    return r.lastId;
+  }
   async function insert(res, body, user) {
+    if (res === 'riders' && !body.customer_id) body.customer_id = await directCustomer(body, user);
     validate(res, body);
     const fields = writable(res).filter((f) => body[f.k] !== undefined || f.def !== undefined);
     const vals = fields.map((f) => clean(f, body[f.k] !== undefined ? body[f.k] : f.def));
@@ -121,11 +130,66 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
     if (res === 'bikes' && await db.get("SELECT 1 FROM rentals WHERE bike_id=? AND status IN ('aktif','rezervasyon')", [id])) err(409, 'Aktif kiralaması olan bisiklet silinemez.');
     if (res === 'customers' && await db.get('SELECT 1 FROM rentals WHERE customer_id=?', [id])) err(409, 'Kiralama geçmişi olan müşteri silinemez; kara listeye alabilir veya not düşebilirsiniz.');
     if (res === 'users' && user.id === Number(id)) err(409, 'Kendi kullanıcınızı silemezsiniz.');
-    if (res === 'payments') { await db.run('DELETE FROM payments WHERE id=?', [id]); await recalcInvoice(row.invoice_id); await audit(user, 'silme', res, id); return { ok: true }; }
+    if (res === 'payments') { await db.run('DELETE FROM cash_moves WHERE payment_id=?', [id]); await db.run('DELETE FROM payments WHERE id=?', [id]); await recalcInvoice(row.invoice_id); await audit(user, 'silme', res, id); return { ok: true }; }
     try { await db.run(`DELETE FROM ${res} WHERE id=?`, [id]); } catch (e) { err(409, 'Bu kayda bağlı başka kayıtlar olduğu için silinemiyor.'); }
     await audit(user, 'silme', res, id, RESOURCES[res].title?.(row) || '');
     return { ok: true };
   }
+
+  // ---------- cash register (kasa) ----------
+  async function cashMove({ date, type, amount, category, description, payment_id = null, deposit_id = null, rental_id = null }, user) {
+    if (!['giriş', 'çıkış', 'sayım farkı'].includes(type)) err(400, 'Geçersiz kasa hareketi.');
+    if (type !== 'sayım farkı' && !(Number(amount) > 0)) err(400, 'Tutar sıfırdan büyük olmalı.');
+    const r = await db.run('INSERT INTO cash_moves(date,type,amount,category,description,payment_id,deposit_id,rental_id,user_id) VALUES(?,?,?,?,?,?,?,?,?)',
+      [date || today(), type, r2(amount), category || null, description || null, payment_id, deposit_id, rental_id, user?.id ?? null]);
+    await audit(user, 'kasa', 'cash_moves', r.lastId, `${type} ${r2(amount)} € ${category || ''}`);
+    return r.lastId;
+  }
+  const cashSigned = "CASE type WHEN 'çıkış' THEN -amount ELSE amount END";
+  async function cashSummary(q = {}) {
+    const t = today(); const m0 = t.slice(0, 7) + '-01';
+    const one = async (sql, p = []) => r2(Object.values((await db.get(sql, p)) || {})[0] || 0);
+    const from = q.from || addDays(t, -30); const to = q.to || t;
+    const rows = await list('cash_moves', { limit: 2000, ...(q.q ? { q: q.q } : {}) });
+    return {
+      balance: await one(`SELECT COALESCE(SUM(${cashSigned}),0) FROM cash_moves`),
+      today_in: await one("SELECT COALESCE(SUM(amount),0) FROM cash_moves WHERE type='giriş' AND date=?", [t]),
+      today_out: await one("SELECT COALESCE(SUM(amount),0) FROM cash_moves WHERE type='çıkış' AND date=?", [t]),
+      month_in: await one("SELECT COALESCE(SUM(amount),0) FROM cash_moves WHERE type='giriş' AND date>=?", [m0]),
+      month_out: await one("SELECT COALESCE(SUM(amount),0) FROM cash_moves WHERE type='çıkış' AND date>=?", [m0]),
+      opening: await one(`SELECT COALESCE(SUM(${cashSigned}),0) FROM cash_moves WHERE date < ?`, [from]),
+      last_count: await db.get("SELECT date, description FROM cash_moves WHERE type='sayım farkı' ORDER BY id DESC LIMIT 1") || null,
+      from, to,
+      rows: rows.filter((r) => r.date >= from && r.date <= to),
+    };
+  }
+  // deposits; cash ones also go to the cash register
+  async function depositMove({ rental_id, customer_id, date, type, amount, notes, method }, user) {
+    const x = await db.run('INSERT INTO deposits(rental_id,customer_id,date,type,amount,notes,method) VALUES(?,?,?,?,?,?,?)', [rental_id, customer_id, date || today(), type, r2(amount), notes || null, method || null]);
+    if (method === 'nakit' && ['tahsil', 'iade'].includes(type) && amount > 0) {
+      const r = await db.get('SELECT contract_no FROM rentals WHERE id=?', [rental_id]);
+      await cashMove({ date, type: type === 'tahsil' ? 'giriş' : 'çıkış', amount, category: type === 'tahsil' ? 'Depozito tahsilatı' : 'Depozito iadesi', description: `${r?.contract_no || ''} ${notes || ''}`.trim(), deposit_id: x.lastId, rental_id }, user);
+    }
+    return x.lastId;
+  }
+
+  // ---------- documents (ID copies, signed contracts…) ----------
+  const DOC_OWNERS = { customer: ['customers', 'customers'], rider: ['riders', 'customers'], rental: ['rentals', 'rentals'] };
+  const DOC_MIME = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+  async function addDocument(b, user) {
+    const own = DOC_OWNERS[b.owner_type] || err(400, 'Geçersiz belge sahibi.');
+    await getOne(own[0], Number(b.owner_id));
+    if (!DOC_MIME.includes(b.mime)) err(400, 'Sadece JPEG, PNG veya PDF yüklenebilir.');
+    const data = String(b.data || '').replace(/^data:[^,]*,/, '');
+    const size = Math.floor(data.length * 3 / 4);
+    if (!size) err(400, 'Dosya boş.');
+    if (size > 3 * 1024 * 1024) err(413, 'Dosya çok büyük (en fazla 3 MB). PDF ise sıkıştırın veya fotoğraf olarak yükleyin.');
+    const r = await db.run('INSERT INTO documents(owner_type,owner_id,doc_type,name,mime,size,data,notes,uploaded_by) VALUES(?,?,?,?,?,?,?,?,?)',
+      [b.owner_type, Number(b.owner_id), b.doc_type || 'Diğer', String(b.name || 'belge').slice(0, 120), b.mime, size, data, b.notes || null, user?.id]);
+    await audit(user, 'belge', own[0], Number(b.owner_id), `${b.doc_type || ''} ${b.name || ''}`);
+    return r.lastId;
+  }
+  const listDocuments = (type, id) => db.all('SELECT d.id, d.owner_type, d.owner_id, d.doc_type, d.name, d.mime, d.size, d.notes, d.created_at, u.name AS uploaded_by_name FROM documents d LEFT JOIN users u ON u.id=d.uploaded_by WHERE d.owner_type=? AND d.owner_id=? ORDER BY d.id DESC', [type, id]);
 
   // ---------- finance ----------
   async function recalcInvoice(id) {
@@ -168,6 +232,10 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
     const r = await db.run('INSERT INTO payments(invoice_id,customer_id,date,amount,method,reference,notes,created_by) VALUES(?,?,?,?,?,?,?,?)',
       [inv.id, inv.customer_id, body.date || today(), r2(body.amount), body.method || null, body.reference || null, body.notes || null, user?.id]);
     await recalcInvoice(inv.id);
+    if (body.method === 'nakit') {
+      const c = await db.get('SELECT COALESCE(company_name,name) AS n FROM customers WHERE id=?', [inv.customer_id]);
+      await cashMove({ date: body.date || today(), type: 'giriş', amount: body.amount, category: 'Fatura tahsilatı', description: `${inv.invoice_no} · ${c?.n || ''}`, payment_id: r.lastId, rental_id: inv.rental_id }, user);
+    }
     await audit(user, 'ödeme', 'invoices', inv.id, `${inv.invoice_no}: ${r2(body.amount)} €`);
     return await getOne('payments', r.lastId);
   }
@@ -178,6 +246,11 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
 
   // ---------- rentals ----------
   async function createRental(b, user) {
+    if (b.customer_id === 'new') {
+      if (!b.rider?.name || !b.rider?.phone) err(400, 'Yeni bireysel müşteri için teslim alan kişinin adı ve telefonu zorunludur.');
+      b.customer_id = await directCustomer({ ...b.rider, doc_lang: b.doc_lang }, user);
+      b.rider.id = null;
+    }
     for (const k of ['customer_id', 'bike_id', 'start_date', 'end_date']) if (!b[k]) err(400, 'Müşteri, bisiklet, başlangıç ve dönüş tarihleri zorunludur.');
     if (b.end_date < b.start_date) err(400, 'Dönüş tarihi başlangıçtan önce olamaz.');
     const cust = await db.get('SELECT * FROM customers WHERE id=?', [b.customer_id]) || err(404, 'Müşteri yok.');
@@ -216,7 +289,7 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
         b.period || plan?.period || 'ay', r2(rate), r2(deposit), deposit > 0 ? (b.deposit_paid ? 'alındı' : 'bekliyor') : 'bekliyor',
         reserve ? 'rezervasyon' : 'aktif', b.start_km ?? bike.odometer_km, b.start_battery ?? bike.battery_level, b.accessories || null, b.notes || null, user?.id]);
       id = r.lastId;
-      if (deposit > 0 && b.deposit_paid) await db.run('INSERT INTO deposits(rental_id,customer_id,date,type,amount,notes) VALUES(?,?,?,?,?,?)', [id, b.customer_id, b.start_date, 'tahsil', r2(deposit), 'Teslimde alındı']);
+      if (deposit > 0 && b.deposit_paid) await depositMove({ rental_id: id, customer_id: b.customer_id, date: b.start_date > today() ? today() : b.start_date, type: 'tahsil', amount: deposit, notes: 'Teslimde alındı', method: b.deposit_method }, user);
       await db.run('UPDATE bikes SET status=? WHERE id=?', [reserve ? 'rezerve' : 'kirada', b.bike_id]);
       await audit(user, 'kiralama', 'rentals', id, `${no} · ${bike.code} → ${cust.company_name || cust.name}`);
       if (!reserve) await billRental(id, user);
@@ -236,7 +309,7 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
   async function collectDeposit(id, b, user) {
     const r = await getOne('rentals', id);
     const amt = r2(b.amount ?? r.deposit_amount);
-    await db.run('INSERT INTO deposits(rental_id,customer_id,date,type,amount,notes) VALUES(?,?,?,?,?,?)', [id, r.customer_id, b.date || today(), 'tahsil', amt, b.notes || 'Depozito tahsil edildi']);
+    await depositMove({ rental_id: id, customer_id: r.customer_id, date: b.date || today(), type: 'tahsil', amount: amt, notes: b.notes || 'Depozito tahsil edildi', method: b.method }, user);
     await db.run("UPDATE rentals SET deposit_status='alındı' WHERE id=?", [id]);
     await audit(user, 'depozito', 'rentals', id, `Tahsil ${amt} €`);
     return await getOne('rentals', id);
@@ -257,7 +330,7 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
       let damageInv = null;
       if (damage > 0) damageInv = await createInvoice({ customer_id: r.customer_id, rental_id: id, description: `Hasar bedeli ${r.contract_no}: ${b.return_condition || ''}`.slice(0, 200), net: damage }, user);
       // deposit settlement
-      const held = r2(await db.get("SELECT COALESCE(SUM(CASE WHEN type='tahsil' THEN amount ELSE -amount END),0) AS s FROM deposits WHERE rental_id=?", [id]).s);
+      const held = r2((await db.get("SELECT COALESCE(SUM(CASE WHEN type='tahsil' THEN amount ELSE -amount END),0) AS s FROM deposits WHERE rental_id=?", [id])).s);
       if (held > 0) {
         let deduct = 0;
         if (b.deduct_from_deposit) {
@@ -271,7 +344,7 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
           if (deduct > 0) await db.run('INSERT INTO deposits(rental_id,customer_id,date,type,amount,notes) VALUES(?,?,?,?,?,?)', [id, r.customer_id, date, 'kesinti', deduct, 'Açık faturalara mahsup']);
         }
         const refund = r2(held - deduct);
-        if (refund > 0) await db.run('INSERT INTO deposits(rental_id,customer_id,date,type,amount,notes) VALUES(?,?,?,?,?,?)', [id, r.customer_id, date, 'iade', refund, 'İadede geri ödendi']);
+        if (refund > 0) await depositMove({ rental_id: id, customer_id: r.customer_id, date, type: 'iade', amount: refund, notes: 'İadede geri ödendi', method: b.refund_method }, user);
         await db.run('UPDATE rentals SET deposit_status=? WHERE id=?', [deduct > 0 ? (refund > 0 ? 'kısmi iade' : 'mahsup edildi') : 'iade edildi', id]);
         out.deposit_refund = refund; out.deposit_deducted = deduct;
       }
@@ -284,7 +357,7 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
       }
       await audit(user, 'iade', 'rentals', id, `${r.contract_no} gecikme ${lateDays} gün, hasar ${damage} €`);
     });
-    return { ...getOne('rentals', id), ...out };
+    return { ...(await getOne('rentals', id)), ...out };
   }
   async function extendRental(id, b, user) {
     const r = await getOne('rentals', id);
@@ -482,7 +555,7 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
       by_type: await db.all("SELECT type, COUNT(*) AS n, SUM(status='kirada') AS rented FROM bikes GROUP BY type"),
       monthly: fin ? months.map((m) => ({ m, invoiced: r2(inv[m] || 0), collected: r2(pay[m] || 0) })) : [],
       late_returns: await db.all("SELECT r.id, r.contract_no, r.end_date, b.code, COALESCE(c.company_name,c.name) AS customer FROM rentals r JOIN bikes b ON b.id=r.bike_id JOIN customers c ON c.id=r.customer_id WHERE r.status='aktif' AND r.end_date < ? ORDER BY r.end_date", [t]),
-      overdue: fin ? await db.all("SELECT i.id, i.invoice_no, i.due_date, (i.total+i.late_fee-i.paid_amount) AS balance, COALESCE(c.company_name,c.name) AS customer, CAST(julianday(?)-julianday(i.due_date) AS INTEGER) AS days FROM invoices i JOIN customers c ON c.id=i.customer_id WHERE i.status IN ('açık','kısmi') AND i.due_date < ? ORDER BY i.due_date LIMIT 8", [t, t]) : [],
+      overdue: fin ? await db.all("SELECT i.id, i.invoice_no, i.due_date, (i.total+i.late_fee-i.paid_amount) AS balance, COALESCE(c.company_name,c.name) AS customer, c.name AS customer_name, c.phone AS customer_phone, c.doc_lang AS customer_lang, CAST(julianday(?)-julianday(i.due_date) AS INTEGER) AS days FROM invoices i JOIN customers c ON c.id=i.customer_id WHERE i.status IN ('açık','kısmi') AND i.due_date < ? ORDER BY i.due_date LIMIT 8", [t, t]) : [],
       upcoming_returns: await db.all("SELECT r.id, r.contract_no, r.end_date, b.code, COALESCE(c.company_name,c.name) AS customer FROM rentals r JOIN bikes b ON b.id=r.bike_id JOIN customers c ON c.id=r.customer_id WHERE r.status='aktif' AND r.end_date BETWEEN ? AND ? ORDER BY r.end_date LIMIT 8", [t, addDays(t, 14)]),
       open_service: await db.all("SELECT s.id, s.order_no, s.status, s.type, s.estimated_ready, b.code FROM service_orders s JOIN bikes b ON b.id=s.bike_id WHERE s.status NOT IN ('teslim edildi','iptal') ORDER BY s.received_at LIMIT 8"),
       low_stock: await db.all('SELECT id, sku, name, stock, min_stock, unit FROM parts WHERE stock <= min_stock ORDER BY stock LIMIT 8'),
@@ -536,6 +609,8 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
     r.deposits = await db.all('SELECT * FROM deposits WHERE rental_id=? ORDER BY date, id', [id]);
     r.deposit_held = r2(r.deposits.reduce((a, d) => a + (d.type === 'tahsil' ? d.amount : -d.amount), 0));
     r.services = await list('service_orders', { rental_id: id });
+    r.documents = await listDocuments('rental', id);
+    r.rider_documents = r.rider_id ? await listDocuments('rider', r.rider_id) : [];
     r.late_days = r.status === 'aktif' ? Math.max(0, daysBetween(r.end_date, today())) : 0;
     r.late_return_fee_per_day = Number(setting('late_return_fee_per_day'));
     if (user && !can(user, 'finance')) { r.invoices = []; r.deposits = []; }
@@ -544,6 +619,7 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
   async function customerDetail(id, user) {
     const c = await getOne('customers', id);
     c.riders = await list('riders', { customer_id: id });
+    c.documents = await listDocuments('customer', id);
     c.rentals = await list('rentals', { customer_id: id });
     c.invoices = await list('invoices', { customer_id: id });
     c.payments = await list('payments', { customer_id: id });
@@ -552,6 +628,13 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
     c.deposit_held = r2((await db.get("SELECT COALESCE(SUM(CASE WHEN type='tahsil' THEN amount ELSE -amount END),0) AS s FROM deposits WHERE customer_id=?", [id])).s);
     if (user && !can(user, 'finance')) { c.invoices = []; c.payments = []; c.balance = c.overdue = c.deposit_held = null; }
     return c;
+  }
+  async function riderDetail(id) {
+    const r = await getOne('riders', id);
+    r.customer = r.customer_id ? await db.get('SELECT * FROM customers WHERE id=?', [r.customer_id]) : null;
+    r.rentals = await list('rentals', { rider_id: id });
+    r.documents = await listDocuments('rider', id);
+    return r;
   }
   async function invoiceDetail(id) {
     const i = await getOne('invoices', id);
@@ -629,7 +712,7 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
       }
       // detail endpoints
       if (a === 'detail') {
-        const fn = { bikes: bikeDetail, rentals: rentalDetail, customers: customerDetail, invoices: invoiceDetail, service_orders: serviceDetail, parts: partDetail }[b];
+        const fn = { bikes: bikeDetail, rentals: rentalDetail, riders: riderDetail, customers: customerDetail, invoices: invoiceDetail, service_orders: serviceDetail, parts: partDetail }[b];
         if (!fn) err(404, 'Bilinmeyen detay.');
         need(user, permOf(b));
         return ok(await fn(Number(c), user));
@@ -669,7 +752,7 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
       if (a === 'deposits' && method === 'POST') {
         need(user, 'finance', 'w'); validate('deposits', body);
         const r = await getOne('rentals', body.rental_id);
-        const x = await db.run('INSERT INTO deposits(rental_id,customer_id,date,type,amount,notes) VALUES(?,?,?,?,?,?)', [r.id, r.customer_id, body.date, body.type, r2(body.amount), body.notes || null]);
+        const x = { lastId: await depositMove({ rental_id: r.id, customer_id: r.customer_id, date: body.date, type: body.type, amount: body.amount, notes: body.notes, method: body.method }, user) };
         if (body.type === 'tahsil') await db.run("UPDATE rentals SET deposit_status='alındı' WHERE id=?", [r.id]);
         await audit(user, 'depozito', 'rentals', r.id, `${body.type} ${body.amount}`);
         return ok(await getOne('deposits', x.lastId));
@@ -685,6 +768,33 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
         need(user, 'stock', 'w'); const p = await insert('parts', body, user);
         await addStockMove({ part_id: p.id, type: 'giriş', qty: body.stock, unit_cost: body.cost, ref: 'Açılış stoğu' }, user);
         return ok(await getOne('parts', p.id));
+      }
+      if (a === 'cash') {
+        need(user, 'finance', method === 'GET' ? 'r' : 'w');
+        if (method === 'GET') return ok(await cashSummary(query));
+        if (method === 'POST' && b === 'count') {
+          const cur = (await cashSummary()).balance; const counted = r2(Number(body.counted));
+          if (!Number.isFinite(counted)) err(400, 'Sayılan tutarı girin.');
+          const diff = r2(counted - cur);
+          await cashMove({ date: body.date || today(), type: 'sayım farkı', amount: diff, category: 'Gün sonu sayımı', description: `Sayılan ${counted} €, beklenen ${cur} €${body.notes ? ' · ' + body.notes : ''}` }, user);
+          return ok({ diff, counted, expected: cur });
+        }
+        if (method === 'POST') { const id = await cashMove({ ...body, type: body.type, amount: Number(body.amount) }, user); return ok(await getOne('cash_moves', id)); }
+        if (method === 'DELETE' && b) {
+          const m = await getOne('cash_moves', Number(b));
+          if (m.payment_id || m.deposit_id) err(409, 'Bu hareket bir ödeme veya depozitodan otomatik oluştu; ilgili ödemeyi silin.');
+          await db.run('DELETE FROM cash_moves WHERE id=?', [m.id]); await audit(user, 'silme', 'cash_moves', m.id, `${m.type} ${m.amount}`);
+          return ok({ ok: true });
+        }
+      }
+      if (a === 'documents') {
+        if (method === 'GET' && !b) { const own = DOC_OWNERS[query.owner_type] || err(400, 'Geçersiz belge sahibi.'); need(user, own[1]); return ok(await listDocuments(query.owner_type, Number(query.owner_id))); }
+        const doc = b ? await db.get('SELECT * FROM documents WHERE id=?', [Number(b)]) || err(404, 'Belge bulunamadı.') : null;
+        const perm = (DOC_OWNERS[doc?.owner_type || body.owner_type] || err(400, 'Geçersiz belge sahibi.'))[1];
+        if (method === 'GET') { need(user, perm); return ok(doc); }
+        need(user, perm, 'w');
+        if (method === 'POST' && !b) { const id = await addDocument(body, user); return ok({ id }); }
+        if (method === 'DELETE') { await db.run('DELETE FROM documents WHERE id=?', [doc.id]); await audit(user, 'belge silme', doc.owner_type, doc.owner_id, doc.name); return ok({ ok: true }); }
       }
       // generic
       if (!RESOURCES[a]) err(404, 'Bilinmeyen kaynak.');

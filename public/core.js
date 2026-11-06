@@ -42,7 +42,7 @@ const BADGE = {
   'aktif': 'brand', 'rezervasyon': 'info', 'tamamlandı': 'muted', 'iptal': 'muted',
   'açık': 'warn', 'kısmi': 'info', 'ödendi': 'ok', 'tahsil': 'brand', 'iade': 'ok', 'kesinti': 'danger',
   'kabul edildi': 'info', 'teşhis': 'info', 'parça bekliyor': 'warn', 'onarımda': 'warn', 'hazır': 'ok', 'teslim edildi': 'muted',
-  'giriş': 'ok', 'çıkış': 'warn', 'sayım düzeltme': 'info', admin: 'brand', operasyon: 'info', servis: 'warn', muhasebe: 'ok',
+  'giriş': 'ok', 'çıkış': 'warn', 'sayım düzeltme': 'info', 'sayım farkı': 'info', pasif: 'muted', admin: 'brand', operasyon: 'info', servis: 'warn', muhasebe: 'ok',
   'gecikmede': 'danger', 'kara liste': 'danger', 'alındı': 'ok', 'bekliyor': 'warn', 'iade edildi': 'muted', 'kısmi iade': 'info', 'mahsup edildi': 'info',
 };
 export const badge = (v, label) => (v == null || v === '' ? '—' : `<span class="badge b-${BADGE[v] || 'muted'}">${esc(label ?? v)}</span>`);

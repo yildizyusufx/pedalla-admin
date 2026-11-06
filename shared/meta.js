@@ -10,6 +10,10 @@ export const SERVICE_TYPES = ['periyodik bakım', 'arıza', 'hasar', 'garanti', 
 export const PAY_METHODS = ['banka havalesi', 'SEPA otomatik ödeme', 'kredi kartı', 'nakit', 'PayPal', 'depozitodan mahsup'];
 export const PERIODS = ['gün', 'hafta', 'ay'];
 export const ID_TYPES = ['Kimlik kartı (Personalausweis)', 'Pasaport', 'Oturum izni (Aufenthaltstitel)', 'Ehliyet'];
+export const DOC_LANGS = [{ v: 'de', l: 'Almanca (Deutsch)' }, { v: 'en', l: 'İngilizce (English)' }];
+export const DOC_TYPES = ['Kimlik ön yüz', 'Kimlik arka yüz', 'Pasaport', 'Oturum izni', 'Ehliyet', 'Adres belgesi (Meldebescheinigung)', 'Ticaret sicili / Gewerbeanmeldung', 'İmzalı sözleşme', 'Teslim fotoğrafı', 'Hasar fotoğrafı', 'Diğer'];
+export const CASH_IN = ['Fatura tahsilatı', 'Depozito tahsilatı', 'Servis / parça satışı', 'Kasaya para konuldu', 'Diğer gelir'];
+export const CASH_OUT = ['Depozito iadesi', 'Masraf / malzeme', 'Yakıt / ulaşım', 'Personel avansı', 'Bankaya yatırıldı', 'Diğer gider'];
 export const PART_CATEGORIES = ['fren', 'lastik/jant', 'zincir/aktarma', 'batarya', 'motor/elektrik', 'ışık', 'kargo kutusu', 'gidon/sele', 'aksesuar', 'diğer'];
 
 export const ROLES = {
@@ -85,6 +89,7 @@ export const RESOURCES = {
       { k: 'address', l: 'Adres', t: 'textarea' },
       { k: 'city', l: 'Şehir', list: 1 },
       { k: 'iban', l: 'IBAN (SEPA)' },
+      { k: 'doc_lang', l: 'Sözleşme / fatura dili', t: 'select', o: DOC_LANGS, def: 'de' },
       { k: 'id_verified', l: 'Kimlik doğrulandı', t: 'bool' },
       { k: 'blacklisted', l: 'Kara liste', t: 'bool', list: 1 },
       { k: 'notes', l: 'Notlar', t: 'textarea' },
@@ -93,11 +98,11 @@ export const RESOURCES = {
   riders: {
     label: 'Sürücüler (bisiklet kullanıcıları)', single: 'Sürücü', perm: 'customers', order: 'name', search: ['name', 'phone', 'email', 'customer_label'],
     title: (r) => r.name,
-    listSql: `SELECT r.*, COALESCE(c.company_name,c.name) AS customer_label,
+    listSql: `SELECT r.*, CASE WHEN c.type='bireysel' THEN 'Doğrudan müşteri' ELSE COALESCE(c.company_name,c.name) END AS customer_label, c.type AS customer_type,
       (SELECT b.code FROM rentals x JOIN bikes b ON b.id=x.bike_id WHERE x.rider_id=r.id AND x.status='aktif' LIMIT 1) AS current_bike
       FROM riders r LEFT JOIN customers c ON c.id=r.customer_id`,
     fields: [
-      { k: 'customer_id', l: 'Bağlı müşteri', t: 'ref', ref: 'customers', req: 1, list: 1, show: 'customer_label' },
+      { k: 'customer_id', l: 'Bağlı firma (boş bırakılırsa sürücü doğrudan müşteri olur)', t: 'ref', ref: 'customers', list: 1, show: 'customer_label' },
       { k: 'name', l: 'Ad soyad', req: 1, list: 1 },
       { k: 'phone', l: 'Telefon', t: 'tel', list: 1 },
       { k: 'email', l: 'E-posta', t: 'email' },
@@ -162,7 +167,7 @@ export const RESOURCES = {
   invoices: {
     label: 'Faturalar', single: 'Fatura', perm: 'finance', order: 'issue_date DESC, id DESC', search: ['invoice_no', 'customer_label', 'contract_no'],
     title: (r) => r.invoice_no,
-    listSql: `SELECT i.*, COALESCE(c.company_name,c.name) AS customer_label, r.contract_no,
+    listSql: `SELECT i.*, COALESCE(c.company_name,c.name) AS customer_label, c.name AS customer_name, c.phone AS customer_phone, c.doc_lang AS customer_lang, r.contract_no,
       CASE WHEN i.status IN ('açık','kısmi') AND i.due_date < date('now') THEN CAST(julianday('now') - julianday(i.due_date) AS INTEGER) ELSE 0 END AS days_late,
       (i.total + i.late_fee - i.paid_amount) AS balance
       FROM invoices i LEFT JOIN customers c ON c.id=i.customer_id LEFT JOIN rentals r ON r.id=i.rental_id`,
@@ -282,6 +287,20 @@ export const RESOURCES = {
       { k: 'notes', l: 'Not' },
     ],
   },
+  cash_moves: {
+    label: 'Kasa', single: 'Kasa hareketi', perm: 'finance', order: 'date DESC, id DESC', search: ['category', 'description', 'user_name'],
+    title: (r) => `Kasa #${r.id}`, noCreate: 1, noEdit: 1,
+    listSql: `SELECT m.*, u.name AS user_name, p.invoice_id, i.invoice_no, r.contract_no FROM cash_moves m LEFT JOIN users u ON u.id=m.user_id
+      LEFT JOIN payments p ON p.id=m.payment_id LEFT JOIN invoices i ON i.id=p.invoice_id LEFT JOIN rentals r ON r.id=m.rental_id`,
+    fields: [
+      { k: 'date', l: 'Tarih', t: 'date', req: 1, list: 1 },
+      { k: 'type', l: 'Hareket', t: 'select', o: opt(['giriş', 'çıkış', 'sayım farkı']), req: 1, list: 1, badge: 1 },
+      { k: 'category', l: 'Kategori', list: 1 },
+      { k: 'description', l: 'Açıklama', list: 1 },
+      { k: 'amount', l: 'Tutar', t: 'money', req: 1, list: 1 },
+      { k: 'user_name', l: 'Kullanıcı', ro: 1, list: 1 },
+    ],
+  },
   suppliers: {
     label: 'Tedarikçiler', single: 'Tedarikçi', perm: 'stock', order: 'name', search: ['name', 'contact', 'email'],
     title: (r) => r.name,
@@ -341,5 +360,12 @@ export const DEFAULT_SETTINGS = {
   map_center_lat: '53.5600',
   map_center_lng: '9.9500',
   contract_terms: 'Kiracı, bisikleti özenle kullanmayı, yalnızca sözleşmede adı geçen sürücülere kullandırmayı ve her hasarı derhal bildirmeyi kabul eder. Bakım, onarım ve sigorta kiralama bedeline dahildir; kullanıcı hatasından kaynaklanan hasarlar ve kayıp/çalıntı durumunda muafiyet tutarı kiracıya faturalanır. Geciken iadelerde günlük gecikme bedeli uygulanır. Depozito, bisikletin eksiksiz ve hasarsız iadesinden sonra 7 iş günü içinde iade edilir.',
+  doc_lang: 'de',
+  contract_terms_de: 'Der Mieter verpflichtet sich, das Fahrrad sorgfältig zu behandeln, es nur den im Vertrag genannten Fahrern zu überlassen und jeden Schaden unverzüglich zu melden. Wartung, Reparatur und Versicherung sind im Mietpreis enthalten; durch unsachgemäßen Gebrauch verursachte Schäden sowie die Selbstbeteiligung bei Verlust oder Diebstahl werden dem Mieter in Rechnung gestellt. Bei verspäteter Rückgabe wird eine tägliche Verzugsgebühr berechnet. Die Kaution wird innerhalb von 7 Werktagen nach vollständiger und schadenfreier Rückgabe erstattet.',
+  contract_terms_en: 'The renter agrees to handle the bike with care, to let only the riders named in this agreement use it and to report any damage immediately. Maintenance, repairs and insurance are included in the rental fee; damage caused by misuse and the deductible in case of loss or theft are charged to the renter. A daily late fee applies to late returns. The deposit is refunded within 7 working days after the bike has been returned complete and undamaged.',
+  service_terms_de: 'Die Kostenschätzung dient nur zur Information; Arbeiten, die die Schätzung um mehr als 20 % übersteigen, werden nur nach Zustimmung des Kunden ausgeführt. Für Fahrräder, die nicht innerhalb von 14 Tagen nach Fertigmeldung abgeholt werden, kann eine Lagergebühr berechnet werden.',
+  service_terms_en: 'The cost estimate is for information only; work exceeding the estimate by more than 20% is carried out only with the customer\'s approval. A storage fee may be charged for bikes not collected within 14 days after notification that they are ready.',
+  whatsapp_de: 'Hallo {name}, die Rechnung {invoice_no} über {amount} war am {due_date} fällig. Bitte überweisen Sie den Betrag auf {iban} (Verwendungszweck: {invoice_no}). Vielen Dank! {company}',
+  whatsapp_en: 'Hello {name}, invoice {invoice_no} for {amount} was due on {due_date}. Please transfer the amount to {iban} (reference: {invoice_no}). Thank you! {company}',
   service_terms: 'Servise bırakılan bisiklet için tahmini maliyet bilgilendirme amaçlıdır; tahmini tutarın %20 üzerine çıkacak işlemler için müşteri onayı alınır. Hazır olduğu bildirildikten sonra 14 gün içinde teslim alınmayan bisikletler için depolama ücreti uygulanabilir.',
 };
