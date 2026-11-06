@@ -7,6 +7,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { randomBytes } from 'node:crypto';
 import { crypto, hashPassword } from './shared/node-crypto.js';
 import { createApi } from './shared/api.js';
+import { corsHeaders } from './shared/cors.js';
 import { seed } from './shared/seed.js';
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
@@ -43,11 +44,13 @@ const server = http.createServer(async (req, res) => {
   try {
     if (url.pathname === '/api/_mode') { res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' }); return res.end('{"db":true}'); }
     if (url.pathname.startsWith('/api/')) {
+      const cors = corsHeaders(req.headers.origin, url.pathname);
+      if (req.method === 'OPTIONS') { res.writeHead(204, cors); return res.end(); }
       let raw = ''; for await (const ch of req) { raw += ch; if (raw.length > 6e6) throw new Error('too large'); }
       let body = {}; if (raw) { try { body = JSON.parse(raw); } catch { body = {}; } }
       const token = (req.headers.authorization || '').replace(/^Bearer /, '') || null;
       const out = await api.handle({ method: req.method, path: url.pathname, query: Object.fromEntries(url.searchParams), body, token });
-      res.writeHead(out.status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+      res.writeHead(out.status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...cors });
       return res.end(JSON.stringify(out.body));
     }
     let p = url.pathname === '/' ? '/index.html' : url.pathname;

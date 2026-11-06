@@ -858,6 +858,23 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
     const [, b, c] = seg;
     if (b === 'config' && method === 'GET') return ok({ signup: setting('portal_signup') !== '0', company: setting('company_name'), id_types: ID_TYPES });
     if (b === 'bike-types' && method === 'GET') return ok(await bikeTypeList());
+    if (b === 'catalog' && method === 'GET') {
+      // public data for the marketing website: bike types, cheapest active plan per type, free bikes and
+      // their rough position (rounded to ~100 m, no codes) for the map
+      const periods = enabledPeriods(SETTINGS);
+      const plans = (await db.all('SELECT bike_type, period, price, deposit FROM pricing_plans WHERE active=1 ORDER BY price')).filter((p) => periods.includes(p.period));
+      const free = await db.all("SELECT type, lat, lng FROM bikes WHERE status='müsait'");
+      const types = (await bikeTypeList()).map((x) => {
+        const pl = plans.filter((p) => p.bike_type === x.name);
+        const best = pl.find((p) => p.period === 'ay') || pl[0] || null;
+        return { ...x, price: best?.price ?? null, deposit: best?.deposit ?? null, period: best?.period ?? null, available: free.filter((f) => f.type === x.name).length };
+      });
+      const rnd = (n) => Math.round(n * 1000) / 1000;
+      return ok({
+        signup: setting('portal_signup') !== '0', periods, types, id_types: ID_TYPES,
+        fleet: free.filter((f) => Number.isFinite(f.lat) && Number.isFinite(f.lng) && f.lat && f.lng).map((f) => ({ type: f.type, lat: rnd(f.lat), lng: rnd(f.lng) })),
+      });
+    }
     if (b === 'signup' && method === 'POST') {
       // self-registration from the rider screen: creates a rider + an individual customer; staff checks the ID before renting
       if (setting('portal_signup') === '0') err(403, 'Kayıt şu an kapalı. Lütfen bizimle iletişime geçin.');

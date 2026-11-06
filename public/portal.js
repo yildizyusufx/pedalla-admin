@@ -112,6 +112,11 @@ const L = {
 const LANGS = [['tr', 'TR'], ['de', 'DE'], ['en', 'EN']];
 const store = { get: (k) => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} } };
 const guessLang = () => { const n = (navigator.language || 'de').slice(0, 2); return L[n] ? n : 'de'; };
+// hand-off from the public website: portal.html?lang=de#t=<token>&go=requests logs the rider straight in
+const handoff = new URLSearchParams(location.hash.startsWith('#t=') ? location.hash.slice(1) : '');
+const qlang = new URLSearchParams(location.search).get('lang');
+if (qlang && L[qlang]) store.set('pedalla_rider_lang', qlang);
+if (handoff.get('t')) { store.set('pedalla_rider_token', handoff.get('t')); history.replaceState(null, '', location.pathname + location.search + '#' + (handoff.get('go') || 'home')); }
 let lang = store.get('pedalla_rider_lang') || guessLang();
 let token = store.get('pedalla_rider_token');
 let data = null; let tab = (location.hash.slice(1) || 'home');

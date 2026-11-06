@@ -1,0 +1,12 @@
+{
+  "name": "pedalla-website",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Pedalla public website (pedalla.bike) – static, DE/EN/TR",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build": "node build.mjs",
+    "dev": "node build.mjs && node dev.mjs"
+  }
+}

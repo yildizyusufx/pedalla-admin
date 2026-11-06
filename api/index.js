@@ -4,6 +4,7 @@ import { createApi } from '../shared/api.js';
 import { libsqlDb } from '../shared/db-libsql.js';
 import { seedRemote } from '../shared/dump.js';
 import { crypto } from '../shared/node-crypto.js';
+import { corsHeaders } from '../shared/cors.js';
 
 let ready;
 const looksUrl = (v) => /^(libsql|https?|wss?):|turso\.io/i.test(v);
@@ -83,6 +84,8 @@ export default async function handler(req, res) {
     const rewritten = url.searchParams.get('__path');
     url.searchParams.delete('__path');
     const path = rewritten != null && !url.pathname.startsWith('/api/') ? `/api/${rewritten}` : url.pathname;
+    for (const [k, v] of Object.entries(corsHeaders(req.headers.origin, path))) res.setHeader(k, v);
+    if (req.method === 'OPTIONS') { res.statusCode = 204; return res.end(); }
     const body = req.method === 'GET' ? {} : await readBody(req);
     const token = (req.headers.authorization || '').replace(/^Bearer /, '') || null;
     const out = await api.handle({ method: req.method, path, query: Object.fromEntries(url.searchParams), body, token });
