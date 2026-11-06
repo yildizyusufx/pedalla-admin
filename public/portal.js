@@ -4,6 +4,7 @@ import { DOC_TYPES } from './shared/meta.js';
 
 const L = {
   tr: {
+    loc_h: 'Konum paylaşımı', loc_text: 'Bisikletin güvenliği ve hızlı yardım için, bu ekran açıkken telefonunuzun konumu Pedalla ile paylaşılır. İstediğiniz zaman Profil\'den kapatabilirsiniz.', loc_allow: 'Konumu paylaş', loc_later: 'Şimdi değil', loc_on: 'Konum paylaşılıyor', loc_off: 'Konum paylaşılmıyor', loc_stop: 'Paylaşımı durdur', loc_denied: 'Konum izni verilmedi. Telefon ayarlarından tarayıcıya konum izni verin.', loc_last: 'son gönderim',
     title: 'Sürücü ekranı', login_h: 'Sürücü girişi', login_sub: 'Pedalla\'nın size verdiği e-posta ve şifre ile giriş yapın.', email: 'E-posta', password: 'Şifre', login: 'Giriş yap',
     logout: 'Çıkış yap', hello: 'Merhaba', home: 'Ana sayfa', requests: 'Talepler', payments: 'Ödemeler', docs: 'Belgeler', profile: 'Profil',
     notices: 'Bildirimler', no_notices: 'Şu an her şey yolunda. Yeni bildirim yok.', my_bike: 'Bisikletim', no_rental: 'Şu an aktif bir kiralamanız yok.',
@@ -36,6 +37,7 @@ const L = {
     n_service_ready: '{bike} bisikletiniz servisten hazır ({no}). Teslim alabilirsiniz.',
   },
   de: {
+    loc_h: 'Standortfreigabe', loc_text: 'Zur Sicherheit des Fahrrads und für schnelle Hilfe wird der Standort Ihres Handys mit Pedalla geteilt, solange diese Seite geöffnet ist. Sie können es jederzeit im Profil ausschalten.', loc_allow: 'Standort teilen', loc_later: 'Nicht jetzt', loc_on: 'Standort wird geteilt', loc_off: 'Standort wird nicht geteilt', loc_stop: 'Freigabe beenden', loc_denied: 'Keine Standortberechtigung. Bitte in den Handy-Einstellungen dem Browser den Standort erlauben.', loc_last: 'zuletzt gesendet',
     title: 'Fahrerbereich', login_h: 'Fahrer-Login', login_sub: 'Melde dich mit der E-Mail und dem Passwort an, die du von Pedalla bekommen hast.', email: 'E-Mail', password: 'Passwort', login: 'Anmelden',
     logout: 'Abmelden', hello: 'Hallo', home: 'Start', requests: 'Anfragen', payments: 'Zahlungen', docs: 'Dokumente', profile: 'Profil',
     notices: 'Hinweise', no_notices: 'Alles in Ordnung. Keine neuen Hinweise.', my_bike: 'Mein Rad', no_rental: 'Du hast derzeit keine aktive Miete.',
@@ -68,6 +70,7 @@ const L = {
     n_service_ready: 'Dein Rad {bike} ist fertig ({no}) und kann abgeholt werden.',
   },
   en: {
+    loc_h: 'Location sharing', loc_text: 'For the bike\'s safety and quick help, your phone\'s location is shared with Pedalla while this screen is open. You can turn it off any time in Profile.', loc_allow: 'Share location', loc_later: 'Not now', loc_on: 'Location is being shared', loc_off: 'Location is not shared', loc_stop: 'Stop sharing', loc_denied: 'Location permission denied. Allow location for your browser in the phone settings.', loc_last: 'last sent',
     title: 'Rider area', login_h: 'Rider login', login_sub: 'Sign in with the e-mail and password you received from Pedalla.', email: 'E-mail', password: 'Password', login: 'Sign in',
     logout: 'Sign out', hello: 'Hi', home: 'Home', requests: 'Requests', payments: 'Payments', docs: 'Documents', profile: 'Profile',
     notices: 'Notifications', no_notices: 'All good. No new notifications.', my_bike: 'My bike', no_rental: 'You have no active rental right now.',
@@ -186,7 +189,7 @@ function bikeCard(x) {
 function homeView() {
   const d = data; const act = d.rentals.filter((x) => ['aktif', 'rezervasyon'].includes(x.status));
   const nd = d.summary.next_due; const nc = d.rentals.find((x) => x.next_charge)?.next_charge;
-  return `<section><h2 class="p-h">${t('notices')}</h2>${d.notifications.length ? d.notifications.map(notice).join('') : `<div class="p-card p-empty">${ic('check')} ${t('no_notices')}</div>`}</section>
+  return `${!store.get(LOC_KEY) && navigator.geolocation ? `<section class="p-card p-loc"><b>📍 ${t('loc_h')}</b><p class="muted">${t('loc_text')}</p><div class="p-row"><button class="btn primary" data-loc="on">${t('loc_allow')}</button><button class="btn ghost" data-loc="off">${t('loc_later')}</button></div></section>` : ''}<section><h2 class="p-h">${t('notices')}</h2>${d.notifications.length ? d.notifications.map(notice).join('') : `<div class="p-card p-empty">${ic('check')} ${t('no_notices')}</div>`}</section>
   <section><h2 class="p-h">${t('my_bike')}</h2>${act.length ? act.map(bikeCard).join('') : `<div class="p-card p-empty">${t('no_rental')}</div>`}</section>
   ${act.length ? `<section><h2 class="p-h">${t('quick')}</h2><div class="p-quick">
     <button data-new="servis randevusu">${ic('wrench')}<span>${t('q_service')}</span></button><button data-new="arıza bildirimi">${ic('alert')}<span>${t('q_fault')}</span></button>
@@ -241,6 +244,7 @@ function profileView() {
     <label class="field"><span>${t('phone')}</span><input name="phone" type="tel" value="${esc(r.phone || '')}"></label>
     <button class="btn p-big">${t('save')}</button></form></section>
   <section><h2 class="p-h">${t('lang')}</h2><div class="p-card">${langSw()}</div></section>
+  ${navigator.geolocation ? `<section><h2 class="p-h">📍 ${t('loc_h')}</h2><div class="p-card"><p>${locOn() ? `<b class="t-ok">${t('loc_on')}</b>${locSent ? ` <small class="muted">· ${t('loc_last')} ${locSent}</small>` : ''}` : `<b>${t('loc_off')}</b>`}</p><p class="muted">${t('loc_text')}</p>${locOn() ? `<button class="btn" data-loc="off">${t('loc_stop')}</button>` : `<button class="btn primary" data-loc="on">${t('loc_allow')}</button>`}</div></section>` : ''}
   <section><h2 class="p-h">${t('change_pw')}</h2><form class="p-card p-form" id="pw">
     <label class="field"><span>${t('cur_pw')}</span><input name="current_password" type="password" autocomplete="current-password" required></label>
     <label class="field"><span>${t('new_pw')}</span><input name="new_password" type="password" minlength="6" autocomplete="new-password" required></label>
@@ -288,7 +292,8 @@ function bind() {
   })));
   el.querySelector('#pf')?.addEventListener('submit', guard(async (e) => { e.preventDefault(); data = await api('PUT', 'me', { phone: e.target.phone.value }); toast(t('saved')); shell(); }));
   el.querySelector('#pw')?.addEventListener('submit', guard(async (e) => { e.preventDefault(); data = await api('PUT', 'me', Object.fromEntries(new FormData(e.target))); toast(t('saved')); shell(); }));
-  el.querySelector('#lo')?.addEventListener('click', guard(async () => { await api('POST', 'logout').catch(() => {}); setToken(null); render(); }));
+  el.querySelectorAll('[data-loc]').forEach((b) => (b.onclick = () => { store.set(LOC_KEY, b.dataset.loc); if (b.dataset.loc === 'on') startLoc(true); else stopLoc(); shell(); }));
+  el.querySelector('#lo')?.addEventListener('click', guard(async () => { await api('POST', 'logout').catch(() => {}); stopLoc(); setToken(null); render(); }));
 }
 // photos are resized in the browser so uploads stay small on mobile data
 async function fileToData(file) {
@@ -305,9 +310,23 @@ async function fileToData(file) {
   return { name: file.name, mime: file.type || (/\.pdf$/i.test(file.name) ? 'application/pdf' : 'image/jpeg'), data: await read(file) };
 }
 
+// ---- location sharing (only while this screen is open; the browser asks the rider for permission) ----
+const LOC_KEY = 'pedalla_rider_loc';
+const locOn = () => store.get(LOC_KEY) === 'on';
+let locWatch = null; let locLast = 0; let locSent = '';
+function startLoc(ask) {
+  if (!navigator.geolocation || locWatch != null || !token) return;
+  locWatch = navigator.geolocation.watchPosition(async (p) => {
+    if (Date.now() - locLast < 60000) return; // at most once a minute
+    locLast = Date.now();
+    try { await api('POST', 'location', { lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy }); locSent = new Date().toTimeString().slice(0, 5); } catch {}
+  }, (e) => { if (e.code === 1) { store.set(LOC_KEY, 'off'); stopLoc(); if (ask) toast(t('loc_denied'), 'err'); if (data) shell(); } }, { enableHighAccuracy: true, maximumAge: 30000, timeout: 30000 });
+}
+function stopLoc() { if (locWatch != null) navigator.geolocation.clearWatch(locWatch); locWatch = null; }
 async function load() {
   root().innerHTML = '<div class="loading"><div class="spin"></div></div>';
   data = await api('GET', 'me');
+  if (locOn()) startLoc(false);
   if (!store.get('pedalla_rider_lang') && data.rider.lang && L[data.rider.lang]) { lang = data.rider.lang; document.documentElement.lang = lang; }
   if (data.rider.lang && data.rider.lang !== lang && store.get('pedalla_rider_lang')) api('PUT', 'me', { lang }).catch(() => {});
   render();

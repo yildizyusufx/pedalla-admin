@@ -68,3 +68,4 @@ section:first-of-type .p-h { margin-top: 6px; }
 @media (min-width: 900px) { .p-nav { max-width: 640px; margin: 0 auto; border: 1px solid var(--line); border-radius: 16px 16px 0 0; } }
 .p-top .p-lang button { padding: 5px 8px; font-size: 12px; }
 @media (max-width: 440px) { .p-top-tag { display: none; } .p-top-logo { height: 22px; } }
+.p-loc { margin-bottom: 16px; border: 1px solid color-mix(in srgb, var(--brand, #EB4056) 30%, transparent); } .p-loc p { margin: 6px 0 12px; }

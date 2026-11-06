@@ -246,6 +246,8 @@ export async function seed(api, hashPassword) {
     // demo rider portal login (direct customer Lukas Weber): surucu@pedalla.bike / pedalla123
     db.run("UPDATE riders SET portal_email='surucu@pedalla.bike', portal_password_hash=?, portal_active=1, lang='de' WHERE name='Lukas Weber'", [hashPassword('pedalla123')]);
     db.run("UPDATE bikes SET next_service_date=? WHERE id=(SELECT x.bike_id FROM rentals x JOIN riders r ON r.id=x.rider_id WHERE r.name='Lukas Weber' AND x.status='aktif' LIMIT 1)", [addDays(T, 5)]);
+    // phone locations sent from the rider screen (demo)
+    [['Lukas Weber', 53.5511, 9.9937], ['Kemal Arslan', 53.5496, 9.9621], ['Elif Koç', 53.5753, 10.0153]].forEach(([n, la, ln], k) => db.run('UPDATE riders SET last_lat=?, last_lng=?, last_loc_at=?, last_loc_acc=? WHERE name=?', [la, ln, `${T} ${String(9 + k).padStart(2, '0')}:4${k}:00`, 15 + k * 10, n]));
     // QR ids + a few recorded costs (accident, external repair) for the profitability card
     const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     for (const b of bikes) db.run('UPDATE bikes SET uid=? WHERE id=?', [Array.from(globalThis.crypto.getRandomValues(new Uint8Array(8)), (x) => A[x % 32]).join(''), b.id]);

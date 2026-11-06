@@ -321,3 +321,29 @@ tr.off td { opacity: .45; }
 .tbl .sel-c input { flex: 0 0 18px; }
 @media (max-width: 860px) { .tbl td.sel-c { width: auto; align-items: center; padding-top: 8px; padding-bottom: 8px; } .tbl td.sel-c input { flex-basis: 24px; height: 24px; } .bulk-bar { top: 56px; } }
 @media (max-width: 860px) { .tbl:not(.doc .tbl), .tbl:not(.doc .tbl) tbody { display: block; width: 100%; } .tbl td, .tbl td::before { white-space: normal; min-width: 0; overflow-wrap: anywhere; } .tbl td::before { flex: 0 1 45%; } }
+/* service: used parts picker */
+.pp-box { margin-top: 14px; border: 1px solid var(--line); border-radius: 12px; padding: 12px; background: var(--surface-2, transparent); }
+.pp-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: space-between; } .pp-head input { flex: 1; min-width: 200px; max-width: 360px; }
+.pp-cats { margin: 10px 0; }
+.pp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 8px; max-height: 420px; overflow: auto; padding: 2px; }
+.pp { display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; background: var(--surface); }
+.pp label { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; cursor: pointer; }
+.pp label input { width: 20px; height: 20px; flex: 0 0 20px; accent-color: var(--brand); }
+.pp label span { display: flex; flex-direction: column; min-width: 0; } .pp label b { font-size: 13.5px; } .pp label small { color: var(--muted); font-size: 12px; }
+.pp .ppq { width: 64px; flex: 0 0 64px; padding: 6px; }
+.pp.on { border-color: var(--brand); background: color-mix(in srgb, var(--brand) 6%, var(--surface)); }
+.pp.off { opacity: .5; } .pp[hidden] { display: none; }
+.pp-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+/* QR scan */
+.scan-card { margin-bottom: 14px; } .scan-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.scan-in { display: flex; gap: 8px; flex: 1; min-width: 240px; } .scan-in input { flex: 1; }
+.btn .ic, .icon-btn .ic { flex: 0 0 auto; }
+.qr-cam { position: relative; background: #000; border-radius: 12px; overflow: hidden; aspect-ratio: 1 / 1; max-height: 60vh; margin: 0 auto; }
+.qr-cam video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.qr-frame { position: absolute; inset: 18%; border: 3px solid rgba(255,255,255,.9); border-radius: 14px; box-shadow: 0 0 0 999px rgba(0,0,0,.35); }
+/* rider location + balance */
+.rpin { width: 30px; height: 30px; border-radius: 50%; background: #2563eb; color: #fff; font-size: 11px; font-weight: 800; display: grid; place-items: center; border: 3px solid #fff; box-shadow: 0 2px 6px rgba(0,0,0,.35); }
+.rdot { background: #2563eb !important; }
+.rchip-row { margin: 8px 0 4px; } #rchip { display: inline-flex; } #rchip[hidden] { display: none; } #rchip b { margin-left: 4px; }
+.bal-big { font-size: 28px; font-weight: 800; } .bal p { margin: 4px 0 10px; }
+.sub-h { font-size: 13px; margin: 16px 0 6px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }

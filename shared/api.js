@@ -735,12 +735,15 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
     if (user && !can(user, 'finance')) { c.invoices = []; c.payments = []; c.balance = c.overdue = c.deposit_held = null; }
     return c;
   }
-  async function riderDetail(id) {
+  async function riderDetail(id, user) {
     const r = await getOne('riders', id);
     r.customer = r.customer_id ? await db.get('SELECT * FROM customers WHERE id=?', [r.customer_id]) : null;
     r.rentals = await list('rentals', { rider_id: id });
     r.documents = await listDocuments('rider', id);
     r.requests = await list('portal_requests', { rider_id: id, limit: 50 });
+    r.invoices = await db.all(`SELECT * FROM (${baseSql('invoices')}) AS t WHERE rental_id IN (SELECT id FROM rentals WHERE rider_id=?) ORDER BY issue_date DESC, id DESC`, [id]);
+    r.deposits = await db.all('SELECT d.*, x.contract_no FROM deposits d JOIN rentals x ON x.id=d.rental_id WHERE x.rider_id=? ORDER BY d.date DESC, d.id DESC', [id]);
+    if (user && !can(user, 'finance')) { r.invoices = []; r.deposits = []; for (const k of ['balance', 'open_balance', 'overdue', 'deposit_held', 'deposit_pending']) r[k] = null; }
     return r;
   }
   async function invoiceDetail(id) {
@@ -846,6 +849,13 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
     if (!r) err(401, 'Oturum açın.');
     if (b === 'logout') { await db.run('DELETE FROM rider_sessions WHERE token=?', [token]); return ok({ ok: true }); }
     if (b === 'me' && method === 'GET') return ok(await portalData(r));
+    if (b === 'location' && method === 'POST') {
+      // phone location sent from the rider screen (only while it is open and the rider allowed it)
+      const lat = Number(body.lat), lng = Number(body.lng), acc = Number(body.acc);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) err(400, 'Geçersiz konum.');
+      await db.run('UPDATE riders SET last_lat=?, last_lng=?, last_loc_at=?, last_loc_acc=? WHERE id=?', [r6(lat), r6(lng), nowTs(), Number.isFinite(acc) ? Math.round(acc) : null, r.id]);
+      return ok({ ok: true });
+    }
     if (b === 'me' && method === 'PUT') {
       if (body.lang && ['tr', 'de', 'en'].includes(body.lang)) await db.run('UPDATE riders SET lang=? WHERE id=?', [body.lang, r.id]);
       if (body.phone !== undefined) await db.run('UPDATE riders SET phone=? WHERE id=?', [String(body.phone || '').slice(0, 40) || null, r.id]);
@@ -1066,7 +1076,12 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
       // generic
       if (!RESOURCES[a]) err(404, 'Bilinmeyen kaynak.');
       const meta = RESOURCES[a];
-      if (method === 'GET') { need(user, meta.perm); return ok(b ? await getOne(a, Number(b)) : await list(a, query)); }
+      if (method === 'GET') {
+        need(user, meta.perm);
+        const out = b ? await getOne(a, Number(b)) : await list(a, query);
+        if (a === 'riders' && !can(user, 'finance')) for (const x of [out].flat()) for (const k of ['balance', 'open_balance', 'overdue', 'deposit_held', 'deposit_pending']) delete x[k];
+        return ok(out);
+      }
       need(user, meta.perm, 'w');
       if (meta.readonly) err(405, 'Salt okunur.');
       if (method === 'POST' && !b) return ok(await insert(a, body, user));

@@ -112,13 +112,19 @@ export const RESOURCES = {
   riders: {
     label: 'Sürücüler (bisiklet kullanıcıları)', single: 'Sürücü', perm: 'customers', order: 'name', search: ['name', 'phone', 'email', 'customer_label'],
     title: (r) => r.name,
-    listSql: `SELECT r.*, CASE WHEN c.type='bireysel' THEN 'Doğrudan müşteri' ELSE COALESCE(c.company_name,c.name) END AS customer_label, c.type AS customer_type,
-      (SELECT b.code FROM rentals x JOIN bikes b ON b.id=x.bike_id WHERE x.rider_id=r.id AND x.status='aktif' LIMIT 1) AS current_bike
-      FROM riders r LEFT JOIN customers c ON c.id=r.customer_id`,
+    // rider's own balance = deposit held (+) − open invoices of the rider's rentals (−) − deposits not yet collected (−)
+    listSql: `SELECT q.*, ROUND(q.deposit_held - q.open_balance - q.deposit_pending, 2) AS balance FROM (SELECT r.*, CASE WHEN c.type='bireysel' THEN 'Doğrudan müşteri' ELSE COALESCE(c.company_name,c.name) END AS customer_label, c.type AS customer_type,
+      (SELECT b.code FROM rentals x JOIN bikes b ON b.id=x.bike_id WHERE x.rider_id=r.id AND x.status='aktif' LIMIT 1) AS current_bike,
+      (SELECT ROUND(COALESCE(SUM(i.total+i.late_fee-i.paid_amount),0),2) FROM invoices i JOIN rentals x ON x.id=i.rental_id WHERE x.rider_id=r.id AND i.status IN ('açık','kısmi')) AS open_balance,
+      (SELECT ROUND(COALESCE(SUM(i.total+i.late_fee-i.paid_amount),0),2) FROM invoices i JOIN rentals x ON x.id=i.rental_id WHERE x.rider_id=r.id AND i.status IN ('açık','kısmi') AND i.due_date < date('now')) AS overdue,
+      (SELECT ROUND(COALESCE(SUM(CASE d.type WHEN 'tahsil' THEN d.amount ELSE -d.amount END),0),2) FROM deposits d JOIN rentals x ON x.id=d.rental_id WHERE x.rider_id=r.id) AS deposit_held,
+      (SELECT ROUND(COALESCE(SUM(x.deposit_amount),0),2) FROM rentals x WHERE x.rider_id=r.id AND x.status IN ('aktif','rezervasyon') AND x.deposit_status='bekliyor') AS deposit_pending
+      FROM riders r LEFT JOIN customers c ON c.id=r.customer_id) AS q`,
     fields: [
       { k: 'customer_id', l: 'Bağlı firma (boş bırakılırsa sürücü doğrudan müşteri olur)', t: 'ref', ref: 'customers', list: 1, show: 'customer_label' },
       { k: 'name', l: 'Ad soyad', req: 1, list: 1 },
       { k: 'phone', l: 'Telefon', t: 'tel', list: 1 },
+      { k: 'balance', l: 'Bakiye', t: 'money', ro: 1, list: 1 },
       { k: 'email', l: 'E-posta', t: 'email' },
       { k: 'id_type', l: 'Kimlik türü', t: 'select', o: opt(ID_TYPES) },
       { k: 'id_no', l: 'Kimlik / pasaport no', list: 1 },

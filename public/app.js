@@ -32,7 +32,7 @@ const NAV = [
 ];
 const ICONS = {
   grid: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
-  map: '<path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/>', bell: '<path d="M6 8a6 6 0 1 1 12 0c0 7 3 8 3 8H3s3-1 3-8"/><path d="M10 20a2 2 0 0 0 4 0"/>',
+  qr: '<path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4z"/><path d="M14 14h2v2h-2zM18 14h2M14 18v2M18 18h2v2M16 16h2v2"/>', map: '<path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/>', bell: '<path d="M6 8a6 6 0 1 1 12 0c0 7 3 8 3 8H3s3-1 3-8"/><path d="M10 20a2 2 0 0 0 4 0"/>',
   key: '<circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M17 6l3 3M15 8l2 2"/>', bike: '<circle cx="6" cy="16" r="4"/><circle cx="18" cy="16" r="4"/><path d="M6 16 10 8h5l3 8M10 8 8 5H6M12 16l3-8"/>',
   users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 3.5 6"/>', user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
   tag: '<path d="M3 12V3h9l9 9-9 9z"/><circle cx="7.5" cy="7.5" r="1.5"/>', doc: '<path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6M9 13h8M9 17h8"/>',
@@ -58,6 +58,7 @@ function shell() {
     <div class="body"><header class="top"><button class="icon-btn menu" id="menu" aria-label="Menü">☰</button>
       <form class="gsearch" id="gsearch"><input type="search" placeholder="Bisiklet kodu, müşteri, sözleşme, fatura ara…" id="gq"></form>
       ${can('rentals', 'w') ? '<a class="btn primary sm" href="#/rentals/new">+ Kiralama</a>' : ''}${can('service', 'w') ? '<a class="btn sm" href="#/service/new">+ Servis kabul</a>' : ''}${langSwitch()}
+      <button class="icon-btn" id="topscan" title="QR okut" aria-label="QR okut">${icon('qr')}</button>
       <a class="icon-btn bell" href="#/notifications" aria-label="Bildirimler">${icon('bell')}<span class="dot" id="notif-dot" hidden></span></a></header>
       <main id="main"></main></div></div>`;
   $('#logout').onclick = guard(async () => { await POST('logout').catch(() => {}); setToken(null); session.user = null; location.hash = '#/login'; route(); });
@@ -65,6 +66,7 @@ function shell() {
   $('#menu').onclick = () => { const o = $('#side').classList.toggle('open'); $('#sideback').classList.toggle('on', o); };
   $('#sideback').onclick = closeSide; $('#side').querySelectorAll('nav a').forEach((a) => a.addEventListener('click', closeSide));
   bindLangSwitch(appRoot());
+  $('#topscan').onclick = guard(async () => { const txt = await scanQR(); if (!txt) return; const b = await findBikeByCode(txt); location.hash = can('fleet') ? `#/bikes/${b.id}` : `#/service/new?bike_id=${b.id}`; });
   $('#gsearch').onsubmit = (e) => {
     e.preventDefault(); const v = $('#gq').value.trim();
     const qr = v.match(/#\/b\/([A-Za-z0-9-]+)/); // a hand scanner types the whole sticker URL
@@ -136,13 +138,14 @@ let mapTimer;
 async function mapPage(q) {
   clearInterval(mapTimer);
   setMain(`${head('Canlı harita', 'GPS takip cihazlarından gelen son konumlar. Kartlara tıklayarak bisiklet detayına gidin.', `${can('fleet', 'w') ? '<button class="btn sm" id="sim">Konumları güncelle (simülasyon)</button>' : ''}<button class="btn sm" id="refresh">Yenile</button>`)}
-    <div class="map-layout"><div class="map-side card"><div class="card-b"><input type="search" id="mq" placeholder="Kod, müşteri, sürücü…"><div class="chips" id="mchips">${['tümü', ...BIKE_STATUS].map((s) => `<button class="chip ${s === (q.status || 'tümü') ? 'on' : ''}" data-s="${s}">${s === 'tümü' ? 'Tümü' : `<i style="background:${statusHex[s]}"></i>${s}`}</button>`).join('')}</div><div id="mlist" class="mlist"></div></div></div>
+    <div class="map-layout"><div class="map-side card"><div class="card-b"><input type="search" id="mq" placeholder="Kod, müşteri, sürücü…"><div class="chips" id="mchips">${['tümü', ...BIKE_STATUS].map((s) => `<button class="chip ${s === (q.status || 'tümü') ? 'on' : ''}" data-s="${s}">${s === 'tümü' ? 'Tümü' : `<i style="background:${statusHex[s]}"></i>${s}`}</button>`).join('')}</div><div class="rchip-row"><button class="chip on" id="rchip" hidden><i class="rdot"></i>Sürücü konumları <b></b></button></div><div id="mlist" class="mlist"></div></div></div>
     <div id="map" class="map card"></div></div>`);
   if (!window.L) { $('#map').innerHTML = '<div class="empty">Harita kütüphanesi yüklenemedi (internet bağlantısı gerekli).</div>'; }
   const map = window.L ? L.map('map', { zoomControl: true }).setView([Number(session.settings.map_center_lat) || 53.56, Number(session.settings.map_center_lng) || 9.95], 12) : null;
   if (map) L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
   map?.on('popupopen', (e) => bindQuick(e.popup.getElement(), (id) => bikes.find((x) => x.id == id), async () => { map.closePopup(); await load(); }));
   let layer = map ? L.layerGroup().addTo(map) : null; let bikes = []; let filt = q.status || 'tümü'; const markers = {};
+  let riderPins = []; let showRiders = true;
   const draw = () => {
     const term = ($('#mq')?.value || '').toLowerCase();
     const vis = bikes.filter((b) => (filt === 'tümü' || b.status === filt) && (!term || [b.code, b.customer_label, b.rider_name, b.model].join(' ').toLowerCase().includes(term)));
@@ -155,19 +158,27 @@ async function mapPage(q) {
       m.bindPopup(`<div class="pop"><b>${esc(b.code)}</b> ${badge(b.status)}<br>${esc(b.brand)} ${esc(b.model)}<br>${b.status === 'kirada' ? `Kiracı: <b>${esc(b.customer_label || '—')}</b><br>Sürücü: ${esc(b.rider_name || '—')} ${b.rider_phone ? `<a href="tel:${esc(b.rider_phone)}">${esc(b.rider_phone)}</a>` : ''}<br>Dönüş: ${date(b.end_date)}<br>` : ''}Batarya: ${b.battery_level != null ? '%' + b.battery_level : '—'} · Son sinyal: ${ago(b.last_seen)}${b.lock_requested ? '<br><b class="t-danger">🔒 Durduruldu (kilit komutu gönderildi)</b>' : ''}<div class="pop-acts">${quickBtns(b)}<a class="btn sm" href="#/bikes/${b.id}">Detay →</a></div></div>`);
       m.addTo(layer); markers[b.id] = m;
     }
+    if (showRiders) for (const r of riderPins) {
+      const m = L.marker([r.last_lat, r.last_lng], { icon: L.divIcon({ className: '', html: `<div class="rpin" title="${esc(r.name)}">${esc(r.name.split(' ').map((x) => x[0]).join('').slice(0, 2))}</div>`, iconSize: [30, 30], iconAnchor: [15, 15] }) });
+      m.bindPopup(`<div class="pop"><b>${esc(r.name)}</b> <span class="badge b-info">sürücü</span><br>${esc(r.customer_label || '')}${r.current_bike ? ` · ${esc(r.current_bike)}` : ''}<br>${r.phone ? `<a href="tel:${esc(r.phone)}">${esc(r.phone)}</a><br>` : ''}Telefon konumu: ${ago(r.last_loc_at)}${r.last_loc_acc ? ` · ±${num(r.last_loc_acc)} m` : ''}<div class="pop-acts"><a class="btn sm" href="#/riders/${r.id}">Sürücü →</a></div></div>`);
+      m.addTo(layer);
+    }
     $('#mlist').querySelectorAll('.mitem').forEach((el) => el.onclick = () => { const b = bikes.find((x) => x.id == el.dataset.id); if (map && b?.lat) { map.setView([b.lat, b.lng], 15); markers[b.id]?.openPopup(); } else location.hash = `#/bikes/${b.id}`; });
   };
   const load = async () => {
     const [list, rentals] = await Promise.all([GET('bikes'), GET('rentals', { status: 'aktif' })]);
-    const riders = can('customers') ? await lookup('riders') : [];
+    const riders = can('customers') ? await GET('riders').catch(() => []) : [];
     const byBike = Object.fromEntries(rentals.map((r) => [r.bike_id, r]));
-    bikes = list.map((b) => { const r = byBike[b.id]; const rd = riders.find((x) => x.id === r?.rider_id); return { ...b, customer_label: r?.customer_label, rider_name: r?.rider_name, rider_phone: rd?.raw.phone, end_date: r?.end_date }; });
+    bikes = list.map((b) => { const r = byBike[b.id]; const rd = riders.find((x) => x.id === r?.rider_id); return { ...b, customer_label: r?.customer_label, rider_name: r?.rider_name, rider_phone: rd?.phone, end_date: r?.end_date }; });
+    riderPins = riders.filter((r) => r.last_lat != null && r.last_loc_at && r.last_loc_at >= addDays(todayISO(), -2));
+    const rc = $('#rchip'); if (rc) { rc.hidden = !riderPins.length; rc.querySelector('b').textContent = riderPins.length; }
     draw();
   };
   await load();
   $('#mq').oninput = draw;
   $('#mchips').querySelectorAll('.chip').forEach((c) => c.onclick = () => { filt = c.dataset.s; $('#mchips .on')?.classList.remove('on'); c.classList.add('on'); draw(); });
   $('#refresh').onclick = guard(load);
+  $('#rchip').onclick = () => { showRiders = !showRiders; $('#rchip').classList.toggle('on', showRiders); draw(); };
   $('#sim')?.addEventListener('click', guard(async () => { const r = await POST('simulate'); toast(`${r.moved} bisikletin konumu güncellendi`); await load(); }));
   mapTimer = setInterval(() => { if (!document.getElementById('map')) return clearInterval(mapTimer); load().catch(() => {}); }, 30000);
   setTimeout(() => map?.invalidateSize(), 50);
@@ -177,7 +188,7 @@ async function mapPage(q) {
 const LISTS = {
   bikes: { link: (r) => `#/bikes/${r.id}`, chips: ['status', BIKE_STATUS], sub: 'Filodaki tüm bisikletler, durumları ve bakım tarihleri.', actions: (q) => `<a class="btn sm" href="#/bikes/qr${q.status ? `?status=${encodeURIComponent(q.status)}` : ''}">QR etiketleri</a>` },
   customers: { link: (r) => `#/customers/${r.id}`, sub: 'Kurumsal (kurye firmaları) ve bireysel kiracılar.' },
-  riders: { link: (r) => `#/riders/${r.id}`, sub: 'Bisikleti fiilen kullanan kişiler. Firmaya bağlı kuryeleri firmayla, bireysel kiracıları "Bağlı firma" boş bırakarak kaydedin; sistem onları doğrudan müşteri yapar.' },
+  riders: { fmt: { balance: (r) => (r.balance == null ? '—' : `<b class="${r.balance < 0 ? 't-danger' : r.balance > 0 ? 't-ok' : ''}">${r.balance > 0 ? '+' : ''}${money(r.balance)}</b>`) }, link: (r) => `#/riders/${r.id}`, sub: 'Bisikleti fiilen kullanan kişiler. Firmaya bağlı kuryeleri firmayla, bireysel kiracıları "Bağlı firma" boş bırakarak kaydedin; sistem onları doğrudan müşteri yapar.' },
   pricing_plans: { sub: 'Bisiklet tipine göre günlük / haftalık / aylık tarifeler ve depozito tutarları.' },
   payments: { sub: 'Faturalara karşı alınan tüm ödemeler.', create: 'payment' },
   deposits: { sub: 'Depozito tahsilatı, iadesi ve kesintileri.', chips: ['type', ['tahsil', 'iade', 'kesinti']] },
@@ -193,7 +204,7 @@ async function listPage(res, q = {}) {
   const rows = await GET(res, filter);
   const w = can(meta.perm, 'w') && !meta.readonly;
   const canDel = w && !meta.noBulk;
-  const cols = colsFromMeta(res);
+  const cols = colsFromMeta(res).filter((c) => !(c.k === 'balance' && !can('finance'))).map((c) => (cfg.fmt?.[c.k] ? { ...c, f: cfg.fmt[c.k] } : c));
   const chipHtml = cfg.chips ? `<div class="chips">${['', ...cfg.chips[1]].map((v) => `<a class="chip ${(q[cfg.chips[0]] || '') === v ? 'on' : ''}" href="#/${res}${v ? `?${cfg.chips[0]}=${encodeURIComponent(v)}` : ''}">${v || 'Tümü'}</a>`).join('')}</div>` : '';
   setMain(`${head(meta.label, cfg.sub, `<button class="btn sm" id="csv">CSV</button>${cfg.actions ? cfg.actions(q) : ''}${w && !meta.noCreate ? `<button class="btn primary sm" id="new">+ ${meta.single}</button>` : ''}`)}
     <div class="toolbar"><input type="search" id="q" placeholder="Ara…" value="${esc(q.q || '')}">${chipHtml}<span class="muted">${rows.length} kayıt</span></div>
@@ -590,12 +601,24 @@ async function riderPage(id) {
     ${card('Kişisel bilgiler & kimlik', dl([['Telefon', r.phone ? `<a href="tel:${esc(r.phone)}">${esc(r.phone)}</a>` : '—'], ['E-posta', esc(r.email)], ['Doğum tarihi', date(r.birth_date)], ['Uyruk', esc(r.nationality)], ['Kimlik türü', esc(r.id_type)], ['Kimlik no', esc(r.id_no)], ['Geçerlilik', r.id_expiry && r.id_expiry < todayISO() ? `<b class="t-danger">${date(r.id_expiry)} (süresi dolmuş)</b>` : date(r.id_expiry)], ['Ehliyet no', esc(r.license_no)], ['Adres', esc(r.address)], ['Eğitim', r.trained ? '✓ kargo bisikleti eğitimi aldı' : '—'], ['Şu anki bisiklet', esc(r.current_bike || '—')], ['Not', esc(r.notes)]]))}
     ${docsCard('rider', r.id, r.documents, w, 'Evraklar (kimlik, ehliyet, adres belgesi…)')}
   </div>
+  ${r.balance != null ? card('Bakiye', `<div class="bal"><div class="bal-big ${r.balance < 0 ? 't-danger' : r.balance > 0 ? 't-ok' : ''}">${r.balance > 0 ? '+' : ''}${money(r.balance)}</div><p class="muted">Bu sürücünün kendi kiralamalarına göre: depozito (+) − açık faturalar (−) − alınmamış depozito (−). Firma faturalarının tamamı müşteri kartında.</p></div>
+    ${dl([['Tutulan depozito', `<b class="t-ok">+${money(r.deposit_held)}</b>`], ['Açık faturalar', `<b class="${r.open_balance ? 't-danger' : ''}">${r.open_balance ? '−' : ''}${money(r.open_balance)}</b>${r.overdue ? ` <small class="t-danger">(${money(r.overdue)} vadesi geçmiş)</small>` : ''}`], ['Bekleyen depozito', `${r.deposit_pending ? `<b class="t-warn">−${money(r.deposit_pending)}</b>` : money(0)}`]])}
+    ${r.invoices.length ? table(r.invoices.slice(0, 12), [{ k: 'invoice_no', l: 'Fatura' }, { l: 'Tarih', f: (i) => date(i.issue_date) }, { l: 'Vade', f: (i) => date(i.due_date) }, { l: 'Tutar', f: (i) => money(i.total), cls: 'num' }, { l: 'Kalan', f: (i) => money(i.balance), cls: 'num' }, { l: 'Durum', f: (i) => badge(i.days_late ? 'gecikmede' : i.status) }], { link: (i) => `#/invoices/${i.id}` }) : ''}
+    ${r.deposits.length ? `<h3 class="sub-h">Depozito hareketleri</h3>${table(r.deposits, [{ l: 'Tarih', f: (d) => date(d.date) }, { k: 'contract_no', l: 'Sözleşme' }, { l: 'Hareket', f: (d) => badge(d.type) }, { l: 'Tutar', f: (d) => `${d.type === 'tahsil' ? '+' : '−'}${money(d.amount)}`, cls: 'num' }])}` : ''}`) : ''}
+  ${r.last_lat != null ? card(`Son telefon konumu <small class="muted">${ago(r.last_loc_at)}${r.last_loc_acc ? ` · ±${num(r.last_loc_acc)} m` : ''}</small>`, `<div id="rmap" class="map sm"></div><p class="muted"><a href="https://www.google.com/maps?q=${r.last_lat},${r.last_lng}" target="_blank" rel="noopener">Google Haritalar'da aç</a> · Sürücü ekranı açıkken ve sürücü izin verdiyse gönderilir.</p>`) : ''}
   ${card('Sürücü ekranı', `${dl([['Durum', r.portal_active && r.portal_email ? '<span class="badge b-ok">giriş açık</span>' : '<span class="badge b-muted">kapalı</span>'], ['Giriş e-postası', esc(r.portal_email || '—')], ['Son giriş', dt(r.portal_last_login)], ['Dil', esc({ tr: 'Türkçe', de: 'Deutsch', en: 'English' }[r.lang] || '—')], ['Adres', `<a href="${location.origin}${location.pathname.replace(/[^/]*$/, '')}portal.html" target="_blank">${location.host}${location.pathname.replace(/[^/]*$/, '')}portal.html</a>`]])}
     <p class="muted">${r.portal_email ? 'Sürücü bu e-posta ve sizin belirlediğiniz şifreyle girer. Şifreyi değiştirmek veya girişi kapatmak için "Düzenle".' : 'Sürücü ekranını açmak için "Düzenle"den giriş e-postası ve şifre belirleyin.'}</p>
     ${r.requests?.length ? table(r.requests, [{ l: 'Geliş', f: (x) => dt(x.created_at) }, { l: 'Talep', f: (x) => esc(x.type) }, { l: 'İstenen tarih', f: (x) => date(x.preferred_date) }, { l: 'Durum', f: (x) => badge(x.status) }], { link: (x) => `#/portal_requests/${x.id}` }) : ''}`)}
   ${card('Kiralamalar', table(r.rentals, [{ k: 'contract_no', l: 'Sözleşme' }, { k: 'bike_code', l: 'Bisiklet' }, { l: 'Dönem', f: (x) => `${date(x.start_date)} – ${date(x.returned_at || x.end_date)}` }, { l: 'Durum', f: (x) => badge(x.is_late ? 'gecikmede' : x.status) }], { link: (x) => `#/rentals/${x.id}`, empty: 'Kiralama yok' }))}`);
   $('#edit')?.addEventListener('click', () => editForm('riders', r, { onSaved: (x) => (x ? route() : (location.hash = '#/riders')) }));
   bindDocs(main(), route);
+  if (window.L && r.last_lat != null && $('#rmap')) {
+    const m = L.map('rmap').setView([r.last_lat, r.last_lng], 15);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(m);
+    L.marker([r.last_lat, r.last_lng], { icon: L.divIcon({ className: '', html: `<div class="rpin">${esc(r.name.split(' ').map((x) => x[0]).join('').slice(0, 2))}</div>`, iconSize: [30, 30], iconAnchor: [15, 15] }) }).addTo(m);
+    if (r.last_loc_acc) L.circle([r.last_lat, r.last_lng], { radius: r.last_loc_acc, weight: 1, fillOpacity: 0.08 }).addTo(m);
+    setTimeout(() => m.invalidateSize(), 50);
+  }
 }
 
 // ---------- rider requests (from the rider portal) ----------
@@ -738,6 +761,8 @@ async function newServicePage(q) {
   const f = (k) => field('service_orders', k);
   const rq = q.request_id ? await GET(`portal_requests/${q.request_id}`).catch(() => null) : null;
   setMain(`${head('Servis kabul formu', 'Bisiklet servise girerken doldurulur; kaydettikten sonra yazdırıp müşteriye imzalatabilirsiniz.')}
+  <div class="card scan-card"><div class="card-b scan-row"><button type="button" class="btn primary" id="qrscan">${icon('qr')} QR okut</button>
+    <form id="qrf" class="scan-in"><input id="qrin" placeholder="veya QR / bisiklet kodunu yazın (el okuyucu da olur)" autocomplete="off"><button class="btn">Getir</button></form><span id="qrmsg" class="muted"></span></div></div>
   <form id="sf" class="card"><div class="card-b grid-form three">
     <label class="field"><span>Bisiklet *</span><select name="bike_id" required><option value="">Seçin…</option>${bikes.map((b) => `<option value="${b.id}" data-km="${b.odometer_km ?? ''}" data-bat="${b.battery_level ?? ''}" ${String(q.bike_id) === String(b.id) ? 'selected' : ''}>${esc(b.code)} · ${esc(b.model)} (${esc(b.status)})</option>`).join('')}</select></label>
     ${inputHtml(f('type'), 'arıza')}
@@ -776,6 +801,15 @@ async function newServicePage(q) {
   };
   await loadRiders();
   if (q.bike_id) form.bike_id.onchange();
+  const useCode = async (txt) => {
+    const b = await findBikeByCode(txt);
+    form.bike_id.value = String(b.id); await form.bike_id.onchange();
+    $('#qrmsg').innerHTML = `<b class="t-ok">✓ ${esc(b.code)}</b> bulundu, bilgiler dolduruldu`; $('#qrin').value = '';
+    form.querySelector('[name=complaint]').focus();
+  };
+  $('#qrscan').onclick = guard(async () => { const txt = await scanQR(); if (txt) await useCode(txt); });
+  $('#qrf').onsubmit = guard(async (e) => { e.preventDefault(); const v = $('#qrin').value.trim(); if (v) await useCode(v); });
+  if (!q.bike_id) $('#qrin').focus();
   form.onsubmit = guard(async (e) => {
     e.preventDefault(); const d = readForm(form); d.checklist = {}; if (q.request_id) d.request_id = q.request_id;
     CHECK_ITEMS.forEach((c, i) => { d.checklist[c] = form.querySelector(`[name=ck_${i}]:checked`)?.value; delete d[`ck_${i}`]; });
@@ -785,6 +819,72 @@ async function newServicePage(q) {
     else if (pick) { const r = riders.find((x) => String(x.id) === pick); d.brought_by = r?.name || ''; }
     if (!d.signature_name) d.signature_name = d.brought_by;
     const s = await POST('service_orders', d); clearLookups(); toast(`${s.order_no} açıldı`); location.hash = `#/service/${s.id}`;
+  });
+}
+// used parts: tick the boxes (parts that fit this bike's model come first), set quantities, add them all at once
+function partsPicker(parts, bike) {
+  const model = `${bike.brand || ''} ${bike.model || ''}`.toLowerCase();
+  const fits = (p) => (p.compatible || '').toLowerCase().split(/[,;/]/).map((x) => x.trim()).filter((x) => x.length > 2).some((x) => model.includes(x) || x.includes((bike.model || '').toLowerCase()) || /tüm|alle|all/.test(x));
+  const list = parts.map((p) => ({ ...p, fit: fits(p) })).sort((a, b) => (b.fit - a.fit) || (b.stock > 0) - (a.stock > 0) || a.name.localeCompare(b.name, 'tr'));
+  const cats = [...new Set(list.map((p) => p.category).filter(Boolean))];
+  return `<div class="pp-box" id="pp"><div class="pp-head"><b>Kullanılan malzemeleri seçin</b><input type="search" id="ppq" placeholder="Parça ara (kod, ad, model)…"></div>
+    <div class="chips pp-cats"><button type="button" class="chip on" data-c="">Tümü</button>${list.some((p) => p.fit) ? '<button type="button" class="chip" data-c="__fit">Bu bisiklete uygun</button>' : ''}${cats.map((c) => `<button type="button" class="chip" data-c="${esc(c)}">${esc(c)}</button>`).join('')}</div>
+    <div class="pp-grid">${list.map((p) => `<div class="pp ${p.stock <= 0 ? 'off' : ''}" data-id="${p.id}" data-c="${esc(p.category || '')}" data-fit="${p.fit ? 1 : ''}" data-s="${esc(`${p.sku} ${p.name} ${p.compatible || ''}`.toLowerCase())}">
+      <label><input type="checkbox" class="ppc" ${p.stock <= 0 ? 'disabled' : ''}><span><b>${esc(p.name)}</b><small>${esc(p.sku)} · ${tr('stok')} ${num(p.stock, 2)} ${esc(tr(p.unit))} · ${money(p.price)}${p.fit ? ` · <span class="t-ok">${tr('uygun')}</span>` : ''}</small></span></label>
+      <input type="number" class="ppq" min="0.5" step="0.5" value="1" max="${p.stock}" ${p.stock <= 0 ? 'disabled' : ''} aria-label="Miktar"></div>`).join('') || '<div class="empty">Parça kataloğu boş</div>'}</div>
+    <div class="pp-foot"><span id="ppn" class="muted">Seçili parça yok</span><button type="button" class="btn primary sm" id="ppadd" disabled>Seçilenleri ekle (stoktan düş)</button></div></div>`;
+}
+function bindPartsPicker(serviceId) {
+  const box = $('#pp'); if (!box) return;
+  let cat = '';
+  const filter = () => { const q = $('#ppq').value.trim().toLowerCase(); box.querySelectorAll('.pp').forEach((el) => { el.hidden = !((!q || el.dataset.s.includes(q)) && (!cat || (cat === '__fit' ? el.dataset.fit : el.dataset.c === cat)) || el.querySelector('.ppc').checked); }); };
+  const sel = () => [...box.querySelectorAll('.pp')].filter((el) => el.querySelector('.ppc').checked).map((el) => ({ part_id: Number(el.dataset.id), qty: Number(el.querySelector('.ppq').value) || 0, name: el.querySelector('b').textContent }));
+  const upd = () => { const x = sel(); box.querySelectorAll('.pp').forEach((el) => el.classList.toggle('on', el.querySelector('.ppc').checked)); $('#ppn').textContent = x.length ? `${x.length} parça seçildi` : 'Seçili parça yok'; $('#ppadd').disabled = !x.length; };
+  $('#ppq').oninput = filter;
+  box.querySelectorAll('.pp-cats .chip').forEach((c) => (c.onclick = () => { cat = c.dataset.c; box.querySelector('.pp-cats .on')?.classList.remove('on'); c.classList.add('on'); filter(); }));
+  box.querySelectorAll('.ppc').forEach((c) => c.addEventListener('change', upd));
+  box.querySelectorAll('.ppq').forEach((q) => q.addEventListener('input', () => { const c = q.closest('.pp').querySelector('.ppc'); if (!c.disabled && Number(q.value) > 0 && !c.checked) { c.checked = true; upd(); } }));
+  $('#ppadd').onclick = guard(async () => {
+    const items = sel().filter((x) => x.qty > 0); let okN = 0; const fails = [];
+    for (const it of items) { try { await POST(`service_orders/${serviceId}/parts`, { part_id: it.part_id, qty: it.qty }); okN++; } catch (e) { fails.push(`${it.name}: ${e.message}`); } }
+    await route();
+    if (fails.length) modal(`${okN} parça eklendi, ${fails.length} parça eklenemedi`, `<ul class="results">${fails.map((f) => `<li>${esc(f)}</li>`).join('')}</ul>`);
+    else toast(`${okN} parça eklendi, stoktan düşüldü`, 'ok');
+  });
+}
+// ---------- QR scanning (phone / laptop camera) ----------
+async function findBikeByCode(txt) {
+  const m = String(txt).match(/#\/b\/([A-Za-z0-9-]+)/); const code = (m ? m[1] : String(txt).trim().split(/[\s/]/).pop());
+  return await GET(`bikes/by-uid/${encodeURIComponent(code)}`);
+}
+const loadScript = (src) => new Promise((ok, no) => { if (document.querySelector(`script[src="${src}"]`)) return ok(); const el = document.createElement('script'); el.src = src; el.onload = ok; el.onerror = () => no(new Error('Tarayıcı QR okuyucuyu yükleyemedi.')); document.head.appendChild(el); });
+// opens the camera in a modal and resolves with the QR text (null when closed)
+async function scanQR() {
+  if (!navigator.mediaDevices?.getUserMedia) throw new Error('Bu tarayıcı kameraya erişemiyor. Kodu elle yazın veya el okuyucu kullanın.');
+  const native = 'BarcodeDetector' in window && (await window.BarcodeDetector.getSupportedFormats?.().catch(() => []))?.includes('qr_code');
+  if (!native) await loadScript('vendor/jsqr/jsQR.js');
+  let stream;
+  try { stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false }); }
+  catch { throw new Error('Kamera izni verilmedi. Tarayıcı ayarlarından kamera izni verin veya kodu elle yazın.'); }
+  return await new Promise((resolve) => {
+    const body = modal('QR okut', `<div class="qr-cam"><video playsinline muted autoplay></video><div class="qr-frame"></div></div><p class="muted">Bisikletin üzerindeki QR etiketini kameraya gösterin.</p>`);
+    const video = body.querySelector('video'); video.srcObject = stream;
+    const det = native ? new window.BarcodeDetector({ formats: ['qr_code'] }) : null;
+    const cv = document.createElement('canvas'); const ctx = cv.getContext('2d', { willReadFrequently: true });
+    let done = false;
+    const finish = (val) => { if (done) return; done = true; stream.getTracks().forEach((t) => t.stop()); obs.disconnect(); closeModal(); resolve(val); };
+    const obs = new MutationObserver(() => { if (!document.body.contains(video)) finish(null); }); obs.observe(document.body, { childList: true, subtree: true });
+    const tick = async () => {
+      if (done) return;
+      if (video.readyState >= 2) {
+        try {
+          if (det) { const r = await det.detect(video); if (r[0]?.rawValue) return finish(r[0].rawValue); }
+          else { const w = Math.min(640, video.videoWidth); const h = Math.round(video.videoHeight * (w / video.videoWidth)); cv.width = w; cv.height = h; ctx.drawImage(video, 0, 0, w, h); const r = window.jsQR(ctx.getImageData(0, 0, w, h).data, w, h, { inversionAttempts: 'dontInvert' }); if (r?.data) return finish(r.data); }
+        } catch {}
+      }
+      setTimeout(tick, 150);
+    };
+    tick();
   });
 }
 async function serviceDetailPage(id) {
@@ -811,7 +911,7 @@ async function serviceDetailPage(id) {
       ${w && !closed ? '<div class="form-actions span2"><button class="btn primary">Kaydet</button></div>' : ''}</form>`)}
   </div>
   ${card('Kullanılan parçalar', table(s.parts, [{ k: 'sku', l: 'Kod' }, { k: 'name', l: 'Parça' }, { l: 'Miktar', f: (p) => `${num(p.qty, 2)} ${esc(p.unit)}`, cls: 'num' }, { l: 'Birim fiyat', f: (p) => money(p.unit_price), cls: 'num' }, { l: 'Tutar', f: (p) => money(p.qty * p.unit_price), cls: 'num' }, ...(w && !closed ? [{ l: '', f: (p) => `<button class="icon-btn sm" data-rmp="${p.id}" title="Kaldır (stoğa geri al)">✕</button>` }] : [])], { empty: 'Henüz parça kullanılmadı' })
-    + (w && !closed ? `<form id="pf" class="inline-form"><select name="part_id" required><option value="">Parça seçin…</option>${parts.map((p) => `<option value="${p.id}" ${p.stock <= 0 ? 'disabled' : ''}>${esc(p.sku)} · ${esc(p.name)} — stok ${num(p.stock)} · ${money(p.price)}</option>`).join('')}</select><input name="qty" type="number" step="0.5" min="0.5" value="1" style="width:90px"><button class="btn sm">Ekle (stoktan düş)</button></form>` : '')
+    + (w && !closed ? partsPicker(parts, s.bike) : '')
     + `<div class="totals"><div><span>Parça</span><b>${money(s.parts_total)}</b></div><div><span>İşçilik (${num(s.labor_hours, 2)} sa × ${money(s.labor_rate)})</span><b>${money(s.labor_total)}</b></div><div class="grand"><span>Toplam (net)</span><b>${money(s.grand_total)}</b></div></div>`)}`);
   onLang((l) => { lang = l; });
   $('#pintake').onclick = () => printHtml(intakeDoc(s, lang), `${lang === 'en' ? 'Service intake' : 'Serviceannahme'} ${s.order_no}`);
@@ -821,7 +921,7 @@ async function serviceDetailPage(id) {
     await PUT(`service_orders/${id}`, { status: b.dataset.st }); toast(`Durum: ${b.dataset.st}`); route();
   }));
   $('#wf')?.addEventListener('submit', guard(async (e) => { e.preventDefault(); await PUT(`service_orders/${id}`, readForm(e.target)); toast('Kaydedildi'); route(); }));
-  $('#pf')?.addEventListener('submit', guard(async (e) => { e.preventDefault(); await POST(`service_orders/${id}/parts`, readForm(e.target)); toast('Parça eklendi, stoktan düşüldü'); route(); }));
+  bindPartsPicker(id);
   main().querySelectorAll('[data-rmp]').forEach((b) => b.onclick = guard(async () => { await DEL(`service_parts/${b.dataset.rmp}`); toast('Parça kaldırıldı, stoğa iade edildi'); route(); }));
 }
 function docHeader(title, no) {

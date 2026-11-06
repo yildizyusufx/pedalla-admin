@@ -87,7 +87,7 @@ export const INTAKE_CHECKLIST = [
 
 // Columns added after the first release. createApi adds any that are missing (works on existing databases too).
 export const MIGRATIONS = {
-  riders: { portal_email: 'TEXT', portal_password_hash: 'TEXT', portal_active: 'INTEGER DEFAULT 0', portal_last_login: 'TEXT', lang: 'TEXT', id_type: 'TEXT', id_expiry: 'TEXT', birth_date: 'TEXT', nationality: 'TEXT', address: 'TEXT', license_no: 'TEXT', id_checked: 'INTEGER DEFAULT 0' },
+  riders: { last_lat: 'REAL', last_lng: 'REAL', last_loc_at: 'TEXT', last_loc_acc: 'REAL', portal_email: 'TEXT', portal_password_hash: 'TEXT', portal_active: 'INTEGER DEFAULT 0', portal_last_login: 'TEXT', lang: 'TEXT', id_type: 'TEXT', id_expiry: 'TEXT', birth_date: 'TEXT', nationality: 'TEXT', address: 'TEXT', license_no: 'TEXT', id_checked: 'INTEGER DEFAULT 0' },
   service_orders: { brought_by_rider_id: 'INTEGER' },
   customers: { doc_lang: "TEXT DEFAULT 'de'" },
   deposits: { method: 'TEXT' },
