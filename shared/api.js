@@ -1,7 +1,7 @@
 // Pedalla Admin – API core. Runs on Node (node:sqlite) and in the browser demo (sql.js).
 // db adapter: { all(sql, p), get(sql, p), run(sql, p) -> {changes, lastId}, exec(sql), tx(fn) }
 import { RESOURCES, DEFAULT_ROLE_PERMS, DEFAULT_SETTINGS, PERMS, ROLES } from './meta.js';
-import { SCHEMA, INTAKE_CHECKLIST } from './schema.js';
+import { SCHEMA, INTAKE_CHECKLIST, MIGRATIONS } from './schema.js';
 
 export class ApiError extends Error { constructor(status, msg) { super(msg); this.status = status; } }
 const err = (s, m) => { throw new ApiError(s, m); };
@@ -19,6 +19,10 @@ const daysBetween = (a, b) => Math.round((new Date(b + 'T00:00:00Z') - new Date(
 
 export async function createApi(db, { hashPassword, verifyPassword, randomToken }) {
   await db.exec(SCHEMA);
+  for (const [table, cols] of Object.entries(MIGRATIONS)) {
+    const have = new Set((await db.all(`PRAGMA table_info(${table})`)).map((c) => c.name));
+    for (const [col, type] of Object.entries(cols)) if (!have.has(col)) await db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${type}`);
+  }
   // ---------- settings ----------
   // settings + role permissions are read once per request (see handle) and kept in memory
   let SETTINGS = { ...DEFAULT_SETTINGS }; let PERMS_CACHE = DEFAULT_ROLE_PERMS;
@@ -183,6 +187,24 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
     if (!['müsait', 'rezerve'].includes(bike.status)) err(409, `Bisiklet şu an "${bike.status}" durumunda, kiralanamaz.`);
     const clash = await db.get("SELECT contract_no FROM rentals WHERE bike_id=? AND status IN ('aktif','rezervasyon') AND NOT (end_date < ? OR start_date > ?)", [b.bike_id, b.start_date, b.end_date]);
     if (clash) err(409, `Bu tarihlerde bisiklet ${clash.contract_no} ile çakışıyor.`);
+    if (b.rider && typeof b.rider === 'object') {
+      const rd = b.rider;
+      if (!rd.name || !rd.phone || !rd.id_type || !rd.id_no) err(400, 'Teslim alan kişinin adı, telefonu, kimlik türü ve kimlik numarası zorunludur.');
+      const vals = [rd.name, rd.phone, rd.email || null, rd.id_type, rd.id_no, rd.id_expiry || null, rd.birth_date || null, rd.nationality || null, rd.address || null, rd.license_no || null, rd.id_checked ? 1 : 0];
+      if (rd.id) {
+        const ex = await db.get('SELECT * FROM riders WHERE id=?', [rd.id]) || err(404, 'Sürücü bulunamadı.');
+        if (String(ex.customer_id) !== String(b.customer_id)) err(400, 'Seçilen sürücü bu müşteriye bağlı değil.');
+        await db.run('UPDATE riders SET name=?, phone=?, email=COALESCE(?,email), id_type=?, id_no=?, id_expiry=?, birth_date=?, nationality=?, address=?, license_no=?, id_checked=? WHERE id=?', [...vals, rd.id]);
+        b.rider_id = rd.id;
+      } else {
+        b.rider_id = (await db.run('INSERT INTO riders(customer_id,name,phone,email,id_type,id_no,id_expiry,birth_date,nationality,address,license_no,id_checked,active) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,1)', [b.customer_id, ...vals])).lastId;
+        await audit(user, 'oluşturma', 'riders', b.rider_id, rd.name);
+      }
+    }
+    if (!reserve) {
+      const rider = b.rider_id ? await db.get('SELECT * FROM riders WHERE id=?', [b.rider_id]) : null;
+      if (!rider || !rider.id_no) err(400, 'Bisikleti teslim alan kişinin kimlik bilgileri zorunludur (sürücü seçin ve kimlik no girin).');
+    }
     let plan = b.plan_id ? await db.get('SELECT * FROM pricing_plans WHERE id=?', [b.plan_id]) : null;
     const rate = b.rate !== undefined && b.rate !== '' ? Number(b.rate) : plan?.price || 0;
     const deposit = b.deposit_amount !== undefined && b.deposit_amount !== '' ? Number(b.deposit_amount) : plan?.deposit || 0;
@@ -204,6 +226,8 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
   async function activateRental(id, user) {
     const r = await getOne('rentals', id);
     if (r.status !== 'rezervasyon') err(409, 'Sadece rezervasyonlar başlatılabilir.');
+    const rider = r.rider_id ? await db.get('SELECT id_no FROM riders WHERE id=?', [r.rider_id]) : null;
+    if (!rider?.id_no) err(400, 'Teslimden önce bisikleti teslim alan kişiyi ve kimlik bilgilerini girin (Düzenle).');
     await db.run("UPDATE rentals SET status='aktif', start_date=? WHERE id=?", [r.start_date > today() ? today() : r.start_date, id]);
     await db.run("UPDATE bikes SET status='kirada' WHERE id=?", [r.bike_id]);
     await billRental(id, user); await audit(user, 'teslim', 'rentals', id, r.contract_no);
@@ -286,8 +310,8 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
     if (!internal && !b.complaint) err(400, 'Şikayet / talep zorunludur.');
     const bike = await db.get('SELECT * FROM bikes WHERE id=?', [b.bike_id]) || err(404, 'Bisiklet yok.');
     const no = await nextNo('S');
-    const r = await db.run(`INSERT INTO service_orders(order_no,bike_id,customer_id,rental_id,type,status,received_at,received_by,brought_by,km,battery_level,complaint,checklist,visual_condition,accessories,estimated_cost,estimated_ready,technician_id,labor_rate,billable,signature_name)
-      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, [no, b.bike_id, b.customer_id || null, b.rental_id || null, b.type || 'arıza', 'kabul edildi', b.received_at || nowTs(), user?.id,
+    const r = await db.run(`INSERT INTO service_orders(order_no,bike_id,customer_id,rental_id,brought_by_rider_id,type,status,received_at,received_by,brought_by,km,battery_level,complaint,checklist,visual_condition,accessories,estimated_cost,estimated_ready,technician_id,labor_rate,billable,signature_name)
+      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, [no, b.bike_id, b.customer_id || null, b.rental_id || null, b.brought_by_rider_id || null, b.type || 'arıza', 'kabul edildi', b.received_at || nowTs(), user?.id,
       b.brought_by || null, b.km ?? bike.odometer_km, b.battery_level ?? bike.battery_level, b.complaint || '', JSON.stringify(b.checklist || {}), b.visual_condition || null,
       b.accessories || null, b.estimated_cost || null, b.estimated_ready || null, b.technician_id || null, Number(setting('labor_rate')) || 0, b.billable ? 1 : 0, b.signature_name || null]);
     if (bike.status !== 'kirada') await db.run("UPDATE bikes SET status='serviste' WHERE id=?", [b.bike_id]);
@@ -301,6 +325,7 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
     s.bike = await db.get('SELECT * FROM bikes WHERE id=?', [s.bike_id]);
     s.customer = s.customer_id ? await db.get('SELECT * FROM customers WHERE id=?', [s.customer_id]) : null;
     s.received_by_name = (await db.get('SELECT name FROM users WHERE id=?', [s.received_by]))?.name;
+    s.brought_by_rider = s.brought_by_rider_id ? await db.get('SELECT * FROM riders WHERE id=?', [s.brought_by_rider_id]) : null;
     s.labor_total = r2((s.labor_hours || 0) * (s.labor_rate || 0));
     s.grand_total = r2(s.labor_total + s.parts_total);
     s.checklist_items = INTAKE_CHECKLIST;

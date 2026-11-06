@@ -91,10 +91,13 @@ export async function seed(api, hashPassword) {
     db.run("UPDATE customers SET notes='İki kez ödeme gecikmesi ve iade edilmeyen kilit. Yeni kiralama yapılmasın.' WHERE id=?", [customers[8]]);
     const riderNames = ['Kemal Arslan', 'Jan Petersen', 'Mia Schröder', 'Omar Haddad', 'Leon Wolf', 'Sara Yılmaz', 'Felix Braun', 'Lea Zimmermann', 'Can Öztürk', 'Tim Hartmann', 'Hannah König', 'David Lang', 'Elif Koç', 'Max Richter', 'Julia Klein', 'Ben Wójcik', 'Ayşe Çelik', 'Noah Krause'];
     const riderCust = [0, 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 3, 4, 4, 4, 7, 7, 2];
-    const riders = riderNames.map((n, i) => ({ id: ins('INSERT INTO riders(customer_id,name,phone,trained,active) VALUES(?,?,?,?,1)', [customers[riderCust[i]], n, `+49 15${i % 10} 555${2000 + i}`, rnd() > 0.2 ? 1 : 0]), c: riderCust[i] }));
+    const idTypes = ['Kimlik kartı (Personalausweis)', 'Pasaport', 'Oturum izni (Aufenthaltstitel)'];
+    const riders = riderNames.map((n, i) => ({ id: ins(`INSERT INTO riders(customer_id,name,phone,trained,active,id_type,id_no,id_expiry,birth_date,nationality,address,id_checked)
+      VALUES(?,?,?,?,1,?,?,?,?,?,?,1)`, [customers[riderCust[i]], n, `+49 15${i % 10} 555${2000 + i}`, rnd() > 0.2 ? 1 : 0, idTypes[i % 3], `L${String(700000 + i * 7919).slice(0, 6)}X${i}`,
+      addDays(T, 400 + i * 30), `${1985 + (i % 15)}-0${1 + (i % 9)}-1${i % 9}`, i % 3 === 1 ? 'Türkiye' : 'Almanya', `Musterstraße ${10 + i}, 2${2000 + i * 13} Hamburg`]), c: riderCust[i] }));
     riderCust.forEach(() => {});
     // individual customers ride themselves
-    for (const ci of [5, 6, 8]) riders.push({ id: ins('INSERT INTO riders(customer_id,name,phone,trained) VALUES(?,?,?,1)', [customers[ci], custData[ci][1], custData[ci][5]]), c: ci });
+    for (const ci of [5, 6, 8]) riders.push({ id: ins("INSERT INTO riders(customer_id,name,phone,trained,id_type,id_no,address,id_checked) VALUES(?,?,?,1,'Kimlik kartı (Personalausweis)',?,?,1)", [customers[ci], custData[ci][1], custData[ci][5], `T${88000 + ci}K${ci}`, custData[ci][6]]), c: ci });
 
     // bikes
     const models = [

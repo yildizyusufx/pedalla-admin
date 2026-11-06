@@ -46,7 +46,7 @@ Vercel sürekli çalışan bir sunucu ve yerel veritabanı dosyası desteklemedi
 
 ## Marka
 
-Renkler ve yazı tipi `public/brand.css` dosyasındadır. pedalla.bike sitesinin stil dosyasına bu ortamdan erişilemediği için yeşil/lime tonları tahmini seçildi; kesin hex kodlarını bu dosyaya yazmanız tüm paneli günceller. Logo `public/app.js` içindeki `LOGO` sabitidir; gerçek logoyu `public/logo.svg` olarak koyup bu sabiti `<img src="logo.svg">` ile değiştirebilirsiniz.
+Logo `public/img/logo.png` (yatay), `public/img/mark.png` (ikon / favicon). Renkler `public/brand.css` dosyasında: kırmızı `#EB4056`, gri `#7A929E`.
 
 ## Modüller
 
@@ -55,13 +55,13 @@ Renkler ve yazı tipi `public/brand.css` dosyasındadır. pedalla.bike sitesinin
 | **Özet ekranı** | Kiradaki / müsait / serviste bisiklet, doluluk oranı, geciken iade, geciken ödeme tutarı, aylık tekrarlayan gelir, tutulan depozito, kritik stok; 12 aylık faturalanan–tahsil edilen grafiği; filo durumu; yaklaşan iadeler, açık servisler, son işlemler |
 | **Canlı harita** | Tüm bisikletler OpenStreetMap üzerinde, duruma göre renkli; kiracı, sürücü, telefon, batarya, son sinyal; filtre ve arama; 30 sn'de bir yenileme. GPS cihazları `POST /api/telemetry` ile konum gönderir |
 | **Bisikletler** | Filo kartı (şasi, batarya, GPS cihazı, sigorta, km, bakım tarihleri), şu anki kiracı ve kullanıcı, konum geçmişi (rota), kiralama ve servis geçmişi, toplam ciro |
-| **Kiralamalar** | Sözleşme oluşturma (müşteri → sürücü → bisiklet → tarife; ücret/depozito otomatik), rezervasyon, teslim, uzatma, iade (km, durum, hasar bedeli, geç iade bedeli, depozitodan mahsup, servise gönderme), yazdırılabilir sözleşme |
+| **Kiralamalar** | Sözleşme oluşturma (müşteri → sürücü → bisiklet → tarife; ücret/depozito otomatik), rezervasyon, teslim, uzatma, iade (km, durum, hasar bedeli, geç iade bedeli, depozitodan mahsup, servise gönderme); bisikleti teslim alan kişinin kimlik bilgileri (kimlik türü/no, geçerlilik, doğum tarihi, uyruk, adres, ehliyet); üç imzalı yazdırılabilir sözleşme sayfası (`#/rentals/:id/contract`) |
 | **Müşteriler & sürücüler** | Kurumsal (kurye firması) ve bireysel kiracılar, kimlik doğrulama, kara liste, IBAN; firmaya bağlı sürücüler (bisikleti fiilen kullanan kişi) ve şu an kullandıkları bisiklet; müşteri bakiyesi |
 | **Tarifeler** | Bisiklet tipine göre günlük / haftalık / aylık fiyat ve depozito |
 | **Faturalar** | Kiralama periyoduna göre otomatik dönem faturaları, hasar / servis / geç iade faturaları, KDV, vade, gecikme gün sayısı, gecikme bedeli, ödeme hatırlatması, yazdırılabilir fatura |
 | **Ödemeler** | Kısmi / tam ödeme, yöntem ve referans; fatura durumu otomatik güncellenir |
 | **Depozitolar** | Tahsil, iade, kesinti hareketleri; kiralama başına tutulan tutar |
-| **Servis** | Servis kabul formu (km, batarya, şikayet, 12 maddelik kontrol listesi, görsel hasar, bırakılan aksesuarlar, tahmini maliyet/tarih, imza), yazdırılabilir kabul formu, durum akışı (kabul → teşhis → parça bekliyor → onarımda → hazır → teslim), parça kullanımı (stoktan otomatik düşer), işçilik, servis raporu, müşteriye faturalama, bir sonraki bakım tarihinin otomatik ayarlanması |
+| **Servis** | Servis kabul formu (teslim eden kişi kiracının sürücü listesinden otomatik, km, batarya, şikayet, 12 maddelik kontrol listesi, görsel hasar, bırakılan aksesuarlar, tahmini maliyet/tarih, imza), yazdırılabilir kabul formu, durum akışı (kabul → teşhis → parça bekliyor → onarımda → hazır → teslim), parça kullanımı (stoktan otomatik düşer), işçilik, servis raporu, müşteriye faturalama, bir sonraki bakım tarihinin otomatik ayarlanması |
 | **Yedek parça & stok** | Katalog, uyumlu modeller, raf, tedarikçi, alış/satış fiyatı, min. stok uyarısı, giriş/çıkış/sayım hareketleri, kullanıldığı servisler, stok değeri |
 | **Raporlar** | Aylık gelir, bisiklet bazında doluluk–ciro–servis maliyeti–katkı, müşteri bazında ciro ve açık bakiye, alacak yaşlandırma, parça tüketimi, servis tipleri ve ortalama süre; hepsi CSV olarak indirilebilir |
 | **Bildirimler** | Geciken ödeme, geciken / yaklaşan iade, alınmamış depozito, kritik stok, bakım zamanı, düşük batarya, GPS sinyali kesilmesi, sigorta bitişi, geciken servis |

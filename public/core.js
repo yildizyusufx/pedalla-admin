@@ -47,7 +47,7 @@ const BADGE = {
 };
 export const badge = (v, label) => (v == null || v === '' ? '—' : `<span class="badge b-${BADGE[v] || 'muted'}">${esc(label ?? v)}</span>`);
 export const STATUS_COLORS = { 'müsait': '#1f9d55', 'kirada': 'var(--brand)', 'rezerve': '#2f6fd6', 'serviste': '#e0a100', 'arızalı': '#d64545', 'kayıp/çalıntı': '#7a1f1f', 'hizmet dışı': '#8a9690' };
-export const statusHex = { 'müsait': '#1f9d55', 'kirada': '#0f6b48', 'rezerve': '#2f6fd6', 'serviste': '#e0a100', 'arızalı': '#d64545', 'kayıp/çalıntı': '#7a1f1f', 'hizmet dışı': '#8a9690' };
+export const statusHex = { 'müsait': '#1f9d55', 'kirada': '#eb4056', 'rezerve': '#2f6fd6', 'serviste': '#e0a100', 'arızalı': '#7a1f2b', 'kayıp/çalıntı': '#6b2fa0', 'hizmet dışı': '#7a929e' };
 
 export function fmtField(f, row) {
   const v = f.show ? row[f.show] ?? row[f.k] : row[f.k];

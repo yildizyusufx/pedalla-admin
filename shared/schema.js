@@ -68,3 +68,10 @@ export const INTAKE_CHECKLIST = [
   'Frenler (ön/arka)', 'Lastikler ve hava basıncı', 'Zincir / kayış', 'Vites', 'Işıklar (ön/arka)', 'Zil / korna',
   'Batarya ve şarj soketi', 'Ekran / kumanda', 'Motor desteği', 'Kargo kutusu / kilit', 'Ayaklık (sehpa)', 'Gövde / boya',
 ];
+
+// Columns added after the first release. createApi adds any that are missing (works on existing databases too).
+export const MIGRATIONS = {
+  riders: { id_type: 'TEXT', id_expiry: 'TEXT', birth_date: 'TEXT', nationality: 'TEXT', address: 'TEXT', license_no: 'TEXT', id_checked: 'INTEGER DEFAULT 0' },
+  service_orders: { brought_by_rider_id: 'INTEGER' },
+};
+export const ID_TYPES = ['Kimlik kartı (Personalausweis)', 'Pasaport', 'Oturum izni (Aufenthaltstitel)', 'Ehliyet'];

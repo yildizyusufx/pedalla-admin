@@ -9,6 +9,7 @@ export const SERVICE_STATUS = ['kabul edildi', 'teşhis', 'parça bekliyor', 'on
 export const SERVICE_TYPES = ['periyodik bakım', 'arıza', 'hasar', 'garanti', 'kaza'];
 export const PAY_METHODS = ['banka havalesi', 'SEPA otomatik ödeme', 'kredi kartı', 'nakit', 'PayPal', 'depozitodan mahsup'];
 export const PERIODS = ['gün', 'hafta', 'ay'];
+export const ID_TYPES = ['Kimlik kartı (Personalausweis)', 'Pasaport', 'Oturum izni (Aufenthaltstitel)', 'Ehliyet'];
 export const PART_CATEGORIES = ['fren', 'lastik/jant', 'zincir/aktarma', 'batarya', 'motor/elektrik', 'ışık', 'kargo kutusu', 'gidon/sele', 'aksesuar', 'diğer'];
 
 export const ROLES = {
@@ -100,7 +101,14 @@ export const RESOURCES = {
       { k: 'name', l: 'Ad soyad', req: 1, list: 1 },
       { k: 'phone', l: 'Telefon', t: 'tel', list: 1 },
       { k: 'email', l: 'E-posta', t: 'email' },
-      { k: 'id_no', l: 'Kimlik no' },
+      { k: 'id_type', l: 'Kimlik türü', t: 'select', o: opt(ID_TYPES) },
+      { k: 'id_no', l: 'Kimlik / pasaport no', list: 1 },
+      { k: 'id_expiry', l: 'Kimlik geçerlilik tarihi', t: 'date' },
+      { k: 'birth_date', l: 'Doğum tarihi', t: 'date' },
+      { k: 'nationality', l: 'Uyruk' },
+      { k: 'license_no', l: 'Ehliyet no (varsa)' },
+      { k: 'address', l: 'Adres', t: 'textarea' },
+      { k: 'id_checked', l: 'Kimlik aslı görüldü / kopyası alındı', t: 'bool', list: 1 },
       { k: 'trained', l: 'Kargo bisikleti eğitimi aldı', t: 'bool', list: 1 },
       { k: 'active', l: 'Aktif', t: 'bool', def: 1, list: 1 },
       { k: 'current_bike', l: 'Şu anki bisiklet', ro: 1, list: 1 },

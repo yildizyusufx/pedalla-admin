@@ -1,14 +1,15 @@
 /* ==========================================================
-   PEDALLA MARKA AYARLARI
-   Sitenin kesin renk kodlarını buraya yazmanız yeterli;
-   tüm panel bu değişkenlerden beslenir.
+   PEDALLA MARKA AYARLARI (logodan alınan renkler)
+   Kırmızı işaret: #EB4056 · Gri yazı: #7A929E
    ========================================================== */
 :root {
-  --brand: #0f6b48;        /* ana marka rengi (yeşil) */
-  --brand-d: #0a4a32;      /* koyu ton: kenar çubuğu, başlıklar */
-  --brand-l: #e5f2ec;      /* açık ton: arka plan vurguları */
-  --accent: #c6f04b;       /* vurgu (lime) */
-  --accent-d: #8fbf1a;     /* grafiklerde ikinci seri */
+  --brand: #eb4056;        /* ana marka rengi (logo kırmızısı): butonlar, aktif menü */
+  --brand-d: #c92b42;      /* koyu kırmızı: hover */
+  --brand-l: #fdebee;      /* açık kırmızı: vurgu arka planı */
+  --slate: #7a929e;        /* logo grisi */
+  --slate-d: #33434c;      /* koyu gri: başlıklar, özet kartı */
+  --accent: #7a929e;       /* ikincil renk (grafiklerde 2. seri) */
+  --accent-d: #7a929e;
   --font: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --radius: 14px;
 }
