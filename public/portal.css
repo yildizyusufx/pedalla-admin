@@ -75,3 +75,10 @@ section:first-of-type .p-h { margin-top: 6px; }
 .p-welcome { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 14px; border-left: 4px solid #1f9d55; }
 .p-price { margin: -4px 0 10px; font-size: 14px; }
 .p-empty .btn { margin-top: 10px; }
+.p-types { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; margin-top: 6px; }
+.p-type { position: relative; display: flex; flex-direction: column; gap: 6px; border: 2px solid var(--line, #e5e7eb); border-radius: 14px; padding: 8px; cursor: pointer; background: #fff; text-align: center; font-size: 13px; font-weight: 600; }
+.p-type input { position: absolute; opacity: 0; pointer-events: none; }
+.p-type-img { aspect-ratio: 4 / 3; border-radius: 10px; background: #f4f5f7; display: grid; place-items: center; overflow: hidden; color: #9aa5ad; }
+.p-type-img img { width: 100%; height: 100%; object-fit: contain; background: #fff; } .p-type-img .ic { width: 40px; height: 40px; }
+.p-type-any { font-size: 28px; font-weight: 800; }
+.p-type:has(input:checked) { border-color: var(--brand, #EB4056); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand, #EB4056) 18%, transparent); }

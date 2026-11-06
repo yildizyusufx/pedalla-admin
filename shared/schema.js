@@ -93,6 +93,6 @@ export const MIGRATIONS = {
   deposits: { method: 'TEXT' },
   users: { lang: 'TEXT' },
   portal_requests: { bike_type: 'TEXT', period: 'TEXT', duration: 'INTEGER' },
-  bikes: { uid: 'TEXT', lock_requested: 'INTEGER DEFAULT 0', stolen_at: 'TEXT' },
+  bikes: { service_interval_days: 'INTEGER', uid: 'TEXT', lock_requested: 'INTEGER DEFAULT 0', stolen_at: 'TEXT' },
 };
 export const ID_TYPES = ['Kimlik kartı (Personalausweis)', 'Pasaport', 'Oturum izni (Aufenthaltstitel)', 'Ehliyet'];

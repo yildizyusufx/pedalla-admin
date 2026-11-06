@@ -359,6 +359,21 @@ export const UI = {
   "gecikmiş": ["überfällig", "overdue"],
   "yaklaşan": ["bald fällig", "due soon"],
   "düzenli": ["pünktlich", "on time"],
+  // periods, type images, service interval
+  'Kiralama periyotları': ['Mietzeiträume', 'Rental periods'],
+  'Sürücülerin ve sizin seçebileceğiniz periyotlar (kapalı olanlar tarife, kiralama ve sürücü ekranında görünmez)': ['Zeiträume, die Sie und die Fahrer wählen können (deaktivierte erscheinen nicht in Tarifen, Mieten und der Fahrer-App)', 'Periods you and riders can choose (disabled ones are hidden in plans, rentals and the rider app)'],
+  'Günlük': ['Täglich', 'Daily'], 'Haftalık': ['Wöchentlich', 'Weekly'], 'Aylık': ['Monatlich', 'Monthly'],
+  'En az bir kiralama periyodu açık olmalı.': ['Mindestens ein Mietzeitraum muss aktiv sein.', 'At least one rental period must be enabled.'],
+  'Tip görselleri': ['Typ-Bilder', 'Type images'],
+  'sürücü ekranında kiralama talebinde gösterilir; yeni tip eklediyseniz önce "Ayarları kaydet"': ['werden in der Fahrer-App bei Mietanfragen gezeigt; neuen Typ zuerst mit „Einstellungen speichern“ sichern', 'shown to riders when requesting a rental; if you added a new type, click "Save settings" first'],
+  'görsel yok': ['kein Bild', 'no image'], 'Değiştir': ['Ändern', 'Change'], 'Görsel yükle': ['Bild hochladen', 'Upload image'], 'Kaldır': ['Entfernen', 'Remove'],
+  'Görsel kaydedildi': ['Bild gespeichert', 'Image saved'], 'Görsel okunamadı.': ['Bild konnte nicht gelesen werden.', 'Could not read the image.'],
+  'Bakımı gelen bisikletler': ['Fällige Wartungen', 'Bikes due for service'],
+  'sürücü ekranında da "bakım zamanı" bildirimi görünür': ['der Fahrer sieht auch einen „Wartung fällig“-Hinweis in der App', 'the rider also sees a "service due" notice in the app'],
+  'WhatsApp ile çağır': ['Per WhatsApp einladen', 'Call in via WhatsApp'], 'Servis kaydı aç': ['Serviceauftrag anlegen', 'Open service order'], 'Bakım tarihi': ['Wartungsdatum', 'Service date'],
+  "Bakım periyodu (gün, boşsa Ayarlar'daki)": ['Wartungsintervall (Tage, leer = aus Einstellungen)', 'Service interval (days, empty = from Settings)'],
+  'Sonraki bakım (boşsa otomatik)': ['Nächste Wartung (leer = automatisch)', 'Next service (empty = automatic)'],
+  'Örn. teslim saati, özel fiyat anlaşması, sürücüye verilen ek bilgi…': ['z. B. Übergabezeit, Sonderpreis, Zusatzinfos für den Fahrer…', 'e.g. handover time, special price agreement, extra info for the rider…'],
 };
 
 // Texts with a variable part (names, numbers) – tried after the exact lookups.

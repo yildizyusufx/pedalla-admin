@@ -1,6 +1,6 @@
 // Pedalla Admin – API core. Runs on Node (node:sqlite) and in the browser demo (sql.js).
 // db adapter: { all(sql, p), get(sql, p), run(sql, p) -> {changes, lastId}, exec(sql), tx(fn) }
-import { RESOURCES, DEFAULT_ROLE_PERMS, DEFAULT_SETTINGS, PERMS, ROLES, REQUEST_TYPES, RIDER_REQUIRED_DOCS, ID_TYPES } from './meta.js';
+import { RESOURCES, DEFAULT_ROLE_PERMS, DEFAULT_SETTINGS, PERMS, ROLES, REQUEST_TYPES, RIDER_REQUIRED_DOCS, ID_TYPES, enabledPeriods } from './meta.js';
 import { SCHEMA, INTAKE_CHECKLIST, MIGRATIONS } from './schema.js';
 
 export class ApiError extends Error { constructor(status, msg) { super(msg); this.status = status; } }
@@ -32,7 +32,7 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
   let SETTINGS = { ...DEFAULT_SETTINGS }; let PERMS_CACHE = DEFAULT_ROLE_PERMS;
   const getSettings = async () => {
     const s = { ...DEFAULT_SETTINGS };
-    for (const row of await db.all('SELECT key, value FROM settings')) s[row.key] = row.value;
+    for (const row of await db.all("SELECT key, value FROM settings WHERE key NOT LIKE 'img_type:%'")) s[row.key] = row.value;
     SETTINGS = s; PERMS_CACHE = s.role_perms ? JSON.parse(s.role_perms) : DEFAULT_ROLE_PERMS;
     return s;
   };
@@ -67,7 +67,7 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
   const baseSql = (res) => RESOURCES[res].listSql || `SELECT * FROM ${res}`;
   const writable = (res) => RESOURCES[res].fields.filter((f) => !f.ro && f.t !== 'password' && !(f.show && f.k === f.show));
   const clean = (f, v) => {
-    if (v === '' || v === undefined) return null;
+    if (v === '' || v === undefined || v === null) return null;
     if (f.t === 'bool') return v ? 1 : 0;
     if (['number', 'money', 'ref'].includes(f.t)) { const n = Number(v); return Number.isFinite(n) ? n : null; }
     return String(v);
@@ -123,6 +123,13 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
       if (body.portal_active === undefined || body.portal_active === '') body.portal_active = 1;
     }
   }
+  // next service date = last service (or purchase / today) + the bike's own interval (or the default from Settings)
+  async function fixServiceDate(id, recalc) {
+    const b = await db.get('SELECT id, last_service_date, purchase_date, next_service_date, service_interval_days FROM bikes WHERE id=?', [id]);
+    if (!b || (!recalc && b.next_service_date)) return;
+    const days = Number(b.service_interval_days) || Number(setting('service_interval_days')) || 90;
+    await db.run('UPDATE bikes SET next_service_date=? WHERE id=?', [addDays([b.last_service_date, b.purchase_date].find((x) => /^\d{4}-\d{2}-\d{2}/.test(x || '')) || today(), days), id]);
+  }
   async function insert(res, body, user) {
     const rx = {}; if (res === 'riders') await riderPortalFields(body, rx, null);
     if (res === 'riders' && !body.customer_id) body.customer_id = await directCustomer(body, user);
@@ -135,11 +142,12 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
     if (res === 'bike_costs') extra.user_id = user?.id ?? null;
     const cols = [...fields.map((f) => f.k), ...Object.keys(extra)];
     const r = await db.run(`INSERT INTO ${res} (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`, [...vals, ...Object.values(extra)]);
+    if (res === 'bikes') await fixServiceDate(r.lastId, false);
     await audit(user, 'oluşturma', res, r.lastId, RESOURCES[res].title?.(body) || '');
     return await getOne(res, r.lastId);
   }
   async function update(res, id, body, user) {
-    await getOne(res, id);
+    const before = await getOne(res, id);
     const rx = {}; if (res === 'riders') await riderPortalFields(body, rx, id);
     const fields = writable(res).filter((f) => body[f.k] !== undefined);
     const sets = fields.map((f) => `${f.k}=?`); const vals = fields.map((f) => clean(f, body[f.k]));
@@ -148,6 +156,11 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
     if (res === 'portal_requests' && body.status !== undefined) { sets.push('handled_by=?', 'handled_at=?'); vals.push(user?.id ?? null, nowTs()); }
     if (sets.length) await db.run(`UPDATE ${res} SET ${sets.join(',')} WHERE id=?`, [...vals, id]);
     if (res === 'invoices') await recalcInvoice(id);
+    if (res === 'bikes') {
+      const intervalChanged = body.service_interval_days !== undefined && Number(body.service_interval_days || 0) !== Number(before.service_interval_days || 0);
+      const dateTyped = body.next_service_date !== undefined && body.next_service_date && body.next_service_date !== before.next_service_date;
+      await fixServiceDate(id, intervalChanged && !dateTyped);
+    }
     if (res === 'riders' && (rx.portal_password_hash || String(body.portal_active) === '0')) await db.run('DELETE FROM rider_sessions WHERE rider_id=?', [id]);
     await audit(user, 'güncelleme', res, id, fields.map((f) => f.k).join(', '));
     return await getOne(res, id);
@@ -468,7 +481,7 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
     const s = await serviceDetail(id);
     await db.run('UPDATE service_orders SET delivered_at=? WHERE id=?', [nowTs(), id]);
     const active = await db.get("SELECT 1 FROM rentals WHERE bike_id=? AND status='aktif'", [s.bike_id]);
-    const next = addDays(today(), Number(setting('service_interval_days')) || 90);
+    const next = addDays(today(), Number(s.bike.service_interval_days) || Number(setting('service_interval_days')) || 90);
     await db.run('UPDATE bikes SET status=?, last_service_date=?, next_service_date=?, odometer_km=MAX(COALESCE(odometer_km,0), COALESCE(?,0)) WHERE id=?',
       [active ? 'kirada' : 'müsait', today(), next, s.km, s.bike_id]);
     if (s.billable && s.customer_id && !s.invoice_id && s.grand_total > 0) {
@@ -836,13 +849,15 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
       company: { name: setting('company_name'), phone: setting('company_phone'), email: setting('company_email'), address: setting('company_address'), iban: setting('company_iban') },
       request_types: PORTAL_REQ,
       bike_types: String(setting('bike_types') || '').split(/\r?\n|,/).map((x) => x.trim()).filter(Boolean),
-      plans: await db.all('SELECT bike_type, period, price, deposit FROM pricing_plans WHERE active=1 ORDER BY bike_type, price'),
+      plans: (await db.all('SELECT bike_type, period, price, deposit FROM pricing_plans WHERE active=1 ORDER BY bike_type, price')).filter((p) => enabledPeriods(SETTINGS).includes(p.period)),
+      periods: enabledPeriods(SETTINGS),
       vat_rate: vatRate, self_registered: !!r.self_registered,
     };
   }
   async function portalHandle(seg, method, body, token) {
     const [, b, c] = seg;
     if (b === 'config' && method === 'GET') return ok({ signup: setting('portal_signup') !== '0', company: setting('company_name'), id_types: ID_TYPES });
+    if (b === 'bike-types' && method === 'GET') return ok(await bikeTypeList());
     if (b === 'signup' && method === 'POST') {
       // self-registration from the rider screen: creates a rider + an individual customer; staff checks the ID before renting
       if (setting('portal_signup') === '0') err(403, 'Kayıt şu an kapalı. Lütfen bizimle iletişime geçin.');
@@ -910,7 +925,7 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
       let rent = {};
       if (body.type === 'yeni kiralama') {
         const types = String(setting('bike_types') || '').split(/\r?\n|,/).map((x) => x.trim()).filter(Boolean);
-        rent = { bike_type: types.includes(body.bike_type) ? body.bike_type : null, period: ['gün', 'hafta', 'ay'].includes(body.period) ? body.period : 'ay', duration: Math.min(52, Math.max(1, Math.round(Number(body.duration) || 1))) };
+        rent = { bike_type: types.includes(body.bike_type) ? body.bike_type : null, period: enabledPeriods(SETTINGS).includes(body.period) ? body.period : enabledPeriods(SETTINGS)[0], duration: Math.min(52, Math.max(1, Math.round(Number(body.duration) || 1))) };
         if (await db.get("SELECT 1 FROM portal_requests WHERE rider_id=? AND type='yeni kiralama' AND status='yeni'", [r.id])) err(409, 'Bekleyen bir kiralama talebiniz zaten var.');
       }
       const x = await db.run('INSERT INTO portal_requests(rider_id,customer_id,rental_id,bike_id,type,preferred_date,preferred_time,notes,bike_type,period,duration) VALUES(?,?,?,?,?,?,?,?,?,?,?)',
@@ -982,7 +997,7 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
           for (const [k, v] of Object.entries(body)) if (k in DEFAULT_SETTINGS || k === 'telemetry_key') await db.run('INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', [k, String(v ?? '')]);
           await audit(user, 'ayarlar', 'settings', null, Object.keys(body).join(', '));
         }
-        const s = await getSettings(); return ok(Object.fromEntries(Object.entries(s).filter(([k]) => !k.startsWith('seq_') && k !== 'role_perms')));
+        const s = await getSettings(); return ok(Object.fromEntries(Object.entries(s).filter(([k]) => !k.startsWith('seq_') && !k.startsWith('img_type:') && k !== 'role_perms')));
       }
       if (a === 'wipe' && method === 'POST') {
         // removes all business data (sample/test data); keeps settings, roles and the signed-in admin
@@ -1006,6 +1021,17 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
         });
         await audit(user, 'veri silme', 'system', null, 'Tüm örnek/test verileri silindi');
         return ok({ deleted: counts });
+      }
+      if (a === 'bike-types') {
+        // bike type pictures (shown to riders); stored as settings keys img_type:<name>, never sent with /me
+        if (method === 'PUT') {
+          need(user, 'admin', 'w');
+          const type = String(body.type || '').trim(); if (!type) err(400, 'Tip seçin.');
+          if (body.data) { if (!/^data:image\/(jpeg|png|webp);base64,/.test(body.data) || body.data.length > 700000) err(400, 'Görsel JPG/PNG olmalı ve en fazla ~500 KB.'); await db.run('INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', ['img_type:' + type, body.data]); }
+          else await db.run('DELETE FROM settings WHERE key=?', ['img_type:' + type]);
+          await audit(user, 'ayarlar', 'settings', null, `Bisiklet tipi görseli: ${type}`);
+        }
+        return ok(await bikeTypeList());
       }
       if (a === 'roles') {
         if (method === 'PUT') {
@@ -1134,7 +1160,12 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
     }
   }
   const ok = (body) => ({ status: 200, body });
-  const publicSettings = async () => { const s = await getSettings(); return Object.fromEntries(Object.entries(s).filter(([k]) => !k.startsWith('seq_') && k !== 'role_perms' && k !== 'telemetry_key')); };
+  const publicSettings = async () => { const s = await getSettings(); return Object.fromEntries(Object.entries(s).filter(([k]) => !k.startsWith('seq_') && !k.startsWith('img_type:') && k !== 'role_perms' && k !== 'telemetry_key')); };
+  const typeNames = () => String(setting('bike_types') || '').split(/\r?\n|,/).map((x) => x.trim()).filter(Boolean);
+  async function bikeTypeList() {
+    const imgs = Object.fromEntries((await db.all("SELECT key, value FROM settings WHERE key LIKE 'img_type:%'")).map((r) => [r.key.slice(9), r.value]));
+    return typeNames().map((name) => ({ name, image: imgs[name] || null }));
+  }
 
   return { handle, db, billRental, createRental, returnRental, createService, addServicePart, addPayment, addStockMove, telemetry, finishService, updateService, audit };
 }

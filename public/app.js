@@ -1,4 +1,4 @@
-import { applyBikeTypes, RESOURCES, ROLES, PERMS, BIKE_STATUS, SERVICE_STATUS, PAY_METHODS, PERIODS, ID_TYPES, DOC_TYPES, DOC_LANGS, CASH_IN, CASH_OUT } from './shared/meta.js';
+import { applyBikeTypes, enabledPeriods, RESOURCES, ROLES, PERMS, BIKE_STATUS, SERVICE_STATUS, PAY_METHODS, PERIODS, ID_TYPES, DOC_TYPES, DOC_LANGS, CASH_IN, CASH_OUT } from './shared/meta.js';
 import {
   GET, POST, PUT, DEL, session, setToken, can, esc, money, num, date, dt, ago, badge, todayISO, addDays, fmtField, toast, guard, modal, closeModal, confirmBox,
   inputHtml, fillRefs, readForm, editForm, lookup, clearLookups, csv, table, bindTable, bindSelect, colsFromMeta, barChart, donut, meter, statusHex,
@@ -384,7 +384,7 @@ async function newRentalPage(q) {
     <label class="field"><span>Müşteri *</span><select name="customer_id" required><option value="">Seçin…</option><option value="new" ${q.customer_id === 'new' ? 'selected' : ''}>+ Yeni bireysel müşteri (sürücü kendisi kiracı)</option>${customers.map((c) => `<option value="${c.id}" ${c.raw.blacklisted ? 'disabled' : ''} ${String(q.customer_id) === String(c.id) ? 'selected' : ''}>${esc(c.label)}${c.raw.blacklisted ? ' (kara liste)' : ''}</option>`).join('')}</select></label>
     <label class="field"><span>Bisiklet * <small class="muted">(${bikes.length} müsait)</small></span><select name="bike_id" required><option value="">Seçin…</option>${bikes.map((b) => `<option value="${b.id}" data-type="${esc(b.type)}" data-km="${b.odometer_km ?? ''}" data-bat="${b.battery_level ?? ''}" ${String(q.bike_id) === String(b.id) ? 'selected' : ''}>${esc(b.code)} · ${esc(b.model)} (${esc(b.type)})</option>`).join('')}</select></label>
     <label class="field"><span>Tarife</span><select name="plan_id"><option value="">Manuel fiyat</option></select></label>
-    <label class="field"><span>Faturalama periyodu</span><select name="period">${PERIODS.map((p) => `<option ${p === 'ay' ? 'selected' : ''}>${p}</option>`).join('')}</select></label>
+    <label class="field"><span>Faturalama periyodu</span><select name="period">${enabledPeriods(session.settings).map((p) => `<option ${p === 'ay' ? 'selected' : ''}>${p}</option>`).join('')}</select></label>
     <label class="field"><span>Periyot ücreti (net) *</span><input name="rate" type="number" step="0.01" required></label>
     <label class="field"><span>Başlangıç *</span><input name="start_date" type="date" value="${t}" required></label>
     <label class="field"><span>Planlanan dönüş *</span><input name="end_date" type="date" value="${addDays(t, 30)}" required></label>
@@ -407,7 +407,7 @@ async function newRentalPage(q) {
       <label class="check"><input type="checkbox" name="r_id_checked"> Kimlik aslı görüldü / kopyası alındı</label>
     </div></fieldset>
     <label class="field span3"><span>Teslim edilen aksesuarlar</span><input name="accessories" value="Kilit x1, şarj cihazı x1, yağmur brandası x1"></label>
-    <label class="field span3"><span>Not</span><textarea name="notes" rows="2"></textarea></label>
+    <label class="field span3"><span>Not</span><textarea name="notes" rows="2" placeholder="Örn. teslim saati, özel fiyat anlaşması, sürücüye verilen ek bilgi…"></textarea></label>
   </div><div class="card-f"><span class="muted" id="sum"></span><span class="grow"></span><a class="btn" href="#/rentals">Vazgeç</a><button class="btn primary">Sözleşmeyi oluştur</button></div></form>`);
   const f = $('#rf');
   const upd = async () => {
@@ -440,7 +440,7 @@ async function newRentalPage(q) {
   f.plan_id.onchange = () => { const p = plans.find((x) => String(x.id) === f.plan_id.value); if (p) { f.rate.value = p.price; f.deposit_amount.value = p.deposit; f.period.value = p.period; } sum(); };
   f.rate.oninput = sum; f.deposit_amount.oninput = sum;
   if (q.bike_type && !q.bike_id) { const o = [...f.bike_id.options].find((x) => x.dataset.type === q.bike_type); if (o) f.bike_id.value = o.value; }
-  if (q.period && PERIODS.includes(q.period)) f.period.value = q.period;
+  if (q.period && enabledPeriods(session.settings).includes(q.period)) f.period.value = q.period;
   if (q.start) { const st = q.start < t ? t : q.start; f.start_date.value = st; f.end_date.value = q.period === 'gün' ? addDays(st, Number(q.duration) || 1) : q.period === 'hafta' ? addDays(st, 7 * (Number(q.duration) || 1)) : addDays(st, 30 * (Number(q.duration) || 1)); }
   await upd();
   if (q.period) { const p = plans.find((x) => x.period === q.period && (!f.bike_id.selectedOptions[0]?.dataset.type || x.bike_type === f.bike_id.selectedOptions[0].dataset.type)); if (p) { f.plan_id.value = String(p.id); f.plan_id.onchange(); } }
@@ -750,10 +750,21 @@ async function servicePage(q) {
   const all = await GET('service_orders', q.q ? { q: q.q } : {});
   const sets = { open: all.filter((s) => !['teslim edildi', 'iptal'].includes(s.status)), ready: all.filter((s) => s.status === 'hazır'), done: all.filter((s) => ['teslim edildi', 'iptal'].includes(s.status)), all };
   const rows = sets[tab];
+  // bikes whose service period is due (next 7 days or overdue) and not already in service → call them in
+  const [dueBikes, actRent] = can('fleet') ? await Promise.all([GET('bikes', { limit: 2000 }), GET('rentals', { status: 'aktif' }).catch(() => [])]) : [[], []];
+  const riders = can('customers') ? await GET('riders').catch(() => []) : [];
+  const due = dueBikes.filter((b) => b.next_service_date && b.next_service_date <= addDays(todayISO(), 7) && !['serviste', 'hizmet dışı', 'kayıp/çalıntı'].includes(b.status) && !all.some((x) => x.bike_id === b.id && !['teslim edildi', 'iptal'].includes(x.status)))
+    .sort((a, b) => (a.next_service_date < b.next_service_date ? -1 : 1))
+    .map((b) => { const r = actRent.find((x) => x.bike_id === b.id); const rd = riders.find((x) => x.id === r?.rider_id); return { ...b, rental: r, rider: rd }; });
+  const waCall = (b) => { const ph = String(b.rider?.phone || '').replace(/[^\d+]/g, '').replace(/^\+/, '').replace(/^0/, '49'); if (!ph) return ''; const L = b.rider?.lang || 'de';
+    const msg = { tr: `Merhaba ${b.rider.name}, ${b.code} bisikletinin rutin bakım zamanı geldi (${date(b.next_service_date)}). Size uygun bir gün için sürücü ekranından randevu alabilir veya bu mesaja cevap verebilirsiniz. ${session.settings.company_name}`, de: `Hallo ${b.rider.name}, für Ihr Fahrrad ${b.code} steht die regelmäßige Wartung an (${date(b.next_service_date)}). Bitte buchen Sie im Fahrerbereich einen Termin oder antworten Sie auf diese Nachricht. ${session.settings.company_name}`, en: `Hi ${b.rider.name}, your bike ${b.code} is due for its routine service (${date(b.next_service_date)}). Please book a slot on the rider screen or reply to this message. ${session.settings.company_name}` }[L] || '';
+    return `<a class="btn sm wa" href="https://wa.me/${ph}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">WhatsApp ile çağır</a>`; };
+  const dueCard = due.length ? card(`Bakımı gelen bisikletler <span class="cnt">${due.length}</span> <small class="muted">sürücü ekranında da "bakım zamanı" bildirimi görünür</small>`, table(due, [{ l: 'Bisiklet', f: (b) => `<a href="#/bikes/${b.id}"><b>${esc(b.code)}</b></a> ${esc(b.model || '')}` }, { l: 'Bakım tarihi', f: (b) => (b.next_service_date < todayISO() ? `<b class="t-danger">${date(b.next_service_date)}</b>` : `<b class="t-warn">${date(b.next_service_date)}</b>`) }, { l: 'Sürücü', f: (b) => (b.rider ? `<a href="#/riders/${b.rider.id}">${esc(b.rider.name)}</a>${b.rider.phone ? ` · <a href="tel:${esc(b.rider.phone)}">${esc(b.rider.phone)}</a>` : ''}` : `<span class="muted">${esc(b.status)}</span>`) }, { l: '', f: (b) => `<div class="row-acts">${waCall(b)}${can('service', 'w') ? `<a class="btn sm" href="#/service/new?bike_id=${b.id}">Servis kaydı aç</a>` : ''}</div>` }])) : '';
   const cols = [{ k: 'order_no', l: 'Servis no' }, { k: 'bike_code', l: 'Bisiklet' }, { l: 'Tip', f: (s) => esc(s.type), csv: (s) => s.type }, { l: 'Şikayet', f: (s) => esc((s.complaint || '').slice(0, 60)), csv: (s) => s.complaint }, { l: 'Kabul', f: (s) => dt(s.received_at), csv: (s) => s.received_at },
     { l: 'Tahmini hazır', f: (s) => (s.estimated_ready && s.estimated_ready < todayISO() && !['teslim edildi', 'iptal'].includes(s.status) ? `<b class="t-danger">${date(s.estimated_ready)}</b>` : date(s.estimated_ready)), csv: (s) => s.estimated_ready },
     { l: 'Teknisyen', f: (s) => esc(s.technician_name || '—'), csv: (s) => s.technician_name }, { l: 'Parça', f: (s) => money(s.parts_total), cls: 'num', csv: (s) => s.parts_total }, { l: 'Durum', f: (s) => badge(s.status), csv: (s) => s.status }];
   setMain(`${head('Servis kayıtları', 'Servis kabul formu, teşhis, parça kullanımı ve teslim.', `<button class="btn sm" id="csv">CSV</button>${can('service', 'w') ? '<a class="btn primary sm" href="#/service/new">+ Servis kabul formu</a>' : ''}`)}
+    ${dueCard}
     <div class="toolbar"><input type="search" id="q" placeholder="Servis no, bisiklet, şikayet…" value="${esc(q.q || '')}">${tabs([['open', 'Açık', sets.open.length], ['ready', 'Teslime hazır', sets.ready.length], ['done', 'Kapanan', sets.done.length], ['all', 'Tümü', all.length]], tab)}</div>
     ${tab === 'open' ? `<div class="kanban">${SERVICE_STATUS.slice(0, 5).map((st) => `<div class="kcol"><div class="kcol-h">${badge(st)} <span class="muted">${all.filter((s) => s.status === st).length}</span></div>${all.filter((s) => s.status === st).map((s) => `<a class="kcard" href="#/service/${s.id}"><b>${esc(s.bike_code)}</b> <small class="muted">${esc(s.order_no)}</small><p>${esc((s.complaint || '').slice(0, 80))}</p><small>${esc(s.technician_name || 'atanmadı')} · ${s.estimated_ready && s.estimated_ready < todayISO() ? `<b class="t-danger">${date(s.estimated_ready)}</b>` : date(s.estimated_ready)}</small></a>`).join('')}</div>`).join('')}</div>` : card('', table(rows, cols, { link: (s) => `#/service/${s.id}` }), 'flush')}`);
   main().querySelectorAll('.tab').forEach((b) => b.onclick = () => { location.hash = `#/service?${new URLSearchParams({ ...q, tab: b.dataset.tab })}`; });
@@ -1068,6 +1079,7 @@ const SETTINGS_FORM = [
   ['Şirket', [['company_name', 'Şirket adı'], ['company_address', 'Adres'], ['company_phone', 'Telefon'], ['company_email', 'E-posta'], ['company_tax_no', 'USt-IdNr / vergi no'], ['company_iban', 'IBAN']]],
   ['Finans', [['currency', 'Para birimi'], ['vat_rate', 'KDV oranı %', 'number'], ['payment_terms_days', 'Ödeme vadesi (gün)', 'number'], ['late_fee_per_day', 'Geç ödeme bedeli / gün (€)', 'number'], ['late_return_fee_per_day', 'Geç iade bedeli / gün (€)', 'number']]],
   ['Sürücü ekranı', [['portal_signup', 'Sürücüler sürücü ekranından kendi hesabını oluşturabilsin', 'select', [{ v: '1', l: 'Açık' }, { v: '0', l: 'Kapalı' }]]]],
+  ['Kiralama periyotları', [['rental_periods', 'Sürücülerin ve sizin seçebileceğiniz periyotlar (kapalı olanlar tarife, kiralama ve sürücü ekranında görünmez)', 'periods']]],
   ['Bisiklet tipleri', [['bike_types', 'Bisiklet tipleri (her satıra bir tip; bisiklet ve tarife formlarında seçilir)', 'textarea']]],
   ['Servis & filo', [['service_interval_days', 'Bakım aralığı (gün)', 'number'], ['service_interval_km', 'Bakım aralığı (km)', 'number'], ['labor_rate', 'Saatlik işçilik ücreti (€)', 'number'], ['low_battery_alert', 'Düşük batarya uyarısı %', 'number'], ['map_center_lat', 'Harita merkezi enlem'], ['map_center_lng', 'Harita merkezi boylam'], ['telemetry_key', 'GPS cihaz API anahtarı']]],
   ['Belgeler (sözleşme, fatura, servis formu)', [['doc_lang', 'Varsayılan belge dili', 'select', DOC_LANGS], ['contract_terms_de', 'Sözleşme koşulları – Almanca', 'textarea'], ['contract_terms_en', 'Sözleşme koşulları – İngilizce', 'textarea'], ['service_terms_de', 'Servis formu koşulları – Almanca', 'textarea'], ['service_terms_en', 'Servis formu koşulları – İngilizce', 'textarea']]],
@@ -1075,7 +1087,7 @@ const SETTINGS_FORM = [
 ];
 async function settingsPage() {
   const s = await GET('settings'); const w = can('admin', 'w');
-  setMain(`${head('Ayarlar', 'Şirket bilgileri, finans kuralları ve belge metinleri.')}<form id="stf">${SETTINGS_FORM.map(([g, fs]) => card(g, `<div class="grid-form">${fs.map(([k, l, t, o]) => inputHtml({ k, l, t: t || 'text', step: 'any', o }, s[k], { disabled: !w })).join('')}</div>${g.startsWith('WhatsApp') ? '<p class="muted">Kullanılabilecek alanlar: {name} {invoice_no} {amount} {due_date} {iban} {company}. Müşterinin belge diline göre Almanca veya İngilizce mesaj seçilir.</p>' : ''}`)).join('')}
+  setMain(`${head('Ayarlar', 'Şirket bilgileri, finans kuralları ve belge metinleri.')}<form id="stf">${SETTINGS_FORM.map(([g, fs]) => card(g, `<div class="grid-form">${fs.map(([k, l, t, o]) => (t === 'periods' ? `<div class="field span2"><span>${esc(l)}</span><div class="per-pick">${PERIODS.map((p) => `<label class="check"><input type="checkbox" name="per_${p}" ${enabledPeriods(s).includes(p) ? 'checked' : ''} ${w ? '' : 'disabled'}> ${{ 'gün': 'Günlük', hafta: 'Haftalık', ay: 'Aylık' }[p]}</label>`).join('')}</div></div>` : inputHtml({ k, l, t: t || 'text', step: 'any', o }, s[k], { disabled: !w }))).join('')}</div>${g === 'Bisiklet tipleri' ? '<div id="btimgs" class="bt-imgs"></div>' : ''}${g.startsWith('WhatsApp') ? '<p class="muted">Kullanılabilecek alanlar: {name} {invoice_no} {amount} {due_date} {iban} {company}. Müşterinin belge diline göre Almanca veya İngilizce mesaj seçilir.</p>' : ''}`)).join('')}
   ${card('GPS takip cihazı entegrasyonu', `<p>Takip cihazları konumlarını şu adrese <code>POST</code> eder. Cihaz ID'si bisiklet kartındaki "GPS takip cihazı ID" alanıyla eşleşir.</p><pre class="code">POST ${location.origin}/api/telemetry
 {"key":"${esc(s.telemetry_key || '…')}","tracker_id":"TRK-4101","lat":53.5503,"lng":9.9353,"battery":76,"speed":14}</pre>`)}
   ${w ? '<div class="form-actions"><button class="btn primary">Ayarları kaydet</button></div>' : ''}</form>
@@ -1085,7 +1097,27 @@ async function settingsPage() {
     const b = modal('Tüm verileri sil', `<form class="grid-form"><p class="span2">Bu işlem geri alınamaz. Onaylamak için <b>SİL</b> yazın.</p><label class="field span2"><span>Onay</span><input name="confirm" autocomplete="off" required></label><div class="form-actions span2"><button class="btn danger">Kalıcı olarak sil</button></div></form>`);
     b.querySelector('form').onsubmit = guard(async (e) => { e.preventDefault(); await POST('wipe', { ...readForm(e.target), keep_users: keepUsers }); closeModal(); clearLookups(); toast('Tüm veriler silindi', 'ok'); location.hash = '#/'; route(); });
   });
-  $('#stf').onsubmit = guard(async (e) => { e.preventDefault(); session.settings = await PUT('settings', readForm(e.target)); applyBikeTypes(session.settings); toast('Ayarlar kaydedildi'); });
+  $('#stf').onsubmit = guard(async (e) => {
+    e.preventDefault(); const d = readForm(e.target);
+    const per = PERIODS.filter((p) => d[`per_${p}`]); PERIODS.forEach((p) => delete d[`per_${p}`]);
+    if (!per.length) throw new Error('En az bir kiralama periyodu açık olmalı.');
+    d.rental_periods = per.join(',');
+    session.settings = await PUT('settings', d); applyBikeTypes(session.settings); toast('Ayarlar kaydedildi'); drawTypeImgs();
+  });
+  // bike type pictures
+  const drawTypeImgs = async () => {
+    const list = await GET('bike-types'); const box = $('#btimgs'); if (!box) return;
+    box.innerHTML = `<p class="lbl">Tip görselleri <small class="muted">sürücü ekranında kiralama talebinde gösterilir; yeni tip eklediyseniz önce "Ayarları kaydet"</small></p><div class="bt-grid">${list.map((x, i) => `<div class="bt-card"><div class="bt-img">${x.image ? `<img src="${x.image}" alt="">` : '<span class="muted">görsel yok</span>'}</div><b>${esc(x.name)}</b>${w ? `<div class="bt-acts"><label class="btn sm">${x.image ? 'Değiştir' : 'Görsel yükle'}<input type="file" accept="image/*" data-bt="${i}" hidden></label>${x.image ? `<button type="button" class="btn sm ghost" data-btdel="${i}">Kaldır</button>` : ''}</div>` : ''}</div>`).join('')}</div>`;
+    box.querySelectorAll('[data-bt]').forEach((inp) => inp.onchange = guard(async () => {
+      const f = inp.files[0]; if (!f) return;
+      const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('Görsel okunamadı.')); i.src = URL.createObjectURL(f); });
+      const k = Math.min(1, 900 / Math.max(img.width, img.height)); const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height);
+      await PUT('bike-types', { type: list[inp.dataset.bt].name, data: c.toDataURL('image/jpeg', 0.82) }); toast('Görsel kaydedildi'); drawTypeImgs();
+    }));
+    box.querySelectorAll('[data-btdel]').forEach((b) => b.onclick = guard(async () => { await PUT('bike-types', { type: list[b.dataset.btdel].name, data: null }); drawTypeImgs(); }));
+  };
+  drawTypeImgs();
 }
 
 // ---------- search ----------

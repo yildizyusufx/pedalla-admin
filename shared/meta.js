@@ -52,7 +52,12 @@ export const DEFAULT_ROLE_PERMS = {
 
 const opt = (arr) => arr.map((v) => ({ v, l: v }));
 // bike types are managed in Settings (one per line); the selects of bikes and price plans follow them
+// rental periods switched on in Settings (gün / hafta / ay); at least one stays on
+export const enabledPeriods = (settings) => { const on = String(settings?.rental_periods ?? 'ay').split(',').map((x) => x.trim()); const l = PERIODS.filter((p) => on.includes(p)); return l.length ? l : ['ay']; };
 export function applyBikeTypes(settings) {
+  const per = enabledPeriods(settings);
+  RESOURCES.pricing_plans.fields.find((f) => f.k === 'period').o = opt(per);
+  RESOURCES.rentals.fields.find((f) => f.k === 'period').o = opt(per);
   const list = String(settings?.bike_types || '').split(/\r?\n|,/).map((x) => x.trim()).filter(Boolean);
   if (!list.length) return;
   RESOURCES.bikes.fields.find((f) => f.k === 'type').o = opt(list);
@@ -85,7 +90,8 @@ export const RESOURCES = {
       { k: 'insurance_no', l: 'Sigorta poliçe no' },
       { k: 'insurance_until', l: 'Sigorta bitiş', t: 'date' },
       { k: 'last_service_date', l: 'Son servis', t: 'date' },
-      { k: 'next_service_date', l: 'Sonraki bakım', t: 'date', list: 1 },
+      { k: 'service_interval_days', l: 'Bakım periyodu (gün, boşsa Ayarlar\'daki)', t: 'number' },
+      { k: 'next_service_date', l: 'Sonraki bakım (boşsa otomatik)', t: 'date', list: 1 },
       { k: 'notes', l: 'Notlar', t: 'textarea' },
     ],
   },
@@ -403,6 +409,7 @@ export const RESOURCES = {
 };
 
 export const DEFAULT_SETTINGS = {
+  rental_periods: 'ay',
   portal_signup: '1',
   bike_types: BIKE_TYPES.join('\n'),
   company_name: 'Pedalla GmbH',

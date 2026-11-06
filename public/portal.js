@@ -4,6 +4,7 @@ import { DOC_TYPES } from './shared/meta.js';
 
 const L = {
   tr: {
+    note_ph_rent: 'Örn. kurye işi için kullanacağım, haftada 5 gün; teslim almak için uygun saatim…', note_ph_return: 'Örn. bisikleti hangi saatte getirebileceğiniz, iade adresi…', note_ph_extend: 'Örn. ne kadar uzatmak istediğiniz…',
     no_account: 'Hesabınız yok mu?', signup: 'Kayıt ol', signup_h: 'Sürücü kaydı', signup_sub: 'Bilgilerinizi girin, hesabınızı oluşturun ve hemen kiralama talebi gönderin.', have_account: 'Zaten hesabınız var mı?', full_name: 'Ad soyad', birth: 'Doğum tarihi', nationality: 'Uyruk', address: 'Adres', id_type: 'Kimlik türü', id_no: 'Kimlik / pasaport no', pw_hint: 'En az 6 karakter', consent: 'Bilgilerimin kiralama ve sözleşme için Pedalla tarafından işlenmesini kabul ediyorum. Kimliğimin aslını teslimde göstereceğim.', create_acc: 'Hesabı oluştur', email_taken: 'Bu e-posta ile zaten bir hesap var. Giriş yapın.', welcome_new: 'Hesabınız oluşturuldu. Şimdi kiralama talebi gönderebilir ve kimlik belgelerinizi yükleyebilirsiniz.', rent_cta: 'Bisiklet kiralamak ister misiniz?', rent_btn: 'Kiralama talebi gönder', bike_type: 'Bisiklet tipi', any_type: 'Fark etmez', period: 'Kiralama süresi birimi', duration: 'Süre', p_day: 'Gün', p_week: 'Hafta', p_month: 'Ay', start: 'Başlangıç tarihi', price_from: 'Tarife', deposit_l: 'depozito', vat_note: '+ KDV', optional: '(isteğe bağlı)', signup_closed: 'Yeni kayıt şu an kapalı. Lütfen bizimle iletişime geçin.',
     loc_h: 'Konum paylaşımı', loc_text: 'Bisikletin güvenliği ve hızlı yardım için, bu ekran açıkken telefonunuzun konumu Pedalla ile paylaşılır. İstediğiniz zaman Profil\'den kapatabilirsiniz.', loc_allow: 'Konumu paylaş', loc_later: 'Şimdi değil', loc_on: 'Konum paylaşılıyor', loc_off: 'Konum paylaşılmıyor', loc_stop: 'Paylaşımı durdur', loc_denied: 'Konum izni verilmedi. Telefon ayarlarından tarayıcıya konum izni verin.', loc_last: 'son gönderim',
     title: 'Sürücü ekranı', login_h: 'Sürücü girişi', login_sub: 'Pedalla\'nın size verdiği e-posta ve şifre ile giriş yapın.', email: 'E-posta', password: 'Şifre', login: 'Giriş yap',
@@ -38,6 +39,7 @@ const L = {
     n_service_ready: '{bike} bisikletiniz servisten hazır ({no}). Teslim alabilirsiniz.',
   },
   de: {
+    note_ph_rent: 'z. B. für Kurierfahrten, 5 Tage pro Woche; wann ich das Rad abholen kann…', note_ph_return: 'z. B. wann Sie das Rad zurückbringen können…', note_ph_extend: 'z. B. um wie lange Sie verlängern möchten…',
     no_account: 'Noch kein Konto?', signup: 'Registrieren', signup_h: 'Fahrer-Registrierung', signup_sub: 'Daten eingeben, Konto anlegen und direkt eine Mietanfrage senden.', have_account: 'Schon ein Konto?', full_name: 'Vor- und Nachname', birth: 'Geburtsdatum', nationality: 'Staatsangehörigkeit', address: 'Adresse', id_type: 'Ausweisart', id_no: 'Ausweis- / Passnummer', pw_hint: 'Mindestens 6 Zeichen', consent: 'Ich bin einverstanden, dass Pedalla meine Daten für Miete und Vertrag verarbeitet. Meinen Ausweis zeige ich bei der Übergabe im Original.', create_acc: 'Konto anlegen', email_taken: 'Mit dieser E-Mail gibt es bereits ein Konto. Bitte anmelden.', welcome_new: 'Ihr Konto wurde angelegt. Sie können jetzt eine Mietanfrage senden und Ihre Ausweisdokumente hochladen.', rent_cta: 'Möchten Sie ein Fahrrad mieten?', rent_btn: 'Mietanfrage senden', bike_type: 'Fahrradtyp', any_type: 'Egal', period: 'Mieteinheit', duration: 'Dauer', p_day: 'Tag', p_week: 'Woche', p_month: 'Monat', start: 'Startdatum', price_from: 'Tarif', deposit_l: 'Kaution', vat_note: '+ MwSt.', optional: '(optional)', signup_closed: 'Neue Registrierungen sind derzeit geschlossen. Bitte kontaktieren Sie uns.',
     loc_h: 'Standortfreigabe', loc_text: 'Zur Sicherheit des Fahrrads und für schnelle Hilfe wird der Standort Ihres Handys mit Pedalla geteilt, solange diese Seite geöffnet ist. Sie können es jederzeit im Profil ausschalten.', loc_allow: 'Standort teilen', loc_later: 'Nicht jetzt', loc_on: 'Standort wird geteilt', loc_off: 'Standort wird nicht geteilt', loc_stop: 'Freigabe beenden', loc_denied: 'Keine Standortberechtigung. Bitte in den Handy-Einstellungen dem Browser den Standort erlauben.', loc_last: 'zuletzt gesendet',
     title: 'Fahrerbereich', login_h: 'Fahrer-Login', login_sub: 'Melde dich mit der E-Mail und dem Passwort an, die du von Pedalla bekommen hast.', email: 'E-Mail', password: 'Passwort', login: 'Anmelden',
@@ -72,6 +74,7 @@ const L = {
     n_service_ready: 'Dein Rad {bike} ist fertig ({no}) und kann abgeholt werden.',
   },
   en: {
+    note_ph_rent: 'e.g. for courier work, 5 days a week; when I can pick up the bike…', note_ph_return: 'e.g. when you can bring the bike back…', note_ph_extend: 'e.g. how long you would like to extend…',
     no_account: 'No account yet?', signup: 'Sign up', signup_h: 'Rider sign-up', signup_sub: 'Enter your details, create your account and send a rental request right away.', have_account: 'Already have an account?', full_name: 'Full name', birth: 'Date of birth', nationality: 'Nationality', address: 'Address', id_type: 'ID type', id_no: 'ID / passport no.', pw_hint: 'At least 6 characters', consent: 'I agree that Pedalla processes my data for the rental and contract. I will show my original ID at handover.', create_acc: 'Create account', email_taken: 'An account with this e-mail already exists. Please log in.', welcome_new: 'Your account has been created. You can now send a rental request and upload your ID documents.', rent_cta: 'Would you like to rent a bike?', rent_btn: 'Send rental request', bike_type: 'Bike type', any_type: 'Any', period: 'Rental unit', duration: 'Duration', p_day: 'Day', p_week: 'Week', p_month: 'Month', start: 'Start date', price_from: 'Rate', deposit_l: 'deposit', vat_note: '+ VAT', optional: '(optional)', signup_closed: 'New sign-ups are closed right now. Please contact us.',
     loc_h: 'Location sharing', loc_text: 'For the bike\'s safety and quick help, your phone\'s location is shared with Pedalla while this screen is open. You can turn it off any time in Profile.', loc_allow: 'Share location', loc_later: 'Not now', loc_on: 'Location is being shared', loc_off: 'Location is not shared', loc_stop: 'Stop sharing', loc_denied: 'Location permission denied. Allow location for your browser in the phone settings.', loc_last: 'last sent',
     title: 'Rider area', login_h: 'Rider login', login_sub: 'Sign in with the e-mail and password you received from Pedalla.', email: 'E-mail', password: 'Password', login: 'Sign in',
@@ -200,7 +203,7 @@ function signupView() {
     catch (x) { throw new Error(/zaten bir hesap/.test(x.message) ? t('email_taken') : x.message); }
   }));
 }
-let fresh = false;
+let fresh = false; let btypes = null;
 function notice(n) {
   const p = { ...n, n: n.days, when: n.days != null ? when(n.days) : '', date: date(n.date), amount: n.amount != null ? money(n.amount) : '', type: v(n.type), bike: `<b>${esc(n.bike)}</b>`, no: `<b>${esc(n.no)}</b>` };
   if (n.code === 'docs_missing') p.docs = n.docs.map(v).join(', ');
@@ -237,8 +240,8 @@ function requestsView(pre) {
     <div class="p-row"><label class="field"><span>${t('date')}</span><input name="preferred_date" type="date" min="${min}" value="${addDays(min, 1)}"></label>
     <label class="field"><span>${t('time')}</span><select name="preferred_time"><option value="">${t('any_time')}</option>${['09:00–12:00', '12:00–15:00', '15:00–18:00'].map((x) => `<option>${x}</option>`).join('')}</select></label></div>
     <div class="rent-only" ${pre === 'yeni kiralama' || (!pre && types[0] === 'yeni kiralama') ? '' : 'hidden'}>
-      <label class="field"><span>${t('bike_type')}</span><select name="bike_type"><option value="">${t('any_type')}</option>${(d.bike_types || []).map((x) => `<option value="${esc(x)}">${esc(v(x))}</option>`).join('')}</select></label>
-      <div class="p-row"><label class="field"><span>${t('period')}</span><select name="period"><option value="gün">${t('p_day')}</option><option value="hafta">${t('p_week')}</option><option value="ay" selected>${t('p_month')}</option></select></label>
+      <div class="field"><span>${t('bike_type')}</span><div class="p-types">${(btypes || (d.bike_types || []).map((name) => ({ name }))).map((x, i) => `<label class="p-type"><input type="radio" name="bike_type" value="${esc(x.name)}" ${i === 0 ? 'checked' : ''}><div class="p-type-img">${x.image ? `<img src="${x.image}" alt="" loading="lazy">` : ic('bike')}</div><span>${esc(v(x.name))}</span></label>`).join('')}<label class="p-type"><input type="radio" name="bike_type" value=""><div class="p-type-img p-type-any">?</div><span>${t('any_type')}</span></label></div></div>
+      <div class="p-row"><label class="field"><span>${t('period')}</span><select name="period">${(d.periods || ['ay']).map((p) => `<option value="${p}" ${p === 'ay' ? 'selected' : ''}>${t({ 'gün': 'p_day', hafta: 'p_week', ay: 'p_month' }[p])}</option>`).join('')}</select></label>
       <label class="field"><span>${t('duration')}</span><input name="duration" type="number" min="1" max="52" value="1"></label></div>
       <div class="p-price muted" id="pprice"></div></div>
     <label class="field"><span>${t('note')}</span><textarea name="notes" rows="3" placeholder="${esc(t('note_ph'))}"></textarea></label>
@@ -316,8 +319,8 @@ function bind() {
       const pl = (data.plans || []).filter((x) => x.period === rf.period.value && (!rf.bike_type.value || x.bike_type === rf.bike_type.value)).sort((a, b) => a.price - b.price)[0];
       el.querySelector('#pprice').innerHTML = pl ? `${t('price_from')}: <b>${money(pl.price)}</b> / ${t({ 'gün': 'p_day', hafta: 'p_week', ay: 'p_month' }[pl.period])} ${t('vat_note')} · ${t('deposit_l')} ${money(pl.deposit)}` : '';
     };
-    const tog = () => { el.querySelector('.rent-only').hidden = rf.type.value !== 'yeni kiralama'; price(); };
-    rf.type.addEventListener('change', tog); rf.bike_type.addEventListener('change', price); rf.period.addEventListener('change', price); tog();
+    const tog = () => { const rent = rf.type.value === 'yeni kiralama'; el.querySelector('.rent-only').hidden = !rent; rf.notes.placeholder = t(rent ? 'note_ph_rent' : rf.type.value === 'iade randevusu' ? 'note_ph_return' : rf.type.value === 'kiralama uzatma' ? 'note_ph_extend' : 'note_ph'); price(); };
+    rf.type.addEventListener('change', tog); rf.addEventListener('change', (e) => { if (e.target.name === 'bike_type' || e.target.name === 'period') price(); }); tog();
   }
   el.querySelectorAll('[data-cancel]').forEach((b) => (b.onclick = guard(async () => { data = await api('POST', `requests/${b.dataset.cancel}/cancel`); toast(t('cancelled')); shell(); })));
   const fi = el.querySelector('#df input[type=file]');
@@ -376,6 +379,7 @@ function stopLoc() { clearInterval(locTimer); locTimer = null; }
 async function load() {
   root().innerHTML = '<div class="loading"><div class="spin"></div></div>';
   data = await api('GET', 'me');
+  if (!btypes) api('GET', 'bike-types').then((x) => { btypes = x; if (tab === 'req') shell(); }).catch(() => {});
   if (store.get(LOC_KEY) !== 'off') startLoc(false);
   if (!store.get('pedalla_rider_lang') && data.rider.lang && L[data.rider.lang]) { lang = data.rider.lang; document.documentElement.lang = lang; }
   if (data.rider.lang && data.rider.lang !== lang && store.get('pedalla_rider_lang')) api('PUT', 'me', { lang }).catch(() => {});
