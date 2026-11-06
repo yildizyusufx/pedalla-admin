@@ -99,7 +99,7 @@ export function inputHtml(f, v, extra = {}) {
   const dis = extra.disabled ? 'disabled' : '';
   let ctl;
   if (f.t === 'textarea') ctl = `<textarea id="${id}" name="${f.k}" rows="3" ${req} ${dis}>${esc(v)}</textarea>`;
-  else if (f.t === 'select') ctl = `<select id="${id}" name="${f.k}" ${req} ${dis}><option value="">—</option>${f.o.map((o) => `<option value="${esc(o.v)}" ${String(v) === String(o.v) ? 'selected' : ''}>${esc(o.l)}</option>`).join('')}</select>`;
+  else if (f.t === 'select') { const os = v != null && v !== '' && !f.o.some((o) => String(o.v) === String(v)) ? [...f.o, { v, l: v }] : f.o; ctl = `<select id="${id}" name="${f.k}" ${req} ${dis}><option value="">—</option>${os.map((o) => `<option value="${esc(o.v)}" ${String(v) === String(o.v) ? 'selected' : ''}>${esc(o.l)}</option>`).join('')}</select>`; }
   else if (f.t === 'ref') ctl = `<select id="${id}" name="${f.k}" data-ref="${f.ref}" data-val="${esc(v ?? '')}" ${req} ${dis}><option value="">Yükleniyor…</option></select>`;
   else if (f.t === 'bool') return `<label class="check"><input type="checkbox" id="${id}" name="${f.k}" ${v ? 'checked' : ''} ${dis}> ${esc(f.l)}</label>`;
   else {

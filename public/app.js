@@ -1,9 +1,9 @@
-import { RESOURCES, ROLES, PERMS, BIKE_STATUS, SERVICE_STATUS, PAY_METHODS, PERIODS, ID_TYPES, DOC_TYPES, DOC_LANGS, CASH_IN, CASH_OUT } from './shared/meta.js';
+import { applyBikeTypes, RESOURCES, ROLES, PERMS, BIKE_STATUS, SERVICE_STATUS, PAY_METHODS, PERIODS, ID_TYPES, DOC_TYPES, DOC_LANGS, CASH_IN, CASH_OUT } from './shared/meta.js';
 import {
   GET, POST, PUT, DEL, session, setToken, can, esc, money, num, date, dt, ago, badge, todayISO, addDays, fmtField, toast, guard, modal, closeModal, confirmBox,
   inputHtml, fillRefs, readForm, editForm, lookup, clearLookups, csv, table, bindTable, colsFromMeta, barChart, donut, meter, statusHex,
 } from './core.js';
-import { startI18n, langSwitch, bindLangSwitch, lang as uiLang } from './i18n.js';
+import { startI18n, langSwitch, bindLangSwitch, lang as uiLang, t as tr } from './i18n.js';
 const MONTHS = { tr: ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'], de: ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'], en: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] };
 import { docT, tv, docLangOf, dMoney, dNum, dDate, dDateTime, invoiceText, DOC_LANG_LABEL } from './docs-i18n.js';
 
@@ -54,23 +54,37 @@ function shell() {
     <aside class="side" id="side"><div class="side-top">${LOGO}<span class="side-tag">Admin</span></div>
       <nav>${NAV.map(([g, items]) => { const vis = items.filter(([, , p]) => can(p)); return vis.length ? `<div class="nav-g"><div class="nav-gl">${g}</div>${vis.map(([h, l, , ic]) => `<a href="#/${h}" data-nav="${h}">${icon(ic)}<span>${l}</span>${h === 'notifications' ? '<span class="nav-cnt" id="notif-cnt"></span>' : ''}</a>`).join('')}</div>` : ''; }).join('')}</nav>
       <div class="side-foot"><div class="me"><span class="avatar">${esc(u.name.split(' ').map((x) => x[0]).join('').slice(0, 2))}</span><div><b>${esc(u.name)}</b><small>${esc(ROLES[u.role] || u.role)}</small></div></div><button class="btn ghost sm" id="logout">Çıkış</button></div>
-    </aside>
+    </aside><div class="side-back" id="sideback"></div>
     <div class="body"><header class="top"><button class="icon-btn menu" id="menu" aria-label="Menü">☰</button>
       <form class="gsearch" id="gsearch"><input type="search" placeholder="Bisiklet kodu, müşteri, sözleşme, fatura ara…" id="gq"></form>
       ${can('rentals', 'w') ? '<a class="btn primary sm" href="#/rentals/new">+ Kiralama</a>' : ''}${can('service', 'w') ? '<a class="btn sm" href="#/service/new">+ Servis kabul</a>' : ''}${langSwitch()}
       <a class="icon-btn bell" href="#/notifications" aria-label="Bildirimler">${icon('bell')}<span class="dot" id="notif-dot" hidden></span></a></header>
       <main id="main"></main></div></div>`;
   $('#logout').onclick = guard(async () => { await POST('logout').catch(() => {}); setToken(null); session.user = null; location.hash = '#/login'; route(); });
-  $('#menu').onclick = () => $('#side').classList.toggle('open');
+  const closeSide = () => { $('#side').classList.remove('open'); $('#sideback').classList.remove('on'); };
+  $('#menu').onclick = () => { const o = $('#side').classList.toggle('open'); $('#sideback').classList.toggle('on', o); };
+  $('#sideback').onclick = closeSide; $('#side').querySelectorAll('nav a').forEach((a) => a.addEventListener('click', closeSide));
   bindLangSwitch(appRoot());
-  $('#gsearch').onsubmit = (e) => { e.preventDefault(); location.hash = '#/search/' + encodeURIComponent($('#gq').value); };
+  $('#gsearch').onsubmit = (e) => {
+    e.preventDefault(); const v = $('#gq').value.trim();
+    const qr = v.match(/#\/b\/([A-Za-z0-9-]+)/); // a hand scanner types the whole sticker URL
+    location.hash = qr ? '#/b/' + qr[1] : '#/search/' + encodeURIComponent(v);
+  };
   refreshNotifCount();
 }
+// notifications: a notification counts as unread until the Notifications page has been opened once
+const nKey = (x) => `${x.title}|${x.link}`;
+const seenStore = () => `pedalla_seen_${session.user?.id || 0}`;
+const getSeen = () => { try { return new Set(JSON.parse(localStorage.getItem(seenStore()) || '[]')); } catch { return new Set(); } };
+const setSeen = (keys) => { try { localStorage.setItem(seenStore(), JSON.stringify([...keys].slice(-2000))); } catch {} };
+let notifTimer = null;
 async function refreshNotifCount() {
-  const n = await GET('notifications').catch(() => []);
-  const c = n.filter((x) => x.level !== 'info').length;
-  const el = $('#notif-cnt'); if (el) el.textContent = c || '';
-  const d = $('#notif-dot'); if (d) d.hidden = !c;
+  const n = await GET('notifications').catch(() => null); if (!n) return;
+  const seen = getSeen(); const unread = n.filter((x) => !seen.has(nKey(x))).length;
+  const el = $('#notif-cnt'); if (el) el.textContent = unread || '';
+  const d = $('#notif-dot'); if (d) d.hidden = !unread;
+  const bell = document.querySelector('.top .bell'); if (bell) { bell.classList.toggle('ring', unread > 0); bell.title = unread ? `${unread}` : ''; }
+  clearTimeout(notifTimer); notifTimer = setTimeout(() => { if (session.user) refreshNotifCount(); }, 60000);
 }
 
 // ---------- login ----------
@@ -111,7 +125,7 @@ async function dashboardPage() {
     ${fin ? card('Geciken ödemeler', table(d.overdue, [{ k: 'invoice_no', l: 'Fatura' }, { k: 'customer', l: 'Müşteri' }, { l: 'Gecikme', f: (r) => `<b class="t-danger">${r.days} gün</b>` }, { l: 'Kalan', f: (r) => money(r.balance), cls: 'num' }, ...(can('finance', 'w') ? [{ l: '', f: (r) => waBtn(r, true) }] : [])], { link: (r) => `#/invoices/${r.id}`, empty: 'Geciken ödeme yok' })) : ''}
     ${card('Yaklaşan iadeler (14 gün)', table(d.upcoming_returns, [{ k: 'code', l: 'Bisiklet' }, { k: 'customer', l: 'Müşteri' }, { l: 'Dönüş', f: (r) => date(r.end_date) }], { link: (r) => `#/rentals/${r.id}`, empty: 'Yaklaşan iade yok' }))}
     ${card('Açık servis kayıtları', table(d.open_service, [{ k: 'order_no', l: 'No' }, { k: 'code', l: 'Bisiklet' }, { l: 'Durum', f: (r) => badge(r.status) }, { l: 'Tahmini', f: (r) => (r.estimated_ready < todayISO() ? `<b class="t-danger">${date(r.estimated_ready)}</b>` : date(r.estimated_ready)) }], { link: (r) => `#/service/${r.id}`, empty: 'Açık servis yok' }))}
-    ${card('Kritik stok', table(d.low_stock, [{ k: 'sku', l: 'Kod' }, { k: 'name', l: 'Parça' }, { l: 'Stok', f: (r) => `<b class="${r.stock <= 0 ? 't-danger' : 't-warn'}">${num(r.stock)} ${esc(r.unit)}</b> / min ${num(r.min_stock)}`, cls: 'num' }], { link: (r) => `#/parts/${r.id}`, empty: 'Tüm stoklar yeterli' }))}
+    ${card(`Kritik stok${d.low_stock.length ? '<a class="btn sm right" href="#/parts/order">Sipariş listesi oluştur</a>' : ''}`, table(d.low_stock, [{ k: 'sku', l: 'Kod' }, { k: 'name', l: 'Parça' }, { l: 'Stok', f: (r) => `<b class="${r.stock <= 0 ? 't-danger' : 't-warn'}">${num(r.stock)} ${esc(r.unit)}</b> / min ${num(r.min_stock)}`, cls: 'num' }], { link: (r) => `#/parts/${r.id}`, empty: 'Tüm stoklar yeterli' }))}
     ${card('Son işlemler', `<ul class="feed">${d.recent.map((a) => `<li><span class="feed-t">${ago(a.ts)}</span><b>${esc(a.user || 'Sistem')}</b> · ${esc(a.action)} <span class="muted">${esc(a.details)}</span></li>`).join('')}</ul>`)}
   </div>`);
   bindWa(main());
@@ -127,6 +141,7 @@ async function mapPage(q) {
   if (!window.L) { $('#map').innerHTML = '<div class="empty">Harita kütüphanesi yüklenemedi (internet bağlantısı gerekli).</div>'; }
   const map = window.L ? L.map('map', { zoomControl: true }).setView([Number(session.settings.map_center_lat) || 53.56, Number(session.settings.map_center_lng) || 9.95], 12) : null;
   if (map) L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
+  map?.on('popupopen', (e) => bindQuick(e.popup.getElement(), (id) => bikes.find((x) => x.id == id), async () => { map.closePopup(); await load(); }));
   let layer = map ? L.layerGroup().addTo(map) : null; let bikes = []; let filt = q.status || 'tümü'; const markers = {};
   const draw = () => {
     const term = ($('#mq')?.value || '').toLowerCase();
@@ -137,7 +152,7 @@ async function mapPage(q) {
     for (const b of vis) {
       if (b.lat == null) continue;
       const m = L.marker([b.lat, b.lng], { icon: L.divIcon({ className: '', html: `<div class="pin" style="--c:${statusHex[b.status]}"><span>${esc(b.code.replace('PED-', ''))}</span></div>`, iconSize: [34, 42], iconAnchor: [17, 40] }) });
-      m.bindPopup(`<div class="pop"><b>${esc(b.code)}</b> ${badge(b.status)}<br>${esc(b.brand)} ${esc(b.model)}<br>${b.status === 'kirada' ? `Kiracı: <b>${esc(b.customer_label || '—')}</b><br>Sürücü: ${esc(b.rider_name || '—')} ${b.rider_phone ? `<a href="tel:${esc(b.rider_phone)}">${esc(b.rider_phone)}</a>` : ''}<br>Dönüş: ${date(b.end_date)}<br>` : ''}Batarya: ${b.battery_level != null ? '%' + b.battery_level : '—'} · Son sinyal: ${ago(b.last_seen)}<br><a href="#/bikes/${b.id}">Detay →</a></div>`);
+      m.bindPopup(`<div class="pop"><b>${esc(b.code)}</b> ${badge(b.status)}<br>${esc(b.brand)} ${esc(b.model)}<br>${b.status === 'kirada' ? `Kiracı: <b>${esc(b.customer_label || '—')}</b><br>Sürücü: ${esc(b.rider_name || '—')} ${b.rider_phone ? `<a href="tel:${esc(b.rider_phone)}">${esc(b.rider_phone)}</a>` : ''}<br>Dönüş: ${date(b.end_date)}<br>` : ''}Batarya: ${b.battery_level != null ? '%' + b.battery_level : '—'} · Son sinyal: ${ago(b.last_seen)}${b.lock_requested ? '<br><b class="t-danger">🔒 Durduruldu (kilit komutu gönderildi)</b>' : ''}<div class="pop-acts">${quickBtns(b)}<a class="btn sm" href="#/bikes/${b.id}">Detay →</a></div></div>`);
       m.addTo(layer); markers[b.id] = m;
     }
     $('#mlist').querySelectorAll('.mitem').forEach((el) => el.onclick = () => { const b = bikes.find((x) => x.id == el.dataset.id); if (map && b?.lat) { map.setView([b.lat, b.lng], 15); markers[b.id]?.openPopup(); } else location.hash = `#/bikes/${b.id}`; });
@@ -160,7 +175,7 @@ async function mapPage(q) {
 
 // ---------- generic list ----------
 const LISTS = {
-  bikes: { link: (r) => `#/bikes/${r.id}`, chips: ['status', BIKE_STATUS], sub: 'Filodaki tüm bisikletler, durumları ve bakım tarihleri.' },
+  bikes: { link: (r) => `#/bikes/${r.id}`, chips: ['status', BIKE_STATUS], sub: 'Filodaki tüm bisikletler, durumları ve bakım tarihleri.', actions: (q) => `<a class="btn sm" href="#/bikes/qr${q.status ? `?status=${encodeURIComponent(q.status)}` : ''}">QR etiketleri</a>` },
   customers: { link: (r) => `#/customers/${r.id}`, sub: 'Kurumsal (kurye firmaları) ve bireysel kiracılar.' },
   riders: { link: (r) => `#/riders/${r.id}`, sub: 'Bisikleti fiilen kullanan kişiler. Firmaya bağlı kuryeleri firmayla, bireysel kiracıları "Bağlı firma" boş bırakarak kaydedin; sistem onları doğrudan müşteri yapar.' },
   pricing_plans: { sub: 'Bisiklet tipine göre günlük / haftalık / aylık tarifeler ve depozito tutarları.' },
@@ -179,7 +194,7 @@ async function listPage(res, q = {}) {
   const w = can(meta.perm, 'w') && !meta.readonly;
   const cols = colsFromMeta(res);
   const chipHtml = cfg.chips ? `<div class="chips">${['', ...cfg.chips[1]].map((v) => `<a class="chip ${(q[cfg.chips[0]] || '') === v ? 'on' : ''}" href="#/${res}${v ? `?${cfg.chips[0]}=${encodeURIComponent(v)}` : ''}">${v || 'Tümü'}</a>`).join('')}</div>` : '';
-  setMain(`${head(meta.label, cfg.sub, `<button class="btn sm" id="csv">CSV</button>${w && !meta.noCreate ? `<button class="btn primary sm" id="new">+ ${meta.single}</button>` : ''}`)}
+  setMain(`${head(meta.label, cfg.sub, `<button class="btn sm" id="csv">CSV</button>${cfg.actions ? cfg.actions(q) : ''}${w && !meta.noCreate ? `<button class="btn primary sm" id="new">+ ${meta.single}</button>` : ''}`)}
     <div class="toolbar"><input type="search" id="q" placeholder="Ara…" value="${esc(q.q || '')}">${chipHtml}<span class="muted">${rows.length} kayıt</span></div>
     ${card('', table(rows, cols, { link: cfg.link || (w && !meta.noEdit ? (r) => `#/${res}/${r.id}/edit` : null) }), 'flush')}`);
   $('#csv').onclick = () => csv(rows, cols, res);
@@ -198,15 +213,18 @@ async function bikePage(id) {
   const b = await GET(`detail/bikes/${id}`); const w = can('fleet', 'w');
   const cur = b.current;
   setMain(`${head(`${esc(b.code)} <span class="h-badge">${badge(b.status)}</span>`, `${esc(b.type || '')} · ${esc(b.brand || '')} ${esc(b.model || '')} · ${esc(b.color || '')}`,
-    `${w ? '<button class="btn sm" id="edit">Düzenle</button><button class="btn sm" id="stat">Durum değiştir</button>' : ''}${can('service', 'w') ? `<a class="btn sm" href="#/service/new?bike_id=${b.id}">Servise al</a>` : ''}${can('rentals', 'w') && b.status === 'müsait' ? `<a class="btn primary sm" href="#/rentals/new?bike_id=${b.id}">Kirala</a>` : ''}`)}
+    `${w ? '<button class="btn sm" id="edit">Düzenle</button><button class="btn sm" id="stat">Durum değiştir</button>' : ''}<a class="btn sm" href="#/bikes/${b.id}/qr">QR etiketi</a>${quickBtns(b, false)}${can('service', 'w') ? `<a class="btn sm" href="#/service/new?bike_id=${b.id}">Servise al</a>` : ''}${can('rentals', 'w') && b.status === 'müsait' ? `<a class="btn primary sm" href="#/rentals/new?bike_id=${b.id}">Kirala</a>` : ''}`)}
+  ${b.status === 'kayıp/çalıntı' ? `<div class="alert danger"><b>Çalıntı / kayıp bildirildi</b>${b.stolen_at ? ` · ${dt(b.stolen_at)}` : ''}${b.lat != null ? ` · Son konum: <a href="https://www.google.com/maps?q=${b.lat},${b.lng}" target="_blank" rel="noopener">${b.lat}, ${b.lng}</a> · ${ago(b.last_seen)}` : ''}</div>` : b.lock_requested ? '<div class="alert warn">🔒 Bisiklet durduruldu: GPS cihazına kilit komutu gönderildi. Tekrar kullanıma açmak için "Tekrar aktif et"e basın.</div>' : ''}
+  ${b.economics ? econCard(b) : ''}
   <div class="grid g-1-2">
     <div class="stack">
       ${card('Şu anki kullanım', cur ? dl([['Sözleşme', `<a href="#/rentals/${cur.id}">${esc(cur.contract_no)}</a> ${badge(cur.status)}`], ['Kiracı', `<a href="#/customers/${cur.customer_id}">${esc(cur.customer_label)}</a> ${cur.customer_phone ? `· <a href="tel:${esc(cur.customer_phone)}">${esc(cur.customer_phone)}</a>` : ''}`], ['Kullanıcı (sürücü)', cur.rider_name ? `${esc(cur.rider_name)} ${cur.rider_phone ? `· <a href="tel:${esc(cur.rider_phone)}">${esc(cur.rider_phone)}</a>` : ''}` : '—'], ['Dönem', `${date(cur.start_date)} – ${cur.end_date < todayISO() && cur.status === 'aktif' ? `<b class="t-danger">${date(cur.end_date)} (gecikmede)</b>` : date(cur.end_date)}`], ['Ücret', `${money(cur.rate)} / ${esc(cur.period)}`], ['Depozito', `${money(cur.deposit_amount)} ${badge(cur.deposit_status)}`]]) : `<div class="empty">Bisiklet şu an kirada değil.</div>`)}
-      ${card('Bisiklet bilgileri', dl([['Şasi no', esc(b.frame_no)], ['Batarya no', esc(b.battery_no)], ['GPS cihazı', esc(b.gps_tracker_id)], ['Model yılı', esc(b.year)], ['Alış', `${date(b.purchase_date)} · ${money(b.purchase_price)}`], ['Kilometre', `${num(b.odometer_km)} km`], ['Batarya', b.battery_level != null ? `${meter(b.battery_level, b.battery_level < 20 ? 'low' : '')} %${b.battery_level}` : '—'], ['Sigorta', `${esc(b.insurance_no || '—')} · ${b.insurance_until && b.insurance_until < addDays(todayISO(), 30) ? `<b class="t-warn">${date(b.insurance_until)}</b>` : date(b.insurance_until)}`], ['Son / sonraki bakım', `${date(b.last_service_date)} → ${b.next_service_date && b.next_service_date < todayISO() ? `<b class="t-danger">${date(b.next_service_date)}</b>` : date(b.next_service_date)}`], ['Toplam ciro', can('finance') ? money(b.revenue) : '—'], ['Notlar', esc(b.notes)]]))}
+      ${card('Bisiklet bilgileri', dl([['Şasi no', esc(b.frame_no)], ['Batarya no', esc(b.battery_no)], ['GPS cihazı', esc(b.gps_tracker_id)], ['Model yılı', esc(b.year)], ['Alış', `${date(b.purchase_date)} · ${money(b.purchase_price)}`], ['QR kimliği', `<code class="uid">${esc(b.uid || '—')}</code>`], ['Kilometre', `${num(b.odometer_km)} km`], ['Batarya', b.battery_level != null ? `${meter(b.battery_level, b.battery_level < 20 ? 'low' : '')} %${b.battery_level}` : '—'], ['Sigorta', `${esc(b.insurance_no || '—')} · ${b.insurance_until && b.insurance_until < addDays(todayISO(), 30) ? `<b class="t-warn">${date(b.insurance_until)}</b>` : date(b.insurance_until)}`], ['Son / sonraki bakım', `${date(b.last_service_date)} → ${b.next_service_date && b.next_service_date < todayISO() ? `<b class="t-danger">${date(b.next_service_date)}</b>` : date(b.next_service_date)}`], ['Toplam ciro', can('finance') ? money(b.revenue) : '—'], ['Notlar', esc(b.notes)]]))}
     </div>
     ${card(`Konum · ${esc(b.location_name || '')} <small class="muted">son sinyal ${ago(b.last_seen)}</small>`, '<div id="bmap" class="map sm"></div>')}
   </div>
   ${card('Kiralama geçmişi', table(b.rentals, [{ k: 'contract_no', l: 'Sözleşme' }, { k: 'customer_label', l: 'Kiracı' }, { k: 'rider_name', l: 'Sürücü', f: (r) => esc(r.rider_name || '—') }, { l: 'Başlangıç', f: (r) => date(r.start_date) }, { l: 'Dönüş', f: (r) => date(r.returned_at || r.end_date) }, { l: 'Ücret', f: (r) => `${money(r.rate)}/${r.period}`, cls: 'num' }, { l: 'Durum', f: (r) => badge(r.status) }], { link: (r) => `#/rentals/${r.id}` }))}
+  ${card(`Giderler <small class="muted">kaza, dış onarım, sigorta… (kazançtan düşülür)</small>${w ? '<button class="btn sm right" id="addcost">+ Gider ekle</button>' : ''}`, table(b.costs, [{ l: 'Tarih', f: (r) => date(r.date) }, { l: 'Gider türü', f: (r) => esc(r.category) }, { k: 'description', l: 'Açıklama' }, { l: 'Tutar', f: (r) => money(r.amount), cls: 'num' }, { l: 'Kullanıcı', f: (r) => esc(r.user_name || '—') }, w ? { l: '', f: (r) => `<button class="btn ghost sm" data-delcost="${r.id}" title="Sil">✕</button>` } : null].filter(Boolean), { empty: 'Kayıtlı gider yok' }))}
   ${card('Servis geçmişi', table(b.services, [{ k: 'order_no', l: 'No' }, { l: 'Kabul', f: (r) => dt(r.received_at) }, { l: 'Tip', f: (r) => esc(r.type) }, { k: 'complaint', l: 'Şikayet', f: (r) => esc((r.complaint || '').slice(0, 70)) }, { l: 'Teknisyen', f: (r) => esc(r.technician_name || '—') }, { l: 'Parça', f: (r) => money(r.parts_total), cls: 'num' }, { l: 'Durum', f: (r) => badge(r.status) }], { link: (r) => `#/service/${r.id}` }))}`);
   if (window.L && b.lat != null) {
     const m = L.map('bmap').setView([b.lat, b.lng], 14);
@@ -216,10 +234,93 @@ async function bikePage(id) {
     setTimeout(() => m.invalidateSize(), 50);
   } else $('#bmap').innerHTML = '<div class="empty">Konum bilgisi yok</div>';
   $('#edit')?.addEventListener('click', () => editForm('bikes', b, { onSaved: (x) => (x ? route() : (location.hash = '#/bikes')) }));
+  bindQuick(main(), () => b, route);
+  $('#addcost')?.addEventListener('click', () => editForm('bike_costs', null, { defaults: { bike_id: b.id, date: todayISO() }, onSaved: route }));
+  main().querySelectorAll('[data-delcost]').forEach((x) => x.onclick = guard(async (e) => { e.stopPropagation(); if (await confirmBox('Gider kaydı silinsin mi?')) { await DEL(`bike_costs/${x.dataset.delcost}`); route(); } }));
   $('#stat')?.addEventListener('click', () => {
     const body = modal('Durum değiştir', `<form class="grid-form">${inputHtml(field('bikes', 'status'), b.status)}${inputHtml({ k: 'notes', l: 'Not', t: 'textarea' }, b.notes)}<div class="form-actions span2"><button class="btn primary">Kaydet</button></div></form>`);
     body.querySelector('form').onsubmit = guard(async (e) => { e.preventDefault(); await PUT(`bikes/${b.id}`, readForm(e.target)); closeModal(); toast('Durum güncellendi'); route(); });
   });
+}
+
+// quick actions (map popup + bike page): stop = remote lock, stolen = report theft, resume = back in use
+function quickBtns(b, withService = true) {
+  if (!can('fleet', 'w')) return withService && can('service', 'w') ? `<a class="btn sm" href="#/service/new?bike_id=${b.id}">Servise al</a>` : '';
+  const off = b.lock_requested || ['kayıp/çalıntı', 'hizmet dışı'].includes(b.status);
+  return (off ? `<button class="btn sm ok" data-bact="resume" data-bid="${b.id}">Tekrar aktif et</button>` : `<button class="btn sm warn" data-bact="stop" data-bid="${b.id}">Durdur</button>`)
+    + (b.status !== 'kayıp/çalıntı' ? `<button class="btn sm danger" data-bact="stolen" data-bid="${b.id}">Çalıntı bildir</button>` : '')
+    + (withService && can('service', 'w') ? `<a class="btn sm" href="#/service/new?bike_id=${b.id}">Servise al</a>` : '');
+}
+const QUICK = {
+  stop: ['Bisikleti durdur', 'GPS cihazına kilit komutu gönderilir (cihaz bir sonraki sinyalde uygular). Kirada değilse durum "hizmet dışı" olur.', 'Durdur', 'Bisiklet durduruldu'],
+  stolen: ['Çalıntı bildir', 'Bisiklet "kayıp/çalıntı" olarak işaretlenir, kilit komutu gönderilir ve son konum notlara yazılır. Bildirimlerde kırmızı uyarı olarak görünür.', 'Çalıntı olarak bildir', 'Çalıntı bildirimi kaydedildi'],
+  resume: ['Tekrar aktif et', 'Kilit komutu kaldırılır; bisiklet kiradaysa "kirada", değilse "müsait" olur.', 'Aktif et', 'Bisiklet tekrar aktif'],
+};
+function bindQuick(root, getBike, after) {
+  root?.querySelectorAll('[data-bact]').forEach((btn) => btn.onclick = () => {
+    const b = getBike(btn.dataset.bid); const [title, text, label, done] = QUICK[btn.dataset.bact];
+    const body = modal(`${title} · ${esc(b?.code || '')}`, `<form class="grid-form"><p class="span2">${text}</p>${inputHtml({ k: 'note', l: btn.dataset.bact === 'stolen' ? 'Not (ör. polis tutanak no, son görülme yeri)' : 'Not' , t: 'textarea' }, '')}<div class="form-actions span2"><button class="btn ${btn.dataset.bact === 'resume' ? 'primary' : 'danger'}">${label}</button></div></form>`);
+    body.querySelector('form').onsubmit = guard(async (e) => { e.preventDefault(); await POST(`bikes/${btn.dataset.bid}/action`, { action: btn.dataset.bact, ...readForm(e.target) }); closeModal(); toast(done, 'ok'); refreshNotifCount(); await after(); });
+  });
+}
+function econCard(b) {
+  const e = b.economics; const sign = (v) => `${v > 0 ? '+' : ''}${money(v)}`;
+  if (!e.purchase) return `<div class="alert info">Verimlilik hesabı için bisikletin <b>toplam satın alma maliyetini</b> girin (Düzenle → Toplam satın alma maliyeti). Şu ana kadar net kazanç: <b>${sign(e.net)}</b></div>`;
+  const paid = e.net >= e.purchase;
+  const big = paid ? `<span class="t-ok">${sign(e.profit)} kazanç</span>` : `%${Math.max(0, e.pct)} amorti etti`;
+  const sub = paid ? 'Bisiklet kendini amorti etti; bu tutar satın alma maliyetinin üzerindeki net kazanç.' : `Amortismana kalan: <b>${money(e.purchase - e.net)}</b>${e.payback_months ? ` · bu hızla yaklaşık <b>${e.payback_months} ay</b>` : e.monthly <= 0 ? ' · şu an aylık net kazanç yok' : ''}`;
+  return card('Verimlilik / amortisman', `<div class="econ"><div class="econ-main"><div class="econ-big">${big}</div>${meter(paid ? 100 : e.pct, paid ? 'ok' : e.pct < 30 ? 'low' : '')}<p class="muted">${sub}</p></div>
+    ${dl([['Toplam satın alma maliyeti', money(e.purchase)], ['Kira + servis geliri (net)', money(e.income)], ['− Kullanılan yedek parça', money(e.parts_cost)], ['− Diğer giderler', `${money(e.other_cost)}${e.by_category.length ? ` <small class="muted">${e.by_category.map((c) => `${esc(c.category)}: ${money(c.amount)}`).join(' · ')}</small>` : ''}`], ['= Net kazanç', `<b>${sign(e.net)}</b>`], ['Kâr / zarar (maliyet sonrası)', `<b class="${e.profit >= 0 ? 't-ok' : 't-danger'}">${sign(e.profit)}</b>`], ['Aylık ortalama net', `${money(e.monthly)} <small class="muted">${date(e.since)}'den beri</small>`], ['Servis işçiliği (bilgi)', `${money(e.labor_cost)} <small class="muted">kendi personel, düşülmedi</small>`]])}</div>`);
+}
+
+// ---------- QR stickers ----------
+const bikeUrl = (uid) => `${location.origin}${location.pathname}#/b/${uid}`;
+const qrSvg = (text) => { if (!window.qrcode) return '<div class="empty">QR</div>'; const q = window.qrcode(0, 'M'); q.addData(text); q.make(); return q.createSvgTag({ cellSize: 4, margin: 0, scalable: true }); };
+const sticker = (b) => `<div class="sticker"><div class="st-top">${LOGO}<b>${esc(b.code)}</b></div><div class="st-qr">${qrSvg(bikeUrl(b.uid))}</div><div class="st-foot"><span>ID ${esc(b.uid)}</span><span>${esc(session.settings.company_phone || '')}</span></div></div>`;
+async function qrPage(ids, q = {}) {
+  const all = ids ? [await GET(`bikes/${ids}`)] : await GET('bikes', q.status ? { status: q.status } : {});
+  const bikes = all.filter((b) => b.uid);
+  setMain(`${head(ids ? `QR etiketi · ${esc(bikes[0]?.code || '')}` : 'QR etiketleri', 'Etiketi yazdırıp bisiklete yapıştırın. Telefon kamerasıyla okutunca bisikletin sayfası açılır; servis kabulde hızlıca bulursunuz. Okuyucu tabancayla üstteki arama kutusuna da okutabilirsiniz.',
+    `<label class="inline">Boyut <select id="stsize"><option value="s">Küçük (40 mm)</option><option value="m" selected>Orta (55 mm)</option><option value="l">Büyük (75 mm)</option></select></label><label class="inline">Kopya <input id="stcopies" type="number" min="1" max="20" value="1" style="width:64px"></label><button class="btn primary sm" id="stprint">Yazdır / PDF</button>`)}
+    ${ids ? '' : `<div class="toolbar"><div class="chips">${['', ...BIKE_STATUS].map((v) => `<a class="chip ${(q.status || '') === v ? 'on' : ''}" href="#/bikes/qr${v ? `?status=${encodeURIComponent(v)}` : ''}">${v || 'Tümü'}</a>`).join('')}</div><span class="muted">${bikes.length} etiket</span></div>`}
+    <div class="stickers m" id="stgrid">${bikes.map(sticker).join('') || '<div class="empty">Bisiklet yok</div>'}</div>`);
+  $('#stsize').onchange = (e) => { $('#stgrid').className = `stickers ${e.target.value}`; };
+  $('#stprint').onclick = () => { const n = Math.max(1, Math.min(20, Number($('#stcopies').value) || 1)); printHtml(`<div class="stickers ${$('#stsize').value}">${bikes.map((b) => sticker(b).repeat(n)).join('')}</div>`, ids ? `QR ${bikes[0]?.code}` : 'QR etiketleri'); };
+}
+async function qrOpen(uid) {
+  try {
+    const b = await GET(`bikes/by-uid/${encodeURIComponent(uid)}`);
+    location.replace(can('fleet') ? `#/bikes/${b.id}` : `#/service/new?bike_id=${b.id}`);
+  } catch (e) { setMain(`<div class="alert danger">${esc(e.message)}</div>`); }
+}
+
+// ---------- reorder list ----------
+async function orderListPage() {
+  const d = await GET('parts/reorder');
+  const groups = {}; for (const it of d.items) (groups[it.supplier_name || '—'] ||= []).push(it);
+  const rowHtml = (it) => `<tr data-id="${it.id}"><td><input type="checkbox" class="oi" checked></td><td><b>${esc(it.sku)}</b></td><td>${esc(it.name)}</td><td class="num">${num(it.stock, 2)} / ${num(it.min_stock)}</td><td class="num"><input type="number" class="oq" min="0" step="1" value="${it.suggested}" style="width:72px"> ${esc(it.unit)}</td><td class="num">${money(it.cost)}</td><td class="num ot">${money(it.line_total)}</td></tr>`;
+  setMain(`${head('Sipariş listesi', `Minimum stok seviyesinde veya altındaki parçalar, tedarikçiye göre gruplu. Önerilen miktar = 2 × min. stok − mevcut stok; değiştirebilirsiniz.`, `<a class="btn sm" href="#/parts">← Yedek parçalar</a><button class="btn sm" id="ocsv">CSV</button><button class="btn primary sm" id="oprint">Yazdır / PDF</button>`)}
+    ${d.items.length ? Object.entries(groups).map(([sup, items]) => card(`${esc(sup)} ${items[0].lead_days ? `<small class="muted">teslim ~${items[0].lead_days} gün</small>` : ''} ${items[0].supplier_email ? `<small class="muted">· ${esc(items[0].supplier_email)}${items[0].supplier_phone ? ' · ' + esc(items[0].supplier_phone) : ''}</small>` : ''}`,
+      `<div class="tbl-wrap"><table class="tbl"><thead><tr><th></th><th>Kod</th><th>Parça</th><th class="num">Stok / min</th><th class="num">Sipariş</th><th class="num">Birim fiyat</th><th class="num">Tutar</th></tr></thead><tbody>${items.map(rowHtml).join('')}</tbody><tfoot><tr><td colspan="6" class="num">Ara toplam</td><td class="num sub"></td></tr></tfoot></table></div>`, 'flush ogroup')).join('')
+      + `<div class="card"><div class="card-b order-total">Genel toplam (net): <b id="ogt"></b></div></div>` : '<div class="empty big">Tüm stoklar yeterli, sipariş edilecek parça yok.</div>'}`);
+  const byId = Object.fromEntries(d.items.map((x) => [x.id, x]));
+  const sel = () => [...main().querySelectorAll('tr[data-id]')].filter((tr) => tr.querySelector('.oi').checked && Number(tr.querySelector('.oq').value) > 0).map((tr) => ({ ...byId[tr.dataset.id], qty: Number(tr.querySelector('.oq').value) }));
+  const calc = () => {
+    let gt = 0;
+    main().querySelectorAll('.ogroup').forEach((g) => { let st = 0; g.querySelectorAll('tr[data-id]').forEach((tr) => { const it = byId[tr.dataset.id]; const on = tr.querySelector('.oi').checked; const v = on ? Number(tr.querySelector('.oq').value) * (it.cost || 0) : 0; tr.querySelector('.ot').textContent = money(v); tr.classList.toggle('off', !on); st += v; }); g.querySelector('.sub').textContent = money(st); gt += st; });
+    if ($('#ogt')) $('#ogt').textContent = money(gt);
+  };
+  main().querySelectorAll('.oi, .oq').forEach((x) => x.addEventListener('input', calc)); calc();
+  $('#ocsv').onclick = () => csv(sel(), [{ k: 'supplier_name', l: 'Tedarikçi' }, { k: 'sku', l: 'Kod' }, { k: 'name', l: 'Parça' }, { k: 'qty', l: 'Miktar' }, { k: 'unit', l: 'Birim' }, { k: 'cost', l: 'Birim fiyat' }], 'siparis-listesi');
+  $('#oprint').onclick = () => {
+    const items = sel(); if (!items.length) return toast('Seçili parça yok', 'info');
+    const g = {}; for (const it of items) (g[it.supplier_name || '—'] ||= []).push(it);
+    const tot = (xs) => xs.reduce((a, x) => a + x.qty * (x.cost || 0), 0);
+    printHtml(`<div class="doc">${docHeader(tr('Sipariş listesi'), dDate(uiLang, d.date))}${Object.entries(g).map(([sup, xs]) => `<h3>${esc(sup)}${xs[0].supplier_contact ? ` <small>· ${esc(xs[0].supplier_contact)}</small>` : ''}${xs[0].supplier_email ? ` <small>· ${esc(xs[0].supplier_email)}</small>` : ''}${xs[0].supplier_phone ? ` <small>· ${esc(xs[0].supplier_phone)}</small>` : ''}</h3>
+      <table class="dtbl"><thead><tr><th>${tr('Kod')}</th><th>${tr('Parça')}</th><th class="num">${tr('Miktar')}</th><th class="num">${tr('Birim fiyat')}</th><th class="num">${tr('Tutar')}</th></tr></thead><tbody>${xs.map((x) => `<tr><td>${esc(x.sku)}</td><td>${esc(x.name)}</td><td class="num">${num(x.qty, 2)} ${esc(tr(x.unit))}</td><td class="num">${money(x.cost)}</td><td class="num">${money(x.qty * (x.cost || 0))}</td></tr>`).join('')}</tbody>
+      <tfoot><tr><td colspan="4" class="num">${tr('Ara toplam')}</td><td class="num"><b>${money(tot(xs))}</b></td></tr></tfoot></table>`).join('')}
+      <p class="doc-total">${tr('Genel toplam (net)')}: <b>${money(tot(items))}</b></p><div class="doc-foot">${tr('Hazırlayan')}: ${esc(session.user.name)}</div></div>`, `${tr('Sipariş listesi')} ${d.date}`);
+  };
 }
 
 // ---------- rentals ----------
@@ -772,7 +873,7 @@ async function partsPage(q) {
   const rows = await GET('parts', q); const w = can('stock', 'w');
   const cols = colsFromMeta('parts').map((c) => (c.k === 'stock' ? { ...c, f: (r) => `<b class="${r.stock <= 0 ? 't-danger' : r.low ? 't-warn' : ''}">${num(r.stock, 2)}</b> ${esc(r.unit)}` } : c));
   const value = rows.reduce((a, p) => a + p.stock * p.cost, 0);
-  setMain(`${head('Yedek parçalar', 'Parça kataloğu, stok seviyeleri ve kritik stok uyarıları.', `<button class="btn sm" id="csv">CSV</button>${w ? '<button class="btn sm" id="move">Stok girişi / çıkışı</button><button class="btn primary sm" id="new">+ Parça</button>' : ''}`)}
+  setMain(`${head('Yedek parçalar', 'Parça kataloğu, stok seviyeleri ve kritik stok uyarıları.', `<button class="btn sm" id="csv">CSV</button><a class="btn sm" href="#/parts/order">Sipariş listesi oluştur</a>${w ? '<button class="btn sm" id="move">Stok girişi / çıkışı</button><button class="btn primary sm" id="new">+ Parça</button>' : ''}`)}
     <div class="toolbar"><input type="search" id="q" placeholder="Kod, ad, uyumlu model, raf…" value="${esc(q.q || '')}"><div class="chips"><a class="chip ${!q.low ? 'on' : ''}" href="#/parts">Tümü</a><a class="chip ${q.low ? 'on' : ''}" href="#/parts?low=1">Kritik stok</a></div><span class="muted">${rows.length} parça · stok değeri <b>${money(value)}</b></span></div>
     ${card('', table(rows, cols, { link: (r) => `#/parts/${r.id}` }), 'flush')}`);
   $('#csv').onclick = () => csv(rows, cols, 'yedek-parcalar');
@@ -818,9 +919,11 @@ async function reportsPage(q) {
 // ---------- notifications ----------
 async function notificationsPage() {
   const n = await GET('notifications');
+  const seen = getSeen(); n.forEach((x) => (x.unread = !seen.has(nKey(x))));
+  setSeen(new Set([...seen, ...n.map(nKey)])); refreshNotifCount();
   const groups = {}; n.forEach((x) => (groups[x.title] ||= []).push(x));
   setMain(`${head('Bildirimler', 'Sistem tarafından otomatik üretilen uyarılar: geciken ödeme ve iadeler, kritik stok, bakım zamanı, düşük batarya, GPS sinyali, sigorta.')}
-    ${n.length ? Object.entries(groups).map(([t, items]) => card(`${esc(t)} <span class="cnt">${items.length}</span>`, `<ul class="notifs">${items.map((x) => `<li class="lv-${x.level}"><a href="${x.link}">${esc(x.text)}</a></li>`).join('')}</ul>`)).join('') : '<div class="empty big">Her şey yolunda, bildirim yok.</div>'}`);
+    ${n.length ? Object.entries(groups).map(([t, items]) => card(`${esc(t)} <span class="cnt">${items.length}</span>`, `<ul class="notifs">${items.map((x) => `<li class="lv-${x.level} ${x.unread ? 'unread' : ''}"><a href="${x.link}">${esc(x.text)}</a>${x.unread ? '<span class="badge b-brand">yeni</span>' : ''}</li>`).join('')}</ul>`)).join('') : '<div class="empty big">Her şey yolunda, bildirim yok.</div>'}`);
 }
 
 // ---------- roles ----------
@@ -838,6 +941,7 @@ async function rolesPage() {
 const SETTINGS_FORM = [
   ['Şirket', [['company_name', 'Şirket adı'], ['company_address', 'Adres'], ['company_phone', 'Telefon'], ['company_email', 'E-posta'], ['company_tax_no', 'USt-IdNr / vergi no'], ['company_iban', 'IBAN']]],
   ['Finans', [['currency', 'Para birimi'], ['vat_rate', 'KDV oranı %', 'number'], ['payment_terms_days', 'Ödeme vadesi (gün)', 'number'], ['late_fee_per_day', 'Geç ödeme bedeli / gün (€)', 'number'], ['late_return_fee_per_day', 'Geç iade bedeli / gün (€)', 'number']]],
+  ['Bisiklet tipleri', [['bike_types', 'Bisiklet tipleri (her satıra bir tip; bisiklet ve tarife formlarında seçilir)', 'textarea']]],
   ['Servis & filo', [['service_interval_days', 'Bakım aralığı (gün)', 'number'], ['service_interval_km', 'Bakım aralığı (km)', 'number'], ['labor_rate', 'Saatlik işçilik ücreti (€)', 'number'], ['low_battery_alert', 'Düşük batarya uyarısı %', 'number'], ['map_center_lat', 'Harita merkezi enlem'], ['map_center_lng', 'Harita merkezi boylam'], ['telemetry_key', 'GPS cihaz API anahtarı']]],
   ['Belgeler (sözleşme, fatura, servis formu)', [['doc_lang', 'Varsayılan belge dili', 'select', DOC_LANGS], ['contract_terms_de', 'Sözleşme koşulları – Almanca', 'textarea'], ['contract_terms_en', 'Sözleşme koşulları – İngilizce', 'textarea'], ['service_terms_de', 'Servis formu koşulları – Almanca', 'textarea'], ['service_terms_en', 'Servis formu koşulları – İngilizce', 'textarea']]],
   ['WhatsApp ödeme hatırlatması', [['whatsapp_de', 'Mesaj – Almanca', 'textarea'], ['whatsapp_en', 'Mesaj – İngilizce', 'textarea']]],
@@ -854,7 +958,7 @@ async function settingsPage() {
     const b = modal('Tüm verileri sil', `<form class="grid-form"><p class="span2">Bu işlem geri alınamaz. Onaylamak için <b>SİL</b> yazın.</p><label class="field span2"><span>Onay</span><input name="confirm" autocomplete="off" required></label><div class="form-actions span2"><button class="btn danger">Kalıcı olarak sil</button></div></form>`);
     b.querySelector('form').onsubmit = guard(async (e) => { e.preventDefault(); await POST('wipe', { ...readForm(e.target), keep_users: keepUsers }); closeModal(); clearLookups(); toast('Tüm veriler silindi', 'ok'); location.hash = '#/'; route(); });
   });
-  $('#stf').onsubmit = guard(async (e) => { e.preventDefault(); session.settings = await PUT('settings', readForm(e.target)); toast('Ayarlar kaydedildi'); });
+  $('#stf').onsubmit = guard(async (e) => { e.preventDefault(); session.settings = await PUT('settings', readForm(e.target)); applyBikeTypes(session.settings); toast('Ayarlar kaydedildi'); });
 }
 
 // ---------- search ----------
@@ -873,6 +977,10 @@ const ROUTES = [
   [/^map$/, (m, q) => mapPage(q), 'fleet'],
   [/^notifications$/, () => notificationsPage(), 'dashboard'],
   [/^bikes\/(\d+)$/, (m) => bikePage(m[1]), 'fleet'],
+  [/^bikes\/(\d+)\/qr$/, (m) => qrPage(m[1]), 'fleet'],
+  [/^bikes\/qr$/, (m, q) => qrPage(null, q), 'fleet'],
+  [/^b\/([A-Za-z0-9-]+)$/, (m) => qrOpen(m[1]), null],
+  [/^parts\/order$/, () => orderListPage(), 'stock'],
   [/^rentals$/, (m, q) => rentalsPage(q), 'rentals'],
   [/^rentals\/new$/, (m, q) => newRentalPage(q), 'rentals'],
   [/^rentals\/(\d+)$/, (m) => rentalPage(m[1]), 'rentals'],
@@ -919,7 +1027,7 @@ export async function boot() {
   startI18n();
   if (!session.token) return loginPage();
   try {
-    const me = await GET('me'); Object.assign(session, { user: me.user, perms: me.perms, roles: me.roles, settings: me.settings });
+    const me = await GET('me'); Object.assign(session, { user: me.user, perms: me.perms, roles: me.roles, settings: me.settings }); applyBikeTypes(me.settings);
   } catch { setToken(null); return loginPage(); }
   if (!location.hash || location.hash === '#/login') location.hash = '#/';
   shell(); await route();

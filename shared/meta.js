@@ -19,6 +19,7 @@ export const REQUEST_STATUS = ['yeni', 'onaylandı', 'tamamlandı', 'reddedildi'
 export const RIDER_REQUIRED_DOCS = ['Kimlik ön yüz', 'Kimlik arka yüz', 'Adres belgesi (Meldebescheinigung)'];
 export const CASH_IN = ['Fatura tahsilatı', 'Depozito tahsilatı', 'Servis / parça satışı', 'Kasaya para konuldu', 'Diğer gelir'];
 export const CASH_OUT = ['Depozito iadesi', 'Masraf / malzeme', 'Yakıt / ulaşım', 'Personel avansı', 'Bankaya yatırıldı', 'Diğer gider'];
+export const BIKE_COST_TYPES = ['kaza / hasar', 'dış servis / onarım', 'yedek parça (stok dışı)', 'sigorta', 'aksesuar / ekipman', 'nakliye', 'diğer'];
 export const PART_CATEGORIES = ['fren', 'lastik/jant', 'zincir/aktarma', 'batarya', 'motor/elektrik', 'ışık', 'kargo kutusu', 'gidon/sele', 'aksesuar', 'diğer'];
 
 export const ROLES = {
@@ -50,13 +51,21 @@ export const DEFAULT_ROLE_PERMS = {
 };
 
 const opt = (arr) => arr.map((v) => ({ v, l: v }));
+// bike types are managed in Settings (one per line); the selects of bikes and price plans follow them
+export function applyBikeTypes(settings) {
+  const list = String(settings?.bike_types || '').split(/\r?\n|,/).map((x) => x.trim()).filter(Boolean);
+  if (!list.length) return;
+  RESOURCES.bikes.fields.find((f) => f.k === 'type').o = opt(list);
+  RESOURCES.pricing_plans.fields.find((f) => f.k === 'bike_type').o = opt(list);
+}
 
 export const RESOURCES = {
   bikes: {
-    label: 'Bisikletler', single: 'Bisiklet', perm: 'fleet', order: 'code', search: ['code', 'brand', 'model', 'frame_no', 'gps_tracker_id'],
+    label: 'Bisikletler', single: 'Bisiklet', perm: 'fleet', order: 'code', search: ['code', 'brand', 'model', 'frame_no', 'gps_tracker_id', 'uid'],
     title: (r) => `${r.code} · ${r.brand || ''} ${r.model || ''}`,
     fields: [
       { k: 'code', l: 'Filo kodu', req: 1, list: 1 },
+      { k: 'uid', l: 'QR kimliği', ro: 1 },
       { k: 'type', l: 'Tip', t: 'select', o: opt(BIKE_TYPES), list: 1 },
       { k: 'brand', l: 'Marka', list: 1 },
       { k: 'model', l: 'Model', list: 1 },
@@ -67,7 +76,7 @@ export const RESOURCES = {
       { k: 'color', l: 'Renk' },
       { k: 'year', l: 'Model yılı', t: 'number' },
       { k: 'purchase_date', l: 'Alış tarihi', t: 'date' },
-      { k: 'purchase_price', l: 'Alış fiyatı', t: 'money' },
+      { k: 'purchase_price', l: 'Toplam satın alma maliyeti', t: 'money' },
       { k: 'location_name', l: 'Konum / depo', list: 1 },
       { k: 'lat', l: 'Enlem', t: 'number', step: 'any' },
       { k: 'lng', l: 'Boylam', t: 'number', step: 'any' },
@@ -329,6 +338,19 @@ export const RESOURCES = {
       { k: 'user_name', l: 'Kullanıcı', ro: 1, list: 1 },
     ],
   },
+  bike_costs: {
+    label: 'Bisiklet giderleri', single: 'Bisiklet gideri', perm: 'fleet', order: 'date DESC, id DESC', search: ['category', 'description', 'bike_code'],
+    title: (r) => `Gider #${r.id ?? ''}`,
+    listSql: `SELECT g.*, b.code AS bike_code, u.name AS user_name FROM bike_costs g LEFT JOIN bikes b ON b.id=g.bike_id LEFT JOIN users u ON u.id=g.user_id`,
+    fields: [
+      { k: 'bike_id', l: 'Bisiklet', t: 'ref', ref: 'bikes', req: 1, list: 1, show: 'bike_code' },
+      { k: 'date', l: 'Tarih', t: 'date', req: 1, list: 1 },
+      { k: 'category', l: 'Gider türü', t: 'select', o: opt(BIKE_COST_TYPES), req: 1, list: 1 },
+      { k: 'amount', l: 'Tutar (net)', t: 'money', req: 1, list: 1 },
+      { k: 'description', l: 'Açıklama', list: 1 },
+      { k: 'user_name', l: 'Kullanıcı', ro: 1, list: 1 },
+    ],
+  },
   suppliers: {
     label: 'Tedarikçiler', single: 'Tedarikçi', perm: 'stock', order: 'name', search: ['name', 'contact', 'email'],
     title: (r) => r.name,
@@ -370,6 +392,7 @@ export const RESOURCES = {
 };
 
 export const DEFAULT_SETTINGS = {
+  bike_types: BIKE_TYPES.join('\n'),
   company_name: 'Pedalla GmbH',
   company_address: 'Stresemannstraße 250–252, 22769 Hamburg',
   company_phone: '+49 176 72241488',

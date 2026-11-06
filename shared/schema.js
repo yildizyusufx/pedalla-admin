@@ -72,6 +72,9 @@ CREATE TABLE IF NOT EXISTS portal_requests (
   id INTEGER PRIMARY KEY, rider_id INTEGER REFERENCES riders(id), customer_id INTEGER, rental_id INTEGER, bike_id INTEGER, type TEXT NOT NULL,
   preferred_date TEXT, preferred_time TEXT, notes TEXT, status TEXT DEFAULT 'yeni', admin_note TEXT, service_id INTEGER,
   handled_by INTEGER, handled_at TEXT, created_at TEXT DEFAULT (datetime('now')));
+CREATE TABLE IF NOT EXISTS bike_costs (
+  id INTEGER PRIMARY KEY, bike_id INTEGER NOT NULL REFERENCES bikes(id), date TEXT NOT NULL, category TEXT, amount REAL NOT NULL,
+  description TEXT, user_id INTEGER, created_at TEXT DEFAULT (datetime('now')));
 CREATE TABLE IF NOT EXISTS audit_log (
   id INTEGER PRIMARY KEY, ts TEXT DEFAULT (datetime('now')), user_id INTEGER, action TEXT, entity TEXT, entity_id INTEGER, details TEXT);
 `;
@@ -89,5 +92,6 @@ export const MIGRATIONS = {
   customers: { doc_lang: "TEXT DEFAULT 'de'" },
   deposits: { method: 'TEXT' },
   users: { lang: 'TEXT' },
+  bikes: { uid: 'TEXT', lock_requested: 'INTEGER DEFAULT 0', stolen_at: 'TEXT' },
 };
 export const ID_TYPES = ['Kimlik kartı (Personalausweis)', 'Pasaport', 'Oturum izni (Aufenthaltstitel)', 'Ehliyet'];

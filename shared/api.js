@@ -23,6 +23,10 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
     const have = new Set((await db.all(`PRAGMA table_info(${table})`)).map((c) => c.name));
     for (const [col, type] of Object.entries(cols)) if (!have.has(col)) await db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${type}`);
   }
+  // every bike gets a fixed random QR id (printed on its sticker)
+  const newUid = () => Array.from(globalThis.crypto.getRandomValues(new Uint8Array(8)), (x) => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[x % 32]).join('');
+  for (const b of await db.all("SELECT id FROM bikes WHERE uid IS NULL OR uid=''")) await db.run('UPDATE bikes SET uid=? WHERE id=?', [newUid(), b.id]);
+  await db.exec('CREATE UNIQUE INDEX IF NOT EXISTS ix_bike_uid ON bikes(uid)');
   // ---------- settings ----------
   // settings + role permissions are read once per request (see handle) and kept in memory
   let SETTINGS = { ...DEFAULT_SETTINGS }; let PERMS_CACHE = DEFAULT_ROLE_PERMS;
@@ -127,6 +131,8 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
     const vals = fields.map((f) => clean(f, body[f.k] !== undefined ? body[f.k] : f.def));
     const extra = { ...rx };
     if (res === 'users') { if (!body.password) err(400, 'Şifre zorunludur.'); extra.password_hash = hashPassword(body.password); }
+    if (res === 'bikes') extra.uid = newUid();
+    if (res === 'bike_costs') extra.user_id = user?.id ?? null;
     const cols = [...fields.map((f) => f.k), ...Object.keys(extra)];
     const r = await db.run(`INSERT INTO ${res} (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`, [...vals, ...Object.values(extra)]);
     await audit(user, 'oluşturma', res, r.lastId, RESOURCES[res].title?.(body) || '');
@@ -496,7 +502,7 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
     const ts = b.ts || nowTs();
     await db.run('INSERT INTO bike_locations(bike_id,ts,lat,lng,battery,speed) VALUES(?,?,?,?,?,?)', [bike.id, ts, b.lat, b.lng, b.battery ?? bike.battery_level, b.speed ?? 0]);
     await db.run('UPDATE bikes SET lat=?, lng=?, battery_level=COALESCE(?,battery_level), last_seen=?, odometer_km=odometer_km+COALESCE(?,0) WHERE id=?', [b.lat, b.lng, b.battery ?? null, ts, b.km_delta ?? null, bike.id]);
-    return { ok: true, bike_id: bike.id };
+    return { ok: true, bike_id: bike.id, lock: !!bike.lock_requested };
   }
   async function simulate() {
     // moves rented bikes a little – for demo / testing without real GPS trackers
@@ -510,6 +516,35 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
     return { moved: bikes.length };
   }
   const r6 = (n) => Math.round(n * 1e6) / 1e6;
+  // quick actions from the map / bike page. lock_requested is sent back to the GPS tracker on its next ping (telemetry → lock: true)
+  async function bikeAction(id, b, user) {
+    const bike = await getOne('bikes', id);
+    const active = await db.get("SELECT id FROM rentals WHERE bike_id=? AND status='aktif'", [id]);
+    const stamp = nowTs().slice(0, 16); const note = String(b.note || '').trim().slice(0, 300);
+    const addNote = (txt) => db.run('UPDATE bikes SET notes=? WHERE id=?', [`[${stamp}] ${txt}${note ? ': ' + note : ''}\n${bike.notes || ''}`.trim().slice(0, 4000), id]);
+    if (b.action === 'stop') {
+      await db.run('UPDATE bikes SET lock_requested=1, status=? WHERE id=?', [active ? bike.status : 'hizmet dışı', id]);
+      await addNote('Durduruldu (kilit komutu)');
+    } else if (b.action === 'stolen') {
+      await db.run("UPDATE bikes SET lock_requested=1, status='kayıp/çalıntı', stolen_at=? WHERE id=?", [nowTs(), id]);
+      const loc = bike.lat != null ? ` · son konum ${r6(bike.lat)}, ${r6(bike.lng)} (${bike.last_seen || '—'})` : '';
+      await addNote('Çalıntı bildirildi' + loc);
+    } else if (b.action === 'resume') {
+      const st = active ? 'kirada' : ['hizmet dışı', 'kayıp/çalıntı'].includes(bike.status) ? 'müsait' : bike.status;
+      await db.run('UPDATE bikes SET lock_requested=0, stolen_at=NULL, status=? WHERE id=?', [st, id]);
+      await addNote(bike.status === 'kayıp/çalıntı' ? 'Bulundu, tekrar aktif' : 'Tekrar aktif');
+    } else err(400, 'Bilinmeyen işlem.');
+    await audit(user, { stop: 'durdurma', stolen: 'çalıntı bildirimi', resume: 'aktifleştirme' }[b.action], 'bikes', id, `${bike.code}${note ? ' · ' + note : ''}`);
+    return await getOne('bikes', id);
+  }
+  // parts at or under minimum stock, grouped by supplier, with a suggested order quantity
+  async function reorderList() {
+    const rows = await db.all(`SELECT p.id, p.sku, p.name, p.category, p.unit, p.cost, p.stock, p.min_stock, p.location, p.supplier_id,
+        s.name AS supplier_name, s.contact AS supplier_contact, s.phone AS supplier_phone, s.email AS supplier_email, s.lead_days
+      FROM parts p LEFT JOIN suppliers s ON s.id=p.supplier_id WHERE p.stock <= p.min_stock ORDER BY s.name IS NULL, s.name, p.name`);
+    for (const r of rows) { r.suggested = Math.max(1, Math.ceil(r.min_stock * 2 - r.stock)); r.line_total = r2(r.suggested * (r.cost || 0)); }
+    return { date: today(), items: rows, total: r2(rows.reduce((a, r) => a + r.line_total, 0)) };
+  }
 
   // ---------- notifications ----------
   async function notifications(user) {
@@ -525,6 +560,8 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
       add('warn', 'finance', 'Depozito alınmadı', `${r.contract_no} · ${r.cl} · ${r.deposit_amount} €`, `#/rentals/${r.id}`);
     for (const p of await db.all('SELECT * FROM parts WHERE stock <= min_stock ORDER BY stock'))
       add(p.stock <= 0 ? 'danger' : 'warn', 'stock', 'Kritik stok', `${p.sku} ${p.name}: ${p.stock} ${p.unit} (min ${p.min_stock})`, `#/parts/${p.id}`);
+    for (const b of await db.all("SELECT * FROM bikes WHERE status='kayıp/çalıntı'"))
+      add('danger', 'fleet', 'Çalıntı / kayıp bisiklet', `${b.code}${b.stolen_at ? ' · ' + b.stolen_at.slice(0, 10) : ''}${b.last_seen ? ' · son sinyal ' + b.last_seen : ''}`, `#/bikes/${b.id}`);
     for (const b of await db.all("SELECT * FROM bikes WHERE next_service_date <= ? AND status NOT IN ('serviste','hizmet dışı','kayıp/çalıntı')", [addDays(t, 7)]))
       add(b.next_service_date < t ? 'warn' : 'info', 'service', 'Bakım zamanı', `${b.code}: ${b.next_service_date}`, `#/bikes/${b.id}`);
     for (const b of await db.all("SELECT * FROM bikes WHERE battery_level < ? AND status='kirada'", [Number(setting('low_battery_alert')) || 20]))
@@ -621,7 +658,30 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
     b.track = await db.all('SELECT ts, lat, lng, battery, speed FROM bike_locations WHERE bike_id=? ORDER BY ts DESC LIMIT 200', [id]);
     if (user && !can(user, 'rentals')) b.rentals = [];
     b.revenue = r2((await db.get("SELECT COALESCE(SUM(i.net),0) AS s FROM invoices i JOIN rentals r ON r.id=i.rental_id WHERE r.bike_id=? AND i.status<>'iptal'", [id])).s);
+    b.costs = await list('bike_costs', { bike_id: id });
+    b.economics = await bikeEconomics(b);
+    if (user && !can(user, 'finance')) { b.economics = null; b.revenue = null; }
     return b;
+  }
+  // profitability: net income (rental + service invoices, not cancelled) minus parts used and recorded costs, against the purchase cost
+  async function bikeEconomics(b) {
+    const one = async (sql) => Number((await db.get(sql, [b.id, b.id]))?.s) || 0;
+    const income = await one("SELECT COALESCE(SUM(i.net),0) AS s FROM invoices i WHERE i.status<>'iptal' AND (i.rental_id IN (SELECT id FROM rentals WHERE bike_id=?) OR i.service_id IN (SELECT id FROM service_orders WHERE bike_id=?))");
+    const parts = await one("SELECT COALESCE(SUM(sp.qty*p.cost),0) AS s FROM service_parts sp JOIN parts p ON p.id=sp.part_id JOIN service_orders s ON s.id=sp.service_id WHERE s.bike_id=? AND s.status<>'iptal' AND ?>0");
+    const other = await one('SELECT COALESCE(SUM(amount),0) AS s FROM bike_costs WHERE bike_id=? AND ?>0');
+    const labor = await one("SELECT COALESCE(SUM(labor_hours*labor_rate),0) AS s FROM service_orders WHERE bike_id=? AND status<>'iptal' AND ?>0");
+    const purchase = Number(b.purchase_price) || 0;
+    const net = r2(income - parts - other);
+    const since = b.purchase_date || (await db.get('SELECT MIN(start_date) AS d FROM rentals WHERE bike_id=?', [b.id]))?.d || String(b.created_at || today()).slice(0, 10);
+    const months = Math.max(1, daysBetween(since, today()) / 30.44);
+    const monthly = r2(net / months);
+    const remaining = r2(purchase - net);
+    return {
+      purchase, income: r2(income), parts_cost: r2(parts), other_cost: r2(other), labor_cost: r2(labor), net, since,
+      profit: r2(net - purchase), pct: purchase > 0 ? Math.round((net / purchase) * 100) : null,
+      monthly, payback_months: remaining > 0 && monthly > 0 ? Math.ceil(remaining / monthly) : null,
+      by_category: await db.all('SELECT category, ROUND(SUM(amount),2) AS amount FROM bike_costs WHERE bike_id=? GROUP BY category ORDER BY amount DESC', [b.id]),
+    };
   }
   async function rentalDetail(id, user) {
     const r = await getOne('rentals', id);
@@ -907,6 +967,13 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
         if (c === 'deposit') { need(user, 'finance', 'w'); return ok(await collectDeposit(id, body, user)); }
         if (c === 'bill') { need(user, 'finance', 'w'); return ok({ created: await billRental(id, user) }); }
       }
+      if (a === 'bikes' && b === 'by-uid' && method === 'GET') {
+        if (!can(user, 'fleet') && !can(user, 'service')) err(403, 'Bu işlem için yetkiniz yok.');
+        const bk = await db.get('SELECT id, code, uid, status FROM bikes WHERE uid=? OR code=?', [String(c || '').toUpperCase(), String(c || '')]) || err(404, 'Bu QR koduna ait bisiklet bulunamadı.');
+        return ok(bk);
+      }
+      if (a === 'bikes' && method === 'POST' && c === 'action') { need(user, 'fleet', 'w'); return ok(await bikeAction(Number(b), body, user)); }
+      if (a === 'parts' && b === 'reorder' && method === 'GET') { need(user, 'stock'); return ok(await reorderList()); }
       if (a === 'invoices' && method === 'POST' && b === 'generate') {
         need(user, 'finance', 'w');
         let created = 0; for (const r of await db.all("SELECT id FROM rentals WHERE status='aktif'")) created += await billRental(r.id, user);

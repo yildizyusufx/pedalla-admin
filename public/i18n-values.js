@@ -45,6 +45,16 @@ export const VALUES = {
   'Bankaya yatırıldı': ['Bei der Bank eingezahlt', 'Deposited at bank'], 'Diğer gider': ['Sonstige Ausgabe', 'Other expense'], 'Gün sonu sayımı': ['Tagesabschluss', 'End-of-day count'],
   'Yönetici': ['Administrator', 'Administrator'], 'Operasyon': ['Betrieb', 'Operations'], 'Servis teknisyeni': ['Servicetechniker', 'Service technician'], 'Muhasebe': ['Buchhaltung', 'Accounting'],
   'Doğrudan müşteri': ['Direktkunde', 'Direct customer'],
+  // ---- quick actions, QR, order list, profitability
+  "kaza / hasar": ["Unfall / Schaden", "accident / damage"],
+  "dış servis / onarım": ["Externe Werkstatt / Reparatur", "external service / repair"],
+  "yedek parça (stok dışı)": ["Ersatzteil (nicht aus Lager)", "spare part (not from stock)"],
+  "sigorta": ["Versicherung", "insurance"],
+  "aksesuar / ekipman": ["Zubehör / Ausrüstung", "accessories / equipment"],
+  "nakliye": ["Transport", "transport"],
+  "durdurma": ["Stoppen", "stop"],
+  "çalıntı bildirimi": ["Diebstahlmeldung", "theft report"],
+  "aktifleştirme": ["Aktivierung", "reactivation"],
 };
 const IDX = { de: 0, en: 1 };
 export const tval = (lang, v) => (v == null || lang === 'tr' || !(lang in IDX) ? v : VALUES[v]?.[IDX[lang]] ?? v);

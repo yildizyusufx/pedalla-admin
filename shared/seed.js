@@ -246,6 +246,11 @@ export async function seed(api, hashPassword) {
     // demo rider portal login (direct customer Lukas Weber): surucu@pedalla.bike / pedalla123
     db.run("UPDATE riders SET portal_email='surucu@pedalla.bike', portal_password_hash=?, portal_active=1, lang='de' WHERE name='Lukas Weber'", [hashPassword('pedalla123')]);
     db.run("UPDATE bikes SET next_service_date=? WHERE id=(SELECT x.bike_id FROM rentals x JOIN riders r ON r.id=x.rider_id WHERE r.name='Lukas Weber' AND x.status='aktif' LIMIT 1)", [addDays(T, 5)]);
+    // QR ids + a few recorded costs (accident, external repair) for the profitability card
+    const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    for (const b of bikes) db.run('UPDATE bikes SET uid=? WHERE id=?', [Array.from(globalThis.crypto.getRandomValues(new Uint8Array(8)), (x) => A[x % 32]).join(''), b.id]);
+    [[2, -120, 'kaza / hasar', 240, 'Kaza sonrası kargo kutusu değişimi'], [2, -40, 'dış servis / onarım', 85, 'Motor yazılım güncellemesi (bayi)'], [5, -200, 'aksesuar / ekipman', 60, 'Yağmur örtüsü + kilit'], [9, -15, 'sigorta', 120, 'Yıllık sigorta payı']]
+      .forEach(([bi, d, cat, amt, desc]) => db.run('INSERT INTO bike_costs(bike_id,date,category,amount,description,user_id) VALUES(?,?,?,?,?,?)', [bikes[bi].id, addDays(T, d), cat, amt, desc, users[0]]));
     await api.audit({ id: users[0] }, 'kurulum', 'system', null, 'Demo verileri yüklendi');
   });
   return true;
