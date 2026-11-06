@@ -12,6 +12,11 @@ export const PERIODS = ['gün', 'hafta', 'ay'];
 export const ID_TYPES = ['Kimlik kartı (Personalausweis)', 'Pasaport', 'Oturum izni (Aufenthaltstitel)', 'Ehliyet'];
 export const DOC_LANGS = [{ v: 'de', l: 'Almanca (Deutsch)' }, { v: 'en', l: 'İngilizce (English)' }];
 export const DOC_TYPES = ['Kimlik ön yüz', 'Kimlik arka yüz', 'Pasaport', 'Oturum izni', 'Ehliyet', 'Adres belgesi (Meldebescheinigung)', 'Ticaret sicili / Gewerbeanmeldung', 'İmzalı sözleşme', 'Teslim fotoğrafı', 'Hasar fotoğrafı', 'Diğer'];
+export const UI_LANGS = [{ v: 'tr', l: 'Türkçe' }, { v: 'de', l: 'Deutsch' }, { v: 'en', l: 'English' }];
+export const REQUEST_TYPES = ['servis randevusu', 'arıza bildirimi', 'iade randevusu', 'kiralama uzatma', 'yeni kiralama'];
+export const REQUEST_STATUS = ['yeni', 'onaylandı', 'tamamlandı', 'reddedildi', 'iptal'];
+// documents a rider is expected to upload in the rider portal (passport replaces both ID sides)
+export const RIDER_REQUIRED_DOCS = ['Kimlik ön yüz', 'Kimlik arka yüz', 'Adres belgesi (Meldebescheinigung)'];
 export const CASH_IN = ['Fatura tahsilatı', 'Depozito tahsilatı', 'Servis / parça satışı', 'Kasaya para konuldu', 'Diğer gelir'];
 export const CASH_OUT = ['Depozito iadesi', 'Masraf / malzeme', 'Yakıt / ulaşım', 'Personel avansı', 'Bankaya yatırıldı', 'Diğer gider'];
 export const PART_CATEGORIES = ['fren', 'lastik/jant', 'zincir/aktarma', 'batarya', 'motor/elektrik', 'ışık', 'kargo kutusu', 'gidon/sele', 'aksesuar', 'diğer'];
@@ -117,6 +122,10 @@ export const RESOURCES = {
       { k: 'trained', l: 'Kargo bisikleti eğitimi aldı', t: 'bool', list: 1 },
       { k: 'active', l: 'Aktif', t: 'bool', def: 1, list: 1 },
       { k: 'current_bike', l: 'Şu anki bisiklet', ro: 1, list: 1 },
+      { k: 'portal_email', l: 'Sürücü ekranı giriş e-postası', t: 'email' },
+      { k: 'portal_password', l: 'Sürücü ekranı şifresi (değiştirmek için yazın)', t: 'password' },
+      { k: 'portal_active', l: 'Sürücü ekranına giriş açık', t: 'bool', list: 1 },
+      { k: 'lang', l: 'Sürücü ekranı dili', t: 'select', o: UI_LANGS },
       { k: 'notes', l: 'Notlar', t: 'textarea' },
     ],
   },
@@ -285,6 +294,25 @@ export const RESOURCES = {
       { k: 'ref', l: 'Belge / referans', list: 1 },
       { k: 'user_name', l: 'Kullanıcı', ro: 1, list: 1 },
       { k: 'notes', l: 'Not' },
+    ],
+  },
+  portal_requests: {
+    label: 'Sürücü talepleri', single: 'Talep', perm: 'rentals', order: "CASE status WHEN 'yeni' THEN 0 ELSE 1 END, id DESC", search: ['rider_name', 'customer_label', 'bike_code', 'notes', 'type'],
+    title: (r) => `Talep #${r.id ?? ''}`, noCreate: 1,
+    listSql: `SELECT q.*, rd.name AS rider_name, rd.phone AS rider_phone, COALESCE(c.company_name,c.name) AS customer_label, b.code AS bike_code, x.contract_no, s.order_no
+      FROM portal_requests q LEFT JOIN riders rd ON rd.id=q.rider_id LEFT JOIN customers c ON c.id=q.customer_id LEFT JOIN bikes b ON b.id=q.bike_id
+      LEFT JOIN rentals x ON x.id=q.rental_id LEFT JOIN service_orders s ON s.id=q.service_id`,
+    fields: [
+      { k: 'created_at', l: 'Geliş', t: 'datetime', ro: 1, list: 1 },
+      { k: 'rider_name', l: 'Sürücü', ro: 1, list: 1 },
+      { k: 'customer_label', l: 'Müşteri', ro: 1, list: 1 },
+      { k: 'bike_code', l: 'Bisiklet', ro: 1, list: 1 },
+      { k: 'type', l: 'Talep', t: 'select', o: opt(REQUEST_TYPES), list: 1, ro: 1 },
+      { k: 'preferred_date', l: 'İstenen tarih', t: 'date', list: 1 },
+      { k: 'preferred_time', l: 'İstenen saat' },
+      { k: 'notes', l: 'Sürücünün notu', t: 'textarea', ro: 1 },
+      { k: 'status', l: 'Durum', t: 'select', o: opt(REQUEST_STATUS), list: 1, badge: 1 },
+      { k: 'admin_note', l: 'Sürücüye cevap (sürücü ekranında görünür)', t: 'textarea' },
     ],
   },
   cash_moves: {

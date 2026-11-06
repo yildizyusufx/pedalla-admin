@@ -243,6 +243,9 @@ export async function seed(api, hashPassword) {
     const y = T.slice(0, 4);
     for (const [p, n] of [['K', 40], ['S', 40]]) db.run('INSERT OR REPLACE INTO settings(key,value) VALUES(?,?)', [`seq_${p}_${y}`, String(n)]);
     db.run("INSERT OR REPLACE INTO settings(key,value) VALUES('telemetry_key','demo-tracker-key')");
+    // demo rider portal login (direct customer Lukas Weber): surucu@pedalla.bike / pedalla123
+    db.run("UPDATE riders SET portal_email='surucu@pedalla.bike', portal_password_hash=?, portal_active=1, lang='de' WHERE name='Lukas Weber'", [hashPassword('pedalla123')]);
+    db.run("UPDATE bikes SET next_service_date=? WHERE id=(SELECT x.bike_id FROM rentals x JOIN riders r ON r.id=x.rider_id WHERE r.name='Lukas Weber' AND x.status='aktif' LIMIT 1)", [addDays(T, 5)]);
     await api.audit({ id: users[0] }, 'kurulum', 'system', null, 'Demo verileri yüklendi');
   });
   return true;

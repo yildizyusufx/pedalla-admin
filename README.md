@@ -61,6 +61,9 @@ Logo `public/img/logo.png` (yatay), `public/img/mark.png` (ikon / favicon). Renk
 | **Doğrudan müşteri sürücü** | Sürücü bir firmaya bağlı olmak zorunda değil: "Bağlı firma" boş bırakılırsa sürücü için otomatik bireysel müşteri açılır; yeni kiralamada "+ Yeni bireysel müşteri" seçeneği |
 | **Kasa** | Nakit ödeme ve depozitolar otomatik kasa hareketi oluşturur; elle giriş/çıkış, gün sonu sayımı (sayım farkı kaydı), yürüyen bakiye, CSV |
 | **WhatsApp hatırlatma** | Geciken/açık faturada tek tıkla WhatsApp, müşterinin dilinde (DE/EN) hazır mesajla açılır; şablonlar Ayarlar'da |
+| **Sürücü ekranı** (`/portal.html`) | Mobil uyumlu sürücü girişi; e-posta ve şifreyi yönetici sürücü kartında belirler. Sürücü kendi bisikletini, dönüş tarihini, bakım zamanını, açık/yaklaşan ödemelerini (doğrudan müşteriyse), faturalarını ve ödemelerini görür; servis randevusu, arıza bildirimi, iade randevusu, uzatma ve yeni kiralama talebi gönderir; eksik belgelerini fotoğraf çekerek yükler; bildirimler (bakım yaklaştı, ödeme vadesi, iade günü, eksik belge, kimlik süresi, talep cevabı). TR/DE/EN |
+| **Sürücü talepleri** | Sürücü ekranından gelen talepler panelde listelenir; durum ve cevap sürücüye görünür, tek tıkla servis kaydı açılır |
+| **Dil seçimi** | Panelin tamamı Türkçe / Almanca / İngilizce (sağ üstteki TR · DE · EN); seçim tarayıcıda saklanır. Çeviriler `public/i18n-ui.js` ve `public/i18n-values.js` dosyalarındadır |
 | **Tarifeler** | Bisiklet tipine göre günlük / haftalık / aylık fiyat ve depozito |
 | **Faturalar** | Kiralama periyoduna göre otomatik dönem faturaları, hasar / servis / geç iade faturaları, KDV, vade, gecikme gün sayısı, gecikme bedeli, ödeme hatırlatması, yazdırılabilir fatura |
 | **Ödemeler** | Kısmi / tam ödeme, yöntem ve referans; fatura durumu otomatik güncellenir |

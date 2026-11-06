@@ -3,6 +3,8 @@ import {
   GET, POST, PUT, DEL, session, setToken, can, esc, money, num, date, dt, ago, badge, todayISO, addDays, fmtField, toast, guard, modal, closeModal, confirmBox,
   inputHtml, fillRefs, readForm, editForm, lookup, clearLookups, csv, table, bindTable, colsFromMeta, barChart, donut, meter, statusHex,
 } from './core.js';
+import { startI18n, langSwitch, bindLangSwitch, lang as uiLang } from './i18n.js';
+const MONTHS = { tr: ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'], de: ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'], en: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] };
 import { docT, tv, docLangOf, dMoney, dNum, dDate, dDateTime, invoiceText, DOC_LANG_LABEL } from './docs-i18n.js';
 
 const $ = (s, r = document) => r.querySelector(s);
@@ -22,7 +24,7 @@ const loading = () => setMain('<div class="loading"><div class="spin"></div></di
 // ---------- navigation ----------
 const NAV = [
   ['Genel', [['', 'Özet', 'dashboard', 'grid'], ['map', 'Canlı harita', 'fleet', 'map'], ['notifications', 'Bildirimler', 'dashboard', 'bell']]],
-  ['Kiralama', [['rentals', 'Kiralamalar', 'rentals', 'key'], ['bikes', 'Bisikletler', 'fleet', 'bike'], ['customers', 'Müşteriler', 'customers', 'users'], ['riders', 'Sürücüler', 'customers', 'user'], ['pricing_plans', 'Tarifeler', 'rentals', 'tag']]],
+  ['Kiralama', [['rentals', 'Kiralamalar', 'rentals', 'key'], ['bikes', 'Bisikletler', 'fleet', 'bike'], ['customers', 'Müşteriler', 'customers', 'users'], ['riders', 'Sürücüler', 'customers', 'user'], ['portal_requests', 'Sürücü talepleri', 'rentals', 'inbox'], ['pricing_plans', 'Tarifeler', 'rentals', 'tag']]],
   ['Finans', [['invoices', 'Faturalar', 'finance', 'doc'], ['payments', 'Ödemeler', 'finance', 'cash'], ['deposits', 'Depozitolar', 'finance', 'lock'], ['cash', 'Kasa', 'finance', 'safe']]],
   ['Servis & Stok', [['service', 'Servis kayıtları', 'service', 'wrench'], ['parts', 'Yedek parçalar', 'stock', 'box'], ['stock_moves', 'Stok hareketleri', 'stock', 'swap'], ['suppliers', 'Tedarikçiler', 'stock', 'truck']]],
   ['Analiz', [['reports', 'Raporlar', 'reports', 'chart']]],
@@ -41,6 +43,7 @@ const ICONS = {
   cog: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
   safe: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="12" cy="12" r="3.5"/><path d="M12 8.5v1M12 14.5v1M15.5 12h-1M9.5 12h-1M6 20v1.5M18 20v1.5"/>',
   list: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
+  inbox: '<path d="M3 13h5l2 3h4l2-3h5"/><path d="M5 5h14l2 8v6H3v-6z"/>',
 };
 const icon = (n) => `<svg viewBox="0 0 24 24" class="ic" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS[n] || ''}</svg>`;
 export const LOGO = `<span class="logo"><img src="img/logo.png" alt="pedalla app"></span>`;
@@ -54,11 +57,12 @@ function shell() {
     </aside>
     <div class="body"><header class="top"><button class="icon-btn menu" id="menu" aria-label="Menü">☰</button>
       <form class="gsearch" id="gsearch"><input type="search" placeholder="Bisiklet kodu, müşteri, sözleşme, fatura ara…" id="gq"></form>
-      ${can('rentals', 'w') ? '<a class="btn primary sm" href="#/rentals/new">+ Kiralama</a>' : ''}${can('service', 'w') ? '<a class="btn sm" href="#/service/new">+ Servis kabul</a>' : ''}
+      ${can('rentals', 'w') ? '<a class="btn primary sm" href="#/rentals/new">+ Kiralama</a>' : ''}${can('service', 'w') ? '<a class="btn sm" href="#/service/new">+ Servis kabul</a>' : ''}${langSwitch()}
       <a class="icon-btn bell" href="#/notifications" aria-label="Bildirimler">${icon('bell')}<span class="dot" id="notif-dot" hidden></span></a></header>
       <main id="main"></main></div></div>`;
   $('#logout').onclick = guard(async () => { await POST('logout').catch(() => {}); setToken(null); session.user = null; location.hash = '#/login'; route(); });
   $('#menu').onclick = () => $('#side').classList.toggle('open');
+  bindLangSwitch(appRoot());
   $('#gsearch').onsubmit = (e) => { e.preventDefault(); location.hash = '#/search/' + encodeURIComponent($('#gq').value); };
   refreshNotifCount();
 }
@@ -71,10 +75,11 @@ async function refreshNotifCount() {
 
 // ---------- login ----------
 function loginPage() {
-  appRoot().innerHTML = `<div class="login"><form class="login-card" id="lf">${LOGO}<h1>Yönetim paneli</h1><p class="sub">Filo, kiralama, servis ve finans tek ekranda.</p>
-    <label class="field"><span>E-posta</span><input name="email" type="email" required value="admin@pedalla.bike" autocomplete="username"></label>
+  appRoot().innerHTML = `<div class="login"><form class="login-card" id="lf">${langSwitch()}${LOGO}<h1>Yönetim paneli</h1><p class="sub">Filo, kiralama, servis ve finans tek ekranda.</p>
+    <label class="field"><span>E-posta</span><input name="email" type="email" required value="${window.PEDALLA_DEMO ? 'admin@pedalla.bike' : ''}" autocomplete="username"></label>
     <label class="field"><span>Şifre</span><input name="password" type="password" required autocomplete="current-password" value="${window.PEDALLA_DEMO ? 'pedalla123' : ''}"></label>
-    <button class="btn primary block">Giriş yap</button><p class="hint">Demo hesapları: admin@, operasyon@, servis@, muhasebe@pedalla.bike · şifre <code>pedalla123</code></p></form></div>`;
+    <button class="btn primary block">Giriş yap</button>${window.PEDALLA_DEMO ? '<p class="hint">Demo hesapları: admin@, operasyon@, servis@, muhasebe@pedalla.bike · şifre <code>pedalla123</code></p>' : ''}<p class="hint"><a href="portal.html">Sürücü müsünüz? Sürücü girişi →</a></p></form></div>`;
+  bindLangSwitch(appRoot());
   $('#lf').onsubmit = guard(async (e) => {
     e.preventDefault(); const r = await POST('login', readForm(e.target)); setToken(r.token); await boot();
   });
@@ -84,7 +89,7 @@ function loginPage() {
 async function dashboardPage() {
   const d = await GET('dashboard'); const k = d.kpi; const fin = can('finance');
   const fleet = BIKE_STATUS.map((s) => ({ l: s, v: d.fleet.find((x) => x.status === s)?.n || 0, c: statusHex[s] })).filter((x) => x.v);
-  const months = d.monthly.map((m) => ({ ...m, label: ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'][Number(m.m.slice(5)) - 1] }));
+  const months = d.monthly.map((m) => ({ ...m, label: MONTHS[uiLang][Number(m.m.slice(5)) - 1] }));
   setMain(`${head(`Merhaba, ${esc(session.user.name.split(' ')[0])}`, `${date(todayISO())} · ${esc(session.settings.company_name || 'Pedalla')} filo özeti`)}
   <div class="kpis">
     ${kpi('Kiradaki bisiklet', `${k.bikes_rented}<small>/${k.bikes_total}</small>`, meter(k.utilization) + `Doluluk %${k.utilization}`, 'hero', '#/bikes?status=kirada')}
@@ -165,6 +170,7 @@ const LISTS = {
   suppliers: { sub: 'Yedek parça tedarikçileri.' },
   users: { sub: 'Panele erişen çalışanlar. Yetkiler "Roller & yetkiler" ekranından yönetilir.' },
   audit_log: { sub: 'Sistemde yapılan tüm işlemler.' },
+  portal_requests: { link: (r) => `#/portal_requests/${r.id}`, sub: 'Sürücülerin sürücü ekranından gönderdiği servis, arıza, iade ve uzatma talepleri.', chips: ['status', ['yeni', 'onaylandı', 'tamamlandı', 'reddedildi', 'iptal']] },
 };
 async function listPage(res, q = {}) {
   const meta = RESOURCES[res]; const cfg = LISTS[res] || {};
@@ -463,9 +469,29 @@ async function riderPage(id) {
     ${card('Kişisel bilgiler & kimlik', dl([['Telefon', r.phone ? `<a href="tel:${esc(r.phone)}">${esc(r.phone)}</a>` : '—'], ['E-posta', esc(r.email)], ['Doğum tarihi', date(r.birth_date)], ['Uyruk', esc(r.nationality)], ['Kimlik türü', esc(r.id_type)], ['Kimlik no', esc(r.id_no)], ['Geçerlilik', r.id_expiry && r.id_expiry < todayISO() ? `<b class="t-danger">${date(r.id_expiry)} (süresi dolmuş)</b>` : date(r.id_expiry)], ['Ehliyet no', esc(r.license_no)], ['Adres', esc(r.address)], ['Eğitim', r.trained ? '✓ kargo bisikleti eğitimi aldı' : '—'], ['Şu anki bisiklet', esc(r.current_bike || '—')], ['Not', esc(r.notes)]]))}
     ${docsCard('rider', r.id, r.documents, w, 'Evraklar (kimlik, ehliyet, adres belgesi…)')}
   </div>
+  ${card('Sürücü ekranı', `${dl([['Durum', r.portal_active && r.portal_email ? '<span class="badge b-ok">giriş açık</span>' : '<span class="badge b-muted">kapalı</span>'], ['Giriş e-postası', esc(r.portal_email || '—')], ['Son giriş', dt(r.portal_last_login)], ['Dil', esc({ tr: 'Türkçe', de: 'Deutsch', en: 'English' }[r.lang] || '—')], ['Adres', `<a href="${location.origin}${location.pathname.replace(/[^/]*$/, '')}portal.html" target="_blank">${location.host}${location.pathname.replace(/[^/]*$/, '')}portal.html</a>`]])}
+    <p class="muted">${r.portal_email ? 'Sürücü bu e-posta ve sizin belirlediğiniz şifreyle girer. Şifreyi değiştirmek veya girişi kapatmak için "Düzenle".' : 'Sürücü ekranını açmak için "Düzenle"den giriş e-postası ve şifre belirleyin.'}</p>
+    ${r.requests?.length ? table(r.requests, [{ l: 'Geliş', f: (x) => dt(x.created_at) }, { l: 'Talep', f: (x) => esc(x.type) }, { l: 'İstenen tarih', f: (x) => date(x.preferred_date) }, { l: 'Durum', f: (x) => badge(x.status) }], { link: (x) => `#/portal_requests/${x.id}` }) : ''}`)}
   ${card('Kiralamalar', table(r.rentals, [{ k: 'contract_no', l: 'Sözleşme' }, { k: 'bike_code', l: 'Bisiklet' }, { l: 'Dönem', f: (x) => `${date(x.start_date)} – ${date(x.returned_at || x.end_date)}` }, { l: 'Durum', f: (x) => badge(x.is_late ? 'gecikmede' : x.status) }], { link: (x) => `#/rentals/${x.id}`, empty: 'Kiralama yok' }))}`);
   $('#edit')?.addEventListener('click', () => editForm('riders', r, { onSaved: (x) => (x ? route() : (location.hash = '#/riders')) }));
   bindDocs(main(), route);
+}
+
+// ---------- rider requests (from the rider portal) ----------
+async function requestPage(id) {
+  const q = await GET(`portal_requests/${id}`); const w = can('rentals', 'w');
+  const svc = ['servis randevusu', 'arıza bildirimi'].includes(q.type);
+  setMain(`${head(`${esc(q.type)} <span class="h-badge">${badge(q.status)}</span>`, `Talep #${q.id} · ${dt(q.created_at)}`, `<a class="btn sm" href="#/portal_requests">← Talepler</a>`)}
+  <div class="grid g-1-2">
+    ${card('Talep', dl([['Sürücü', `<a href="#/riders/${q.rider_id}">${esc(q.rider_name)}</a>${q.rider_phone ? ` · <a href="tel:${esc(q.rider_phone)}">${esc(q.rider_phone)}</a>` : ''}`], ['Müşteri', q.customer_id ? `<a href="#/customers/${q.customer_id}">${esc(q.customer_label)}</a>` : '—'], ['Bisiklet', q.bike_id ? `<a href="#/bikes/${q.bike_id}">${esc(q.bike_code)}</a>` : '—'], ['Sözleşme', q.rental_id ? `<a href="#/rentals/${q.rental_id}">${esc(q.contract_no)}</a>` : '—'], ['İstenen tarih', `${date(q.preferred_date)} ${esc(q.preferred_time || '')}`], ['Sürücünün notu', esc(q.notes || '—')], ['Servis kaydı', q.service_id ? `<a href="#/service/${q.service_id}">${esc(q.order_no)}</a>` : '—']]))}
+    ${w ? card('Cevap', `<form class="grid-form" id="qf">
+      <label class="field"><span>Durum</span><select name="status">${['yeni', 'onaylandı', 'tamamlandı', 'reddedildi', 'iptal'].map((x) => `<option value="${x}" ${x === q.status ? 'selected' : ''}>${x}</option>`).join('')}</select></label>
+      <label class="field"><span>Randevu tarihi</span><input name="preferred_date" type="date" value="${esc(q.preferred_date || '')}"></label>
+      <label class="field"><span>Saat</span><input name="preferred_time" value="${esc(q.preferred_time || '')}"></label>
+      <label class="field span2"><span>Sürücüye cevap (sürücü ekranında görünür)</span><textarea name="admin_note" rows="3">${esc(q.admin_note || '')}</textarea></label>
+      <div class="form-actions span2">${svc && q.bike_id && !q.service_id && can('service', 'w') ? `<a class="btn" href="#/service/new?bike_id=${q.bike_id}&request_id=${q.id}">Servis kaydı aç</a>` : ''}${q.type === 'iade randevusu' && q.rental_id ? `<a class="btn" href="#/rentals/${q.rental_id}">Kiralamaya git (iade al)</a>` : ''}${q.type === 'kiralama uzatma' && q.rental_id ? `<a class="btn" href="#/rentals/${q.rental_id}">Kiralamaya git (uzat)</a>` : ''}<span class="grow"></span><button class="btn primary">Kaydet</button></div></form>`) : ''}
+  </div>`);
+  $('#qf')?.addEventListener('submit', guard(async (e) => { e.preventDefault(); await PUT(`portal_requests/${q.id}`, readForm(e.target)); toast('Kaydedildi'); route(); }));
 }
 
 // ---------- cash register (kasa) ----------
@@ -589,6 +615,7 @@ const CHECK_ITEMS = ['Frenler (ön/arka)', 'Lastikler ve hava basıncı', 'Zinci
 async function newServicePage(q) {
   const [bikes, techs, active] = await Promise.all([GET('bikes'), lookup('users', { role: 'servis' }).catch(() => []), GET('rentals', { status: 'aktif' }).catch(() => [])]);
   const f = (k) => field('service_orders', k);
+  const rq = q.request_id ? await GET(`portal_requests/${q.request_id}`).catch(() => null) : null;
   setMain(`${head('Servis kabul formu', 'Bisiklet servise girerken doldurulur; kaydettikten sonra yazdırıp müşteriye imzalatabilirsiniz.')}
   <form id="sf" class="card"><div class="card-b grid-form three">
     <label class="field"><span>Bisiklet *</span><select name="bike_id" required><option value="">Seçin…</option>${bikes.map((b) => `<option value="${b.id}" data-km="${b.odometer_km ?? ''}" data-bat="${b.battery_level ?? ''}" ${String(q.bike_id) === String(b.id) ? 'selected' : ''}>${esc(b.code)} · ${esc(b.model)} (${esc(b.status)})</option>`).join('')}</select></label>
@@ -599,7 +626,7 @@ async function newServicePage(q) {
     <label class="field" id="bb_other" hidden><span>Teslim eden (ad soyad)</span><input name="brought_by" placeholder="Listede yoksa adını yazın"></label>
     ${inputHtml({ k: 'technician_id', l: 'Teknisyen', t: 'select', o: techs.map((t) => ({ v: t.id, l: t.label })) }, '')}
     ${inputHtml(f('km'), '')}${inputHtml(f('battery_level'), '')}${inputHtml(f('estimated_ready'), addDays(todayISO(), 2))}
-    <label class="field span3"><span>Şikayet / talep *</span><textarea name="complaint" rows="2" required></textarea></label>
+    <label class="field span3"><span>Şikayet / talep *</span><textarea name="complaint" rows="2" required>${esc(rq ? `${rq.type}: ${rq.notes || ''}` : '')}</textarea></label>
     <div class="span3"><span class="lbl">Kabul kontrol listesi</span><div class="checklist">${CHECK_ITEMS.map((c, i) => `<div class="ck"><span>${esc(c)}</span><div class="seg">${['ok', 'sorun', 'yok'].map((v) => `<label><input type="radio" name="ck_${i}" value="${v}" ${v === 'ok' ? 'checked' : ''}><span>${v === 'ok' ? 'Sağlam' : v === 'sorun' ? 'Sorunlu' : 'Yok'}</span></label>`).join('')}</div></div>`).join('')}</div></div>
     <label class="field span3"><span>Görsel durum / mevcut hasarlar</span><textarea name="visual_condition" rows="2"></textarea></label>
     <label class="field span2"><span>Bırakılan aksesuarlar</span><input name="accessories" placeholder="Şarj aleti, kilit, anahtar x2…"></label>
@@ -629,7 +656,7 @@ async function newServicePage(q) {
   await loadRiders();
   if (q.bike_id) form.bike_id.onchange();
   form.onsubmit = guard(async (e) => {
-    e.preventDefault(); const d = readForm(form); d.checklist = {};
+    e.preventDefault(); const d = readForm(form); d.checklist = {}; if (q.request_id) d.request_id = q.request_id;
     CHECK_ITEMS.forEach((c, i) => { d.checklist[c] = form.querySelector(`[name=ck_${i}]:checked`)?.value; delete d[`ck_${i}`]; });
     const pick = d.brought_by_rider_id;
     if (pick === 'filo') { d.brought_by = 'Pedalla filo operasyonu'; d.brought_by_rider_id = ''; }
@@ -768,7 +795,7 @@ async function partPage(id) {
 async function reportsPage(q) {
   const from = q.from || addDays(todayISO(), -365); const to = q.to || todayISO();
   const r = await GET('reports', { from, to });
-  const mn = (m) => `${['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'][Number(m.slice(5)) - 1]} ${m.slice(2, 4)}`;
+  const mn = (m) => `${MONTHS[uiLang][Number(m.slice(5)) - 1]} ${m.slice(2, 4)}`;
   const sections = {
     util: { t: 'Bisiklet bazında doluluk ve kârlılık', rows: r.utilization, cols: [{ k: 'code', l: 'Bisiklet' }, { k: 'model', l: 'Model' }, { l: 'Kirada gün', f: (u) => num(u.rented_days), cls: 'num', csv: (u) => u.rented_days }, { l: 'Doluluk', f: (u) => `${meter(u.utilization)} %${u.utilization}`, csv: (u) => u.utilization }, { l: 'Ciro (net)', f: (u) => money(u.revenue), cls: 'num', csv: (u) => u.revenue }, { l: 'Servis maliyeti', f: (u) => money(u.service_cost), cls: 'num', csv: (u) => u.service_cost }, { l: 'Servis sayısı', k: 'service_count', cls: 'num' }, { l: 'Katkı', f: (u) => `<b class="${u.margin < 0 ? 't-danger' : ''}">${money(u.margin)}</b>`, cls: 'num', csv: (u) => u.margin }] },
     cust: { t: 'Müşteri bazında ciro ve açık bakiye', rows: r.top_customers, cols: [{ k: 'customer', l: 'Müşteri' }, { k: 'rentals', l: 'Kiralama', cls: 'num' }, { l: 'Ciro (net)', f: (c) => money(c.revenue), cls: 'num', csv: (c) => c.revenue }, { l: 'Açık bakiye', f: (c) => (c.open > 0 ? `<b class="t-warn">${money(c.open)}</b>` : '—'), cls: 'num', csv: (c) => c.open }] },
@@ -852,6 +879,7 @@ const ROUTES = [
   [/^rentals\/(\d+)\/contract$/, (m) => contractPage(m[1]), 'rentals'],
   [/^customers\/(\d+)$/, (m) => customerPage(m[1]), 'customers'],
   [/^riders\/(\d+)$/, (m) => riderPage(m[1]), 'customers'],
+  [/^portal_requests\/(\d+)$/, (m) => requestPage(m[1]), 'rentals'],
   [/^cash$/, (m, q) => cashPage(q), 'finance'],
   [/^invoices$/, (m, q) => invoicesPage(q), 'finance'],
   [/^invoices\/(\d+)$/, (m) => invoicePage(m[1]), 'finance'],
@@ -888,6 +916,7 @@ export async function route() {
   notFound();
 }
 export async function boot() {
+  startI18n();
   if (!session.token) return loginPage();
   try {
     const me = await GET('me'); Object.assign(session, { user: me.user, perms: me.perms, roles: me.roles, settings: me.settings });

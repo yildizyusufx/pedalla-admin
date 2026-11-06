@@ -1,0 +1,70 @@
+/* Rider portal – mobile first */
+body.portal { font-size: 15px; background: var(--bg); }
+.portal .ic { width: 20px; height: 20px; }
+.p-top { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 10px; padding: 10px 16px; padding-top: max(10px, env(safe-area-inset-top));
+  background: var(--surface); border-bottom: 1px solid var(--line); }
+.p-top-logo { height: 24px; }
+.p-top-tag { font-size: 11px; font-weight: 700; background: var(--slate-d); color: #fff; padding: 2px 8px; border-radius: 99px; white-space: nowrap; }
+.p-main { max-width: 640px; margin: 0 auto; padding: 16px 16px calc(96px + env(safe-area-inset-bottom)); }
+.p-hello { font-size: 20px; margin: 4px 0 14px; }
+.p-title { font-size: 22px; margin: 4px 0 14px; }
+.p-h { font-size: 13px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin: 22px 0 8px; font-weight: 700; }
+section:first-of-type .p-h { margin-top: 6px; }
+.p-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; margin-bottom: 10px; box-shadow: var(--shadow); }
+.p-card[data-tab] { cursor: pointer; }
+.p-empty { color: var(--muted); display: flex; gap: 8px; align-items: center; }
+.p-note { display: flex; gap: 12px; padding: 12px 14px; border-radius: var(--radius); margin-bottom: 8px; border: 1px solid var(--line); background: var(--surface); border-left-width: 4px; }
+.p-note p { margin: 0 0 6px; } .p-note .btn { margin: 4px 6px 0 0; }
+.p-note-ic { flex: none; padding-top: 1px; }
+.p-note.l-danger { border-left-color: var(--danger); } .p-note.l-danger .p-note-ic { color: var(--danger); }
+.p-note.l-warn { border-left-color: var(--warn); } .p-note.l-warn .p-note-ic { color: var(--warn); }
+.p-note.l-info { border-left-color: var(--info); } .p-note.l-info .p-note-ic { color: var(--info); }
+.p-note.l-ok { border-left-color: var(--ok); } .p-note.l-ok .p-note-ic { color: var(--ok); }
+.p-bike-h { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; }
+.p-bike-h .ic { width: 34px; height: 34px; color: var(--brand); background: var(--brand-l); border-radius: 10px; padding: 6px; }
+.p-bike-h b { font-size: 17px; margin-right: 6px; } .p-bike-h small { display: block; color: var(--muted); }
+.p-dl { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; margin: 0; }
+.p-dl dt { font-size: 12px; color: var(--muted); } .p-dl dd { margin: 0; font-weight: 600; word-break: break-word; }
+.p-quick { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.p-quick button { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 14px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--surface);
+  color: var(--ink); font: inherit; font-weight: 600; text-align: left; cursor: pointer; min-height: 84px; }
+.p-quick button .ic { color: var(--brand); width: 24px; height: 24px; }
+.p-quick button:active { background: var(--brand-l); }
+.p-pay-big { font-size: 26px; font-weight: 800; letter-spacing: -.02em; }
+.p-sub { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line); font-size: 14px; }
+.p-form .field { margin-bottom: 12px; }
+.p-form .field input, .p-form .field select, .p-form .field textarea, .p-login .field input { font-size: 16px; padding: 11px 12px; }
+.p-row { display: flex; gap: 10px; flex-wrap: wrap; } .p-row > * { flex: 1 1 140px; }
+.p-big { width: 100%; justify-content: center; padding: 13px; font-size: 16px; }
+.p-item p { margin: 6px 0; }
+.p-item-h { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 4px; }
+.p-item-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 0; }
+.p-list .p-item-row + .p-item-row { border-top: 1px solid var(--line); }
+.p-reply { background: var(--surface-2); padding: 8px 10px; border-radius: 8px; }
+.p-kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.p-kpis small { display: block; color: var(--muted); } .p-kpis b { font-size: 20px; }
+.p-kpis .l-danger b { color: var(--danger); }
+.p-howto p { margin: 6px 0 10px; } .mono { font-family: ui-monospace, Menlo, monospace; }
+.p-file { display: flex; align-items: center; gap: 10px; border: 2px dashed var(--line); border-radius: var(--radius); padding: 18px 14px; margin-bottom: 12px; cursor: pointer; color: var(--ink-2); position: relative; }
+.p-file input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.p-file .ic { color: var(--brand); width: 26px; height: 26px; }
+.t-ok { color: var(--ok); display: inline-flex; align-items: center; gap: 4px; }
+.t-danger.p-item-row, .p-item-row .t-danger { display: inline-flex; align-items: center; gap: 4px; }
+.p-contact b { display: block; } .p-contact .p-row { margin-top: 10px; } .p-contact .btn { justify-content: center; }
+.p-lang { display: inline-flex; border: 1px solid var(--line); border-radius: 99px; overflow: hidden; background: var(--surface); }
+.p-lang button { border: 0; background: none; padding: 6px 11px; font: inherit; font-size: 13px; font-weight: 700; color: var(--ink-2); cursor: pointer; }
+.p-lang button.on { background: var(--brand); color: #fff; }
+.p-nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; display: flex; background: var(--surface); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); }
+.p-nav a { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 9px 2px 8px; color: var(--muted); font-size: 11px; font-weight: 600; position: relative; }
+.p-nav a:hover { text-decoration: none; }
+.p-nav a.on { color: var(--brand); }
+.p-dot { position: absolute; top: 4px; left: calc(50% + 6px); background: var(--danger); color: #fff; font-style: normal; font-size: 10px; font-weight: 700; min-width: 17px; height: 17px; border-radius: 99px; display: grid; place-items: center; padding: 0 4px; }
+.p-login { min-height: 100vh; display: grid; place-items: center; padding: 20px 16px; }
+.p-login-card { width: 100%; max-width: 400px; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 24px 20px; box-shadow: var(--shadow); }
+.p-login-card .p-lang { float: right; }
+.p-logo { height: 38px; display: block; margin: 4px 0 18px; }
+.p-login-card h1 { font-size: 22px; margin-bottom: 4px; } .p-login-card p { margin: 0 0 18px; }
+.p-login-card .field { margin-bottom: 12px; }
+@media (min-width: 900px) { .p-nav { max-width: 640px; margin: 0 auto; border: 1px solid var(--line); border-radius: 16px 16px 0 0; } }
+.p-top .p-lang button { padding: 5px 8px; font-size: 12px; }
+@media (max-width: 440px) { .p-top-tag { display: none; } .p-top-logo { height: 22px; } }

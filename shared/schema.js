@@ -67,6 +67,11 @@ CREATE TABLE IF NOT EXISTS cash_moves (
   id INTEGER PRIMARY KEY, date TEXT NOT NULL, type TEXT NOT NULL, amount REAL NOT NULL, category TEXT, description TEXT,
   payment_id INTEGER, deposit_id INTEGER, rental_id INTEGER, user_id INTEGER, created_at TEXT DEFAULT (datetime('now')));
 CREATE INDEX IF NOT EXISTS ix_cash_date ON cash_moves(date);
+CREATE TABLE IF NOT EXISTS rider_sessions (token TEXT PRIMARY KEY, rider_id INTEGER NOT NULL, expires TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS portal_requests (
+  id INTEGER PRIMARY KEY, rider_id INTEGER REFERENCES riders(id), customer_id INTEGER, rental_id INTEGER, bike_id INTEGER, type TEXT NOT NULL,
+  preferred_date TEXT, preferred_time TEXT, notes TEXT, status TEXT DEFAULT 'yeni', admin_note TEXT, service_id INTEGER,
+  handled_by INTEGER, handled_at TEXT, created_at TEXT DEFAULT (datetime('now')));
 CREATE TABLE IF NOT EXISTS audit_log (
   id INTEGER PRIMARY KEY, ts TEXT DEFAULT (datetime('now')), user_id INTEGER, action TEXT, entity TEXT, entity_id INTEGER, details TEXT);
 `;
@@ -79,9 +84,10 @@ export const INTAKE_CHECKLIST = [
 
 // Columns added after the first release. createApi adds any that are missing (works on existing databases too).
 export const MIGRATIONS = {
-  riders: { id_type: 'TEXT', id_expiry: 'TEXT', birth_date: 'TEXT', nationality: 'TEXT', address: 'TEXT', license_no: 'TEXT', id_checked: 'INTEGER DEFAULT 0' },
+  riders: { portal_email: 'TEXT', portal_password_hash: 'TEXT', portal_active: 'INTEGER DEFAULT 0', portal_last_login: 'TEXT', lang: 'TEXT', id_type: 'TEXT', id_expiry: 'TEXT', birth_date: 'TEXT', nationality: 'TEXT', address: 'TEXT', license_no: 'TEXT', id_checked: 'INTEGER DEFAULT 0' },
   service_orders: { brought_by_rider_id: 'INTEGER' },
   customers: { doc_lang: "TEXT DEFAULT 'de'" },
   deposits: { method: 'TEXT' },
+  users: { lang: 'TEXT' },
 };
 export const ID_TYPES = ['Kimlik kartı (Personalausweis)', 'Pasaport', 'Oturum izni (Aufenthaltstitel)', 'Ehliyet'];

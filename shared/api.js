@@ -1,6 +1,6 @@
 // Pedalla Admin – API core. Runs on Node (node:sqlite) and in the browser demo (sql.js).
 // db adapter: { all(sql, p), get(sql, p), run(sql, p) -> {changes, lastId}, exec(sql), tx(fn) }
-import { RESOURCES, DEFAULT_ROLE_PERMS, DEFAULT_SETTINGS, PERMS, ROLES } from './meta.js';
+import { RESOURCES, DEFAULT_ROLE_PERMS, DEFAULT_SETTINGS, PERMS, ROLES, REQUEST_TYPES, RIDER_REQUIRED_DOCS } from './meta.js';
 import { SCHEMA, INTAKE_CHECKLIST, MIGRATIONS } from './schema.js';
 
 export class ApiError extends Error { constructor(status, msg) { super(msg); this.status = status; } }
@@ -84,12 +84,14 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
     const sort = q.sort && /^[a-z_]+( (asc|desc))?$/i.test(q.sort) ? q.sort : meta.order;
     const limit = Math.min(Number(q.limit) || 500, 5000);
     const sql = `SELECT * FROM (${baseSql(res)}) AS t ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY ${sort} LIMIT ${limit}`;
-    return await db.all(sql, p);
+    const rows = await db.all(sql, p);
+    for (const r of rows) { delete r.password_hash; delete r.portal_password_hash; }
+    return rows;
   }
   async function getOne(res, id) {
     const row = await db.get(`SELECT * FROM (${baseSql(res)}) AS t WHERE id = ?`, [id]);
     if (!row) err(404, 'Kayıt bulunamadı.');
-    delete row.password_hash;
+    delete row.password_hash; delete row.portal_password_hash;
     return row;
   }
   function validate(res, body, partial) {
@@ -103,12 +105,27 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
     await audit(user, 'oluşturma', 'customers', r.lastId, `${p.name} (doğrudan müşteri)`);
     return r.lastId;
   }
+  // rider portal login: e-mail must be unique, password is stored hashed; setting a password opens the portal
+  async function riderPortalFields(body, extra, id) {
+    if (body.portal_email !== undefined) {
+      body.portal_email = String(body.portal_email || '').trim().toLowerCase() || null;
+      if (body.portal_email && await db.get('SELECT 1 FROM riders WHERE lower(portal_email)=? AND id<>?', [body.portal_email, id || 0])) err(409, 'Bu e-posta başka bir sürücünün girişinde kullanılıyor.');
+    }
+    if (body.portal_password) {
+      if (String(body.portal_password).length < 6) err(400, 'Sürücü şifresi en az 6 karakter olmalı.');
+      const email = body.portal_email || (id ? (await db.get('SELECT portal_email FROM riders WHERE id=?', [id]))?.portal_email : null);
+      if (!email) err(400, 'Şifre için önce sürücü ekranı giriş e-postasını girin.');
+      extra.portal_password_hash = hashPassword(String(body.portal_password));
+      if (body.portal_active === undefined || body.portal_active === '') body.portal_active = 1;
+    }
+  }
   async function insert(res, body, user) {
+    const rx = {}; if (res === 'riders') await riderPortalFields(body, rx, null);
     if (res === 'riders' && !body.customer_id) body.customer_id = await directCustomer(body, user);
     validate(res, body);
     const fields = writable(res).filter((f) => body[f.k] !== undefined || f.def !== undefined);
     const vals = fields.map((f) => clean(f, body[f.k] !== undefined ? body[f.k] : f.def));
-    const extra = {};
+    const extra = { ...rx };
     if (res === 'users') { if (!body.password) err(400, 'Şifre zorunludur.'); extra.password_hash = hashPassword(body.password); }
     const cols = [...fields.map((f) => f.k), ...Object.keys(extra)];
     const r = await db.run(`INSERT INTO ${res} (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`, [...vals, ...Object.values(extra)]);
@@ -117,11 +134,15 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
   }
   async function update(res, id, body, user) {
     await getOne(res, id);
+    const rx = {}; if (res === 'riders') await riderPortalFields(body, rx, id);
     const fields = writable(res).filter((f) => body[f.k] !== undefined);
     const sets = fields.map((f) => `${f.k}=?`); const vals = fields.map((f) => clean(f, body[f.k]));
     if (res === 'users' && body.password) { sets.push('password_hash=?'); vals.push(hashPassword(body.password)); }
+    for (const [k, v] of Object.entries(rx)) { sets.push(`${k}=?`); vals.push(v); }
+    if (res === 'portal_requests' && body.status !== undefined) { sets.push('handled_by=?', 'handled_at=?'); vals.push(user?.id ?? null, nowTs()); }
     if (sets.length) await db.run(`UPDATE ${res} SET ${sets.join(',')} WHERE id=?`, [...vals, id]);
     if (res === 'invoices') await recalcInvoice(id);
+    if (res === 'riders' && (rx.portal_password_hash || String(body.portal_active) === '0')) await db.run('DELETE FROM rider_sessions WHERE rider_id=?', [id]);
     await audit(user, 'güncelleme', res, id, fields.map((f) => f.k).join(', '));
     return await getOne(res, id);
   }
@@ -185,7 +206,7 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
     if (!size) err(400, 'Dosya boş.');
     if (size > 3 * 1024 * 1024) err(413, 'Dosya çok büyük (en fazla 3 MB). PDF ise sıkıştırın veya fotoğraf olarak yükleyin.');
     const r = await db.run('INSERT INTO documents(owner_type,owner_id,doc_type,name,mime,size,data,notes,uploaded_by) VALUES(?,?,?,?,?,?,?,?,?)',
-      [b.owner_type, Number(b.owner_id), b.doc_type || 'Diğer', String(b.name || 'belge').slice(0, 120), b.mime, size, data, b.notes || null, user?.id]);
+      [b.owner_type, Number(b.owner_id), b.doc_type || 'Diğer', String(b.name || 'belge').slice(0, 120), b.mime, size, data, b.notes || null, user?.id ?? null]);
     await audit(user, 'belge', own[0], Number(b.owner_id), `${b.doc_type || ''} ${b.name || ''}`);
     return r.lastId;
   }
@@ -389,6 +410,7 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
       b.accessories || null, b.estimated_cost || null, b.estimated_ready || null, b.technician_id || null, Number(setting('labor_rate')) || 0, b.billable ? 1 : 0, b.signature_name || null]);
     if (bike.status !== 'kirada') await db.run("UPDATE bikes SET status='serviste' WHERE id=?", [b.bike_id]);
     await audit(user, 'servis kabul', 'service_orders', r.lastId, `${no} · ${bike.code}`);
+    if (b.request_id) await db.run("UPDATE portal_requests SET service_id=?, status=CASE WHEN status='yeni' THEN 'onaylandı' ELSE status END, handled_by=?, handled_at=? WHERE id=?", [r.lastId, user?.id ?? null, nowTs(), Number(b.request_id)]);
     return await getOne('service_orders', r.lastId);
   }
   async function serviceDetail(id) {
@@ -513,6 +535,8 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
       add('warn', 'fleet', 'Sigorta bitiyor', `${b.code}: ${b.insurance_until}`, `#/bikes/${b.id}`);
     for (const s of await db.all("SELECT s.*, b.code FROM service_orders s JOIN bikes b ON b.id=s.bike_id WHERE s.status NOT IN ('teslim edildi','iptal') AND s.estimated_ready < ?", [t]))
       add('warn', 'service', 'Servis gecikti', `${s.order_no} · ${s.code} · tahmini ${s.estimated_ready}`, `#/service/${s.id}`);
+    for (const q of await db.all("SELECT q.*, rd.name AS rn, b.code FROM portal_requests q LEFT JOIN riders rd ON rd.id=q.rider_id LEFT JOIN bikes b ON b.id=q.bike_id WHERE q.status='yeni' ORDER BY q.id"))
+      add('info', 'rentals', 'Yeni sürücü talebi', `${q.rn} · ${q.type}${q.code ? ' · ' + q.code : ''}${q.preferred_date ? ' · ' + q.preferred_date : ''}`, `#/portal_requests/${q.id}`);
     const rank = { danger: 0, warn: 1, info: 2 };
     return n.sort((a, b) => rank[a.level] - rank[b.level]);
   }
@@ -634,6 +658,7 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
     r.customer = r.customer_id ? await db.get('SELECT * FROM customers WHERE id=?', [r.customer_id]) : null;
     r.rentals = await list('rentals', { rider_id: id });
     r.documents = await listDocuments('rider', id);
+    r.requests = await list('portal_requests', { rider_id: id, limit: 50 });
     return r;
   }
   async function invoiceDetail(id) {
@@ -649,6 +674,135 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
     p.moves = await list('stock_moves', { part_id: id, limit: 200 });
     p.used_in = await db.all('SELECT s.id, s.order_no, b.code, sp.qty, s.received_at FROM service_parts sp JOIN service_orders s ON s.id=sp.service_id JOIN bikes b ON b.id=s.bike_id WHERE sp.part_id=? ORDER BY s.id DESC LIMIT 50', [id]);
     return p;
+  }
+
+  // ---------- rider portal (sürücü ekranı) ----------
+  // Riders sign in with the e-mail/password set by staff. They only ever see their own rentals, bikes,
+  // documents and requests; invoices/payments only when they are the paying (individual) customer.
+  const PORTAL_REQ = REQUEST_TYPES;
+  const riderFromToken = async (token) => {
+    if (!token) return null;
+    const s = await db.get('SELECT * FROM rider_sessions WHERE token=? AND expires > ?', [token, nowTs()]);
+    if (!s) return null;
+    const r = await db.get('SELECT * FROM riders WHERE id=?', [s.rider_id]);
+    return r && r.portal_active && r.active ? r : null;
+  };
+  const portalUser = (r) => ({ id: null, name: `${r.name} (sürücü ekranı)`, rider_id: r.id });
+  async function portalData(r) {
+    const t = today();
+    const cust = r.customer_id ? await db.get('SELECT id,type,name,company_name,phone,email,doc_lang FROM customers WHERE id=?', [r.customer_id]) : null;
+    const payer = !!cust && cust.type === 'bireysel';
+    const rentals = await db.all(`SELECT x.id, x.contract_no, x.status, x.start_date, x.end_date, x.returned_at, x.period, x.rate, x.deposit_amount, x.deposit_status, x.customer_id,
+        b.id AS bike_id, b.code AS bike_code, b.type AS bike_type, b.brand, b.model, b.color, b.battery_level, b.odometer_km, b.next_service_date, b.last_service_date, b.status AS bike_status, p.name AS plan_name
+      FROM rentals x JOIN bikes b ON b.id=x.bike_id LEFT JOIN pricing_plans p ON p.id=x.plan_id WHERE x.rider_id=? ORDER BY CASE x.status WHEN 'aktif' THEN 0 WHEN 'rezervasyon' THEN 1 ELSE 2 END, x.start_date DESC LIMIT 20`, [r.id]);
+    const vatRate = Number(setting('vat_rate')) || 0;
+    for (const x of rentals) {
+      x.late_days = x.status === 'aktif' ? Math.max(0, daysBetween(x.end_date, t)) : 0;
+      x.deposit_held = r2((await db.get("SELECT COALESCE(SUM(CASE WHEN type='tahsil' THEN amount ELSE -amount END),0) AS s FROM deposits WHERE rental_id=?", [x.id])).s);
+      if (x.status === 'aktif' && payer) {
+        const last = (await db.get("SELECT MAX(period_end) AS pe FROM invoices WHERE rental_id=? AND period_end IS NOT NULL AND status<>'iptal'", [x.id]))?.pe;
+        const next = last ? addDays(last, 1) : x.start_date;
+        if (next <= x.end_date) x.next_charge = { date: next, amount: r2(x.rate * (1 + vatRate / 100)) };
+      }
+    }
+    const rentalIds = rentals.map((x) => x.id);
+    const inList = (ids) => (ids.length ? ids.join(',') : '0');
+    const invoices = payer ? await db.all(`SELECT id, invoice_no, issue_date, due_date, description, total, late_fee, paid_amount, status, (total+late_fee-paid_amount) AS balance,
+        CASE WHEN status IN ('açık','kısmi') AND due_date < ? THEN CAST(julianday(?)-julianday(due_date) AS INTEGER) ELSE 0 END AS days_late
+      FROM invoices WHERE customer_id=? AND status<>'iptal' ORDER BY issue_date DESC, id DESC LIMIT 36`, [t, t, cust.id]) : [];
+    for (const i of invoices) i.balance = r2(i.balance);
+    const payments = payer ? await db.all('SELECT p.date, p.amount, p.method, i.invoice_no FROM payments p LEFT JOIN invoices i ON i.id=p.invoice_id WHERE p.customer_id=? ORDER BY p.date DESC, p.id DESC LIMIT 30', [cust.id]) : [];
+    const services = await db.all(`SELECT s.id, s.order_no, s.type, s.status, s.received_at, s.estimated_ready, s.delivered_at, s.complaint, b.code AS bike_code
+      FROM service_orders s JOIN bikes b ON b.id=s.bike_id WHERE s.brought_by_rider_id=? OR s.rental_id IN (${inList(rentalIds)}) ORDER BY s.id DESC LIMIT 20`, [r.id]);
+    const requests = await db.all('SELECT q.id, q.type, q.status, q.preferred_date, q.preferred_time, q.notes, q.admin_note, q.created_at, q.handled_at, b.code AS bike_code FROM portal_requests q LEFT JOIN bikes b ON b.id=q.bike_id WHERE q.rider_id=? ORDER BY q.id DESC LIMIT 30', [r.id]);
+    const documents = await listDocuments('rider', r.id);
+    for (const d of documents) delete d.uploaded_by_name;
+    const have = new Set(documents.map((d) => d.doc_type));
+    const required = RIDER_REQUIRED_DOCS.filter((d) => !(have.has('Pasaport') && /^Kimlik/.test(d)));
+    const missing = required.filter((d) => !have.has(d));
+    // notifications (codes; the portal translates them)
+    const n = []; const add = (level, code, p = {}) => n.push({ level, code, ...p });
+    for (const x of rentals.filter((y) => y.status === 'aktif')) {
+      if (x.late_days > 0) add('danger', 'return_late', { bike: x.bike_code, date: x.end_date, days: x.late_days });
+      else if (x.end_date <= addDays(t, 7)) add('warn', 'return_soon', { bike: x.bike_code, date: x.end_date, days: daysBetween(t, x.end_date) });
+      if (x.next_service_date && x.next_service_date <= addDays(t, 14)) add(x.next_service_date < t ? 'warn' : 'info', x.next_service_date < t ? 'service_overdue' : 'service_due', { bike: x.bike_code, date: x.next_service_date, days: daysBetween(t, x.next_service_date) });
+      if (x.battery_level != null && x.battery_level < (Number(setting('low_battery_alert')) || 20)) add('info', 'battery_low', { bike: x.bike_code, pct: x.battery_level });
+      if (x.deposit_amount > 0 && x.deposit_status === 'bekliyor') add('warn', 'deposit_open', { amount: x.deposit_amount });
+    }
+    for (const x of rentals.filter((y) => y.status === 'rezervasyon')) add('info', 'reservation', { bike: x.bike_code, date: x.start_date });
+    for (const i of invoices.filter((y) => ['açık', 'kısmi'].includes(y.status))) {
+      if (i.days_late > 0) add('danger', 'invoice_overdue', { no: i.invoice_no, amount: i.balance, date: i.due_date, days: i.days_late });
+      else if (i.due_date <= addDays(t, 7)) add('warn', 'invoice_due', { no: i.invoice_no, amount: i.balance, date: i.due_date, days: daysBetween(t, i.due_date) });
+    }
+    if (missing.length) add('warn', 'docs_missing', { docs: missing });
+    if (r.id_expiry && r.id_expiry < addDays(t, 30)) add(r.id_expiry < t ? 'danger' : 'warn', r.id_expiry < t ? 'id_expired' : 'id_expiring', { date: r.id_expiry });
+    for (const q of requests.filter((y) => y.handled_at && y.handled_at >= addDays(t, -7) && ['onaylandı', 'reddedildi', 'tamamlandı'].includes(y.status))) add(q.status === 'reddedildi' ? 'warn' : 'ok', 'request_' + ({ 'onaylandı': 'ok', 'reddedildi': 'no', 'tamamlandı': 'done' })[q.status], { type: q.type, date: q.preferred_date, note: q.admin_note });
+    for (const sv of services.filter((y) => y.status === 'hazır')) add('ok', 'service_ready', { no: sv.order_no, bike: sv.bike_code });
+    const rank = { danger: 0, warn: 1, info: 2, ok: 3 };
+    n.sort((a, b) => rank[a.level] - rank[b.level]);
+    const open = invoices.filter((i) => ['açık', 'kısmi'].includes(i.status));
+    return {
+      rider: { id: r.id, name: r.name, phone: r.phone, email: r.email, portal_email: r.portal_email, lang: r.lang || cust?.doc_lang || setting('doc_lang') || 'de', id_type: r.id_type, id_no: r.id_no, id_expiry: r.id_expiry, address: r.address, birth_date: r.birth_date, nationality: r.nationality },
+      customer: cust ? { name: cust.company_name || cust.name, type: cust.type } : null, payer,
+      rentals, invoices, payments, services, requests, documents, required_docs: required, missing_docs: missing, notifications: n,
+      summary: { open_balance: r2(open.reduce((a, i) => a + i.balance, 0)), overdue: r2(open.filter((i) => i.days_late > 0).reduce((a, i) => a + i.balance, 0)), next_due: open.slice().sort((a, b) => (a.due_date < b.due_date ? -1 : 1))[0] || null },
+      company: { name: setting('company_name'), phone: setting('company_phone'), email: setting('company_email'), address: setting('company_address'), iban: setting('company_iban') },
+      request_types: PORTAL_REQ,
+    };
+  }
+  async function portalHandle(seg, method, body, token) {
+    const [, b, c] = seg;
+    if (b === 'login' && method === 'POST') {
+      const r = await db.get('SELECT * FROM riders WHERE lower(portal_email)=lower(?)', [String(body.email || '').trim()]);
+      if (!r || !r.portal_active || !r.active || !r.portal_password_hash || !verifyPassword(body.password || '', r.portal_password_hash)) err(401, 'E-posta veya şifre hatalı.');
+      const tok = randomToken(); const exp = new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 19).replace('T', ' ');
+      await db.run('INSERT INTO rider_sessions(token,rider_id,expires) VALUES(?,?,?)', [tok, r.id, exp]);
+      await db.run('UPDATE riders SET portal_last_login=? WHERE id=?', [nowTs(), r.id]);
+      return ok({ token: tok });
+    }
+    const r = await riderFromToken(token);
+    if (!r) err(401, 'Oturum açın.');
+    if (b === 'logout') { await db.run('DELETE FROM rider_sessions WHERE token=?', [token]); return ok({ ok: true }); }
+    if (b === 'me' && method === 'GET') return ok(await portalData(r));
+    if (b === 'me' && method === 'PUT') {
+      if (body.lang && ['tr', 'de', 'en'].includes(body.lang)) await db.run('UPDATE riders SET lang=? WHERE id=?', [body.lang, r.id]);
+      if (body.phone !== undefined) await db.run('UPDATE riders SET phone=? WHERE id=?', [String(body.phone || '').slice(0, 40) || null, r.id]);
+      if (body.new_password) {
+        if (!verifyPassword(body.current_password || '', r.portal_password_hash)) err(400, 'Mevcut şifre hatalı.');
+        if (String(body.new_password).length < 6) err(400, 'Yeni şifre en az 6 karakter olmalı.');
+        await db.run('UPDATE riders SET portal_password_hash=? WHERE id=?', [hashPassword(String(body.new_password)), r.id]);
+        await db.run('DELETE FROM rider_sessions WHERE rider_id=? AND token<>?', [r.id, token]);
+      }
+      return ok(await portalData(await db.get('SELECT * FROM riders WHERE id=?', [r.id])));
+    }
+    if (b === 'requests' && method === 'POST' && !c) {
+      if (!PORTAL_REQ.includes(body.type)) err(400, 'Geçersiz talep türü.');
+      let rental = null;
+      if (body.rental_id) rental = await db.get('SELECT * FROM rentals WHERE id=? AND rider_id=?', [Number(body.rental_id), r.id]) || err(404, 'Kiralama bulunamadı.');
+      else if (body.type !== 'yeni kiralama') rental = await db.get("SELECT * FROM rentals WHERE rider_id=? AND status IN ('aktif','rezervasyon') ORDER BY status='aktif' DESC, id DESC LIMIT 1", [r.id]);
+      if (body.type !== 'yeni kiralama' && !rental) err(400, 'Aktif kiralamanız yok.');
+      if (body.preferred_date && body.preferred_date < today()) err(400, 'Geçmiş bir tarih seçilemez.');
+      if (['servis randevusu', 'iade randevusu', 'kiralama uzatma'].includes(body.type) && !body.preferred_date) err(400, 'Tarih seçin.');
+      const x = await db.run('INSERT INTO portal_requests(rider_id,customer_id,rental_id,bike_id,type,preferred_date,preferred_time,notes) VALUES(?,?,?,?,?,?,?,?)',
+        [r.id, rental?.customer_id || r.customer_id, rental?.id || null, rental?.bike_id || null, body.type, body.preferred_date || null, String(body.preferred_time || '').slice(0, 20) || null, String(body.notes || '').slice(0, 1000) || null]);
+      await audit(portalUser(r), 'sürücü talebi', 'portal_requests', x.lastId, `${r.name}: ${body.type}`);
+      return ok(await portalData(r));
+    }
+    if (b === 'requests' && method === 'POST' && seg[3] === 'cancel') {
+      const q = await db.get('SELECT * FROM portal_requests WHERE id=? AND rider_id=?', [Number(c), r.id]) || err(404, 'Talep bulunamadı.');
+      if (q.status !== 'yeni') err(409, 'Sadece yeni talepler iptal edilebilir.');
+      await db.run("UPDATE portal_requests SET status='iptal', handled_at=? WHERE id=?", [nowTs(), q.id]);
+      return ok(await portalData(r));
+    }
+    if (b === 'documents' && method === 'POST' && !c) {
+      await addDocument({ ...body, owner_type: 'rider', owner_id: r.id, notes: 'Sürücü ekranından yüklendi' }, null);
+      return ok(await portalData(r));
+    }
+    if (b === 'documents' && method === 'GET' && c) {
+      const d = await db.get("SELECT * FROM documents WHERE id=? AND owner_type='rider' AND owner_id=?", [Number(c), r.id]) || err(404, 'Belge bulunamadı.');
+      return ok(d);
+    }
+    err(404, 'Bulunamadı.');
   }
 
   // ---------- router ----------
@@ -674,6 +828,7 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
         if (Array.isArray(body.points)) { const out = []; for (const pt of body.points) out.push(await telemetry(pt)); return ok(out); }
         return ok(await telemetry(body));
       }
+      if (a === 'portal') return await portalHandle(seg, method, body, token);
       const user = await userFromToken(token);
       if (!user) err(401, 'Oturum açın.');
       if (a === 'logout') { await db.run('DELETE FROM sessions WHERE token=?', [token]); return ok({ ok: true }); }
