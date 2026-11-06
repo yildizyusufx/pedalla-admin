@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: pedalla-admin
+    runtime: node
+    plan: starter
+    region: frankfurt
+    buildCommand: "echo no build"
+    startCommand: node --no-warnings server.js
+    envVars:
+      - key: NODE_VERSION
+        value: "22.13.0"
+      - key: DB_PATH
+        value: /var/data/pedalla.db
+    disk:
+      name: pedalla-data
+      mountPath: /var/data
+      sizeGB: 1

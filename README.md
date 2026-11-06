@@ -24,6 +24,21 @@ npm start            # http://localhost:3000
 * Port / veritabanı yolu: `PORT=8080 DB_PATH=/var/lib/pedalla/pedalla.db npm start`
 * `public/demo.html` sunucusuz demo sürümüdür: aynı kod tarayıcı içinde SQLite (sql.js) ile çalışır, veriler yalnızca o tarayıcıda tutulur.
 
+## Yayına alma (deploy)
+
+Sistem iki şekilde çalışabilir:
+
+| Seçenek | Veriler | Nerede |
+|---|---|---|
+| **Tam sürüm** (`server.js` + SQLite dosyası) | Sunucuda kalıcı, tüm kullanıcılar aynı veriyi görür | Kalıcı diski olan herhangi bir Node sunucusu: **Render**, **Railway**, **Fly.io**, kendi VPS'iniz |
+| **Statik demo** (`dist/`, tarayıcı içi SQLite) | Her tarayıcıda ayrı, kalıcı değil | Vercel, Netlify, GitHub Pages |
+
+**Vercel:** Vercel sürekli çalışan bir Node sunucusunu ve yerel veritabanı dosyasını desteklemez. Bu yüzden `vercel.json` Vercel'de statik demo sürümünü yayınlar (`node scripts/build-static.mjs` → `dist/`). Bu sürüm tanıtım ve test içindir. Gerçek kullanımda veriler tarayıcıda kalır, ekip arasında paylaşılmaz.
+
+**Render (önerilen, kod değişikliği yok):** repo kökündeki `render.yaml` hazır. Render'da *New → Blueprint* seçip bu repoyu gösterin. 1 GB kalıcı disk tanımlıdır; disk için ücretli "Starter" planı gerekir.
+
+**Railway / Fly.io / Docker:** `Dockerfile` hazır. Veritabanı `/data/pedalla.db` içinde durur; bu klasöre kalıcı bir volume bağlayın.
+
 ## Marka
 
 Renkler ve yazı tipi `public/brand.css` dosyasındadır. pedalla.bike sitesinin stil dosyasına bu ortamdan erişilemediği için yeşil/lime tonları tahmini seçildi; kesin hex kodlarını bu dosyaya yazmanız tüm paneli günceller. Logo `public/app.js` içindeki `LOGO` sabitidir; gerçek logoyu `public/logo.svg` olarak koyup bu sabiti `<img src="logo.svg">` ile değiştirebilirsiniz.
