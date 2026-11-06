@@ -32,6 +32,7 @@ const withScheme = (u) => (u && !/^[a-z]+:/i.test(u) ? `libsql://${u.replace(/^\
 const dbUrl = () => withScheme(envFind(/^(TURSO|LIBSQL)_?(DATABASE|DB)?_?URL$/i) || envFind(/^DATABASE_URL$/i).replace(/^(?!libsql:|https?:|wss?:|file:).*$/, ''));
 const dbToken = () => envFind(/^(TURSO|LIBSQL)_?(AUTH)?_?TOKEN$/i).replace(/^bearer\s+/i, '').replace(/^["']|["']$/g, '').replace(/\s+/g, '');
 async function getApi() {
+  if (/^(libsql|https?):|turso\.io/i.test(dbToken())) throw new Error('TURSO_AUTH_TOKEN içinde veritabanı adresi var. Buraya Turso\'da "Create Token" ile alınan, eyJ… ile başlayan uzun token yazılmalı.');
   if (!dbUrl()) throw new Error('TURSO_DATABASE_URL ortam değişkeni tanımlı değil.');
   const db = libsqlDb(dbUrl(), dbToken());
   const step = async (name, fn) => { try { return await fn(); } catch (e) { throw new Error(`[${name}] ${e.message}${e.cause?.message ? ' / ' + e.cause.message : ''}`); } };
