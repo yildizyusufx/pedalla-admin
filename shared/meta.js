@@ -224,7 +224,7 @@ export const RESOURCES = {
     ],
   },
   deposits: {
-    label: 'Depozito hareketleri', single: 'Depozito hareketi', perm: 'finance', order: 'date DESC, id DESC', search: ['contract_no', 'customer_label', 'notes'],
+    noBulk: 1, label: 'Depozito hareketleri', single: 'Depozito hareketi', perm: 'finance', order: 'date DESC, id DESC', search: ['contract_no', 'customer_label', 'notes'],
     title: (r) => `Depozito #${r.id}`,
     listSql: `SELECT d.*, r.contract_no, COALESCE(c.company_name,c.name) AS customer_label FROM deposits d
       LEFT JOIN rentals r ON r.id=d.rental_id LEFT JOIN customers c ON c.id=d.customer_id`,
@@ -290,7 +290,7 @@ export const RESOURCES = {
     ],
   },
   stock_moves: {
-    label: 'Stok hareketleri', single: 'Stok hareketi', perm: 'stock', order: 'date DESC, id DESC', search: ['part_name', 'sku', 'ref'],
+    noBulk: 1, label: 'Stok hareketleri', single: 'Stok hareketi', perm: 'stock', order: 'date DESC, id DESC', search: ['part_name', 'sku', 'ref'],
     title: (r) => `Hareket #${r.id}`,
     listSql: `SELECT m.*, p.sku, p.name AS part_name, u.name AS user_name FROM stock_moves m LEFT JOIN parts p ON p.id=m.part_id LEFT JOIN users u ON u.id=m.user_id`,
     noEdit: 1,

@@ -226,6 +226,13 @@ export const UI = {
   'Geçersiz cihaz anahtarı.': ['Ungültiger Geräteschlüssel.', 'Invalid device key.'], 'Mevcut şifre hatalı.': ['Aktuelles Passwort falsch.', 'Current password is wrong.'], 'Yeni şifre en az 6 karakter olmalı.': ['Neues Passwort mind. 6 Zeichen.', 'New password must be at least 6 characters.'], 'Hata': ['Fehler', 'Error'], 'Sunucu hatası': ['Serverfehler', 'Server error'],
   'Aç': ['Öffnen', 'Open'], 'Ay': ['Monat', 'Month'], 'Gün': ['Tag', 'Day'], 'Hafta': ['Woche', 'Week'], 'Servis': ['Service', 'Service'], 'İade': ['Rückgabe', 'Return'], 'Bağlantılar': ['Verknüpfungen', 'Links'], 'Depo / konum': ['Lager / Standort', 'Depot / location'],
   // ---- quick actions, QR, order list, profitability
+  "Seçimi kaldır": ["Auswahl aufheben", "Clear selection"],
+  "Seçilenleri sil": ["Ausgewählte löschen", "Delete selected"],
+  "# kayıt seçildi": ["# ausgewählt", "# selected"],
+  "# kayıt silinsin mi? Bu işlem geri alınamaz.": ["# Einträge löschen? Das kann nicht rückgängig gemacht werden.", "Delete # records? This cannot be undone."],
+  "# kayıt silindi": ["# Einträge gelöscht", "# records deleted"],
+  "# kayıt silindi, # kayıt silinemedi": ["# gelöscht, # konnten nicht gelöscht werden", "# deleted, # could not be deleted"],
+  "Tümünü seç": ["Alle auswählen", "Select all"], "Seç": ["Auswählen", "Select"],
   "Çalıntı / kayıp bildirildi": ["Als gestohlen / verloren gemeldet", "Reported stolen / lost"],
   "Bisiklet gideri ekle": ["Fahrradkosten erfassen", "Add bike cost"],
   "Bisiklet şu an kirada değil.": ["Das Fahrrad ist derzeit nicht vermietet.", "The bike is not rented right now."],
@@ -304,6 +311,7 @@ export const UI = {
 // Texts with a variable part (names, numbers) – tried after the exact lookups.
 // Each entry: [regex, (match, translate) => [german, english] | null]
 export const PATTERNS = [
+  [/^Bu kayda bağlı (.+) olduğu için silinemiyor\.$/, (m, tr) => [`Kann nicht gelöscht werden: verknüpfte ${tr(m[1][0].toUpperCase() + m[1].slice(1))} vorhanden.`, `Cannot be deleted: linked ${tr(m[1][0].toUpperCase() + m[1].slice(1)).toLowerCase()} exist.`]],
   [/^%(-?\d+) amorti etti$/, (m) => [`${m[1]} % amortisiert`, `${m[1]}% paid back`]],
   [/^(.+)'(?:den|dan|ten|tan) beri$/, (m) => [`seit ${m[1]}`, `since ${m[1]}`]],
   [/^(.+) kazanç$/, (m) => [`${m[1]} Gewinn`, `${m[1]} profit`]],

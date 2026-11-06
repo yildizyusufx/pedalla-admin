@@ -152,13 +152,35 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
     await audit(user, 'güncelleme', res, id, fields.map((f) => f.k).join(', '));
     return await getOne(res, id);
   }
+  const REFS = {};
+  async function refsTo(res) {
+    if (!REFS[res]) {
+      const out = [];
+      for (const { name } of await db.all("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"))
+        for (const f of await db.all(`PRAGMA foreign_key_list(${name})`)) if (f.table === res && name !== res) out.push([name, f.from]);
+      REFS[res] = out;
+    }
+    return REFS[res];
+  }
   async function remove(res, id, user) {
     const row = await getOne(res, id);
     if (res === 'bikes' && await db.get("SELECT 1 FROM rentals WHERE bike_id=? AND status IN ('aktif','rezervasyon')", [id])) err(409, 'Aktif kiralaması olan bisiklet silinemez.');
     if (res === 'customers' && await db.get('SELECT 1 FROM rentals WHERE customer_id=?', [id])) err(409, 'Kiralama geçmişi olan müşteri silinemez; kara listeye alabilir veya not düşebilirsiniz.');
     if (res === 'users' && user.id === Number(id)) err(409, 'Kendi kullanıcınızı silemezsiniz.');
     if (res === 'payments') { await db.run('DELETE FROM cash_moves WHERE payment_id=?', [id]); await db.run('DELETE FROM payments WHERE id=?', [id]); await recalcInvoice(row.invoice_id); await audit(user, 'silme', res, id); return { ok: true }; }
-    try { await db.run(`DELETE FROM ${res} WHERE id=?`, [id]); } catch (e) { err(409, 'Bu kayda bağlı başka kayıtlar olduğu için silinemiyor.'); }
+    // linked records block the delete (checked here too, because Turso does not enforce foreign keys)
+    const cleanup = { bikes: ['bike_locations', 'bike_costs'], riders: ['portal_requests'] }[res] || [];
+    for (const [t, col] of await refsTo(res)) {
+      if (cleanup.includes(t)) continue;
+      if (await db.get(`SELECT 1 FROM ${t} WHERE ${col}=? LIMIT 1`, [id])) err(409, `Bu kayda bağlı ${(RESOURCES[t]?.label || t).toLocaleLowerCase('tr')} olduğu için silinemiyor.`);
+    }
+    try {
+      for (const t of cleanup) await db.run(`DELETE FROM ${t} WHERE ${t === 'portal_requests' ? 'rider_id' : 'bike_id'}=?`, [id]);
+      if (res === 'riders') await db.run('DELETE FROM rider_sessions WHERE rider_id=?', [id]);
+      const own = { riders: 'rider', customers: 'customer', rentals: 'rental' }[res];
+      if (own) await db.run('DELETE FROM documents WHERE owner_type=? AND owner_id=?', [own, id]);
+      await db.run(`DELETE FROM ${res} WHERE id=?`, [id]);
+    } catch (e) { err(409, 'Bu kayda bağlı başka kayıtlar olduğu için silinemiyor.'); }
     await audit(user, 'silme', res, id, RESOURCES[res].title?.(row) || '');
     return { ok: true };
   }

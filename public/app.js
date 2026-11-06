@@ -1,7 +1,7 @@
 import { applyBikeTypes, RESOURCES, ROLES, PERMS, BIKE_STATUS, SERVICE_STATUS, PAY_METHODS, PERIODS, ID_TYPES, DOC_TYPES, DOC_LANGS, CASH_IN, CASH_OUT } from './shared/meta.js';
 import {
   GET, POST, PUT, DEL, session, setToken, can, esc, money, num, date, dt, ago, badge, todayISO, addDays, fmtField, toast, guard, modal, closeModal, confirmBox,
-  inputHtml, fillRefs, readForm, editForm, lookup, clearLookups, csv, table, bindTable, colsFromMeta, barChart, donut, meter, statusHex,
+  inputHtml, fillRefs, readForm, editForm, lookup, clearLookups, csv, table, bindTable, bindSelect, colsFromMeta, barChart, donut, meter, statusHex,
 } from './core.js';
 import { startI18n, langSwitch, bindLangSwitch, lang as uiLang, t as tr } from './i18n.js';
 const MONTHS = { tr: ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'], de: ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'], en: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] };
@@ -192,15 +192,35 @@ async function listPage(res, q = {}) {
   const filter = { ...q }; delete filter.tab;
   const rows = await GET(res, filter);
   const w = can(meta.perm, 'w') && !meta.readonly;
+  const canDel = w && !meta.noBulk;
   const cols = colsFromMeta(res);
   const chipHtml = cfg.chips ? `<div class="chips">${['', ...cfg.chips[1]].map((v) => `<a class="chip ${(q[cfg.chips[0]] || '') === v ? 'on' : ''}" href="#/${res}${v ? `?${cfg.chips[0]}=${encodeURIComponent(v)}` : ''}">${v || 'Tümü'}</a>`).join('')}</div>` : '';
   setMain(`${head(meta.label, cfg.sub, `<button class="btn sm" id="csv">CSV</button>${cfg.actions ? cfg.actions(q) : ''}${w && !meta.noCreate ? `<button class="btn primary sm" id="new">+ ${meta.single}</button>` : ''}`)}
     <div class="toolbar"><input type="search" id="q" placeholder="Ara…" value="${esc(q.q || '')}">${chipHtml}<span class="muted">${rows.length} kayıt</span></div>
-    ${card('', table(rows, cols, { link: cfg.link || (w && !meta.noEdit ? (r) => `#/${res}/${r.id}/edit` : null) }), 'flush')}`);
+    ${canDel ? bulkBar() : ''}
+    ${card('', table(rows, cols, { link: cfg.link || (w && !meta.noEdit ? (r) => `#/${res}/${r.id}/edit` : null), select: canDel }), 'flush')}`);
   $('#csv').onclick = () => csv(rows, cols, res);
+  if (canDel) bindBulkDelete(res, rows);
   const reload = () => route();
   $('#new')?.addEventListener('click', () => (cfg.create === 'payment' ? paymentForm({}, reload) : editForm(res, null, { onSaved: reload })));
   let t; $('#q').oninput = (e) => { clearTimeout(t); t = setTimeout(() => { const p = new URLSearchParams({ ...q, q: e.target.value }); location.hash = `#/${res}?${p}`; }, 350); };
+}
+// bulk delete: tick rows in the last column, then "Seçilenleri sil". Records with linked data are skipped with the reason.
+const bulkBar = () => `<div class="bulk-bar" id="bulk" hidden><span id="bulkn"></span><button class="btn sm ghost" id="bulkclr">Seçimi kaldır</button><button class="btn sm danger" id="bulkdel">Seçilenleri sil</button></div>`;
+function bindBulkDelete(res, rows, path = res) {
+  let ids = [];
+  const sel = bindSelect(main(), (x) => { ids = x; $('#bulk').hidden = !ids.length; $('#bulkn').textContent = `${ids.length} kayıt seçildi`; });
+  $('#bulkclr').onclick = () => sel.clear();
+  $('#bulkdel').onclick = guard(async () => {
+    if (!ids.length || !(await confirmBox(`${ids.length} kayıt silinsin mi? Bu işlem geri alınamaz.`))) return;
+    let okN = 0; const fails = [];
+    for (const id of ids) {
+      try { await DEL(`${path}/${id}`); okN++; } catch (e) { const r = rows.find((x) => x.id === id); fails.push(`${RESOURCES[res].title ? RESOURCES[res].title(r || {}) : '#' + id}: ${e.message}`); }
+    }
+    clearLookups(); await route();
+    if (fails.length) modal(`${okN} kayıt silindi, ${fails.length} kayıt silinemedi`, `<ul class="results">${fails.map((f) => `<li>${esc(f)}</li>`).join('')}</ul>`);
+    else toast(`${okN} kayıt silindi`, 'ok');
+  });
 }
 async function editRoute(res, id) {
   const row = await GET(`${res}/${id}`);
@@ -875,8 +895,9 @@ async function partsPage(q) {
   const value = rows.reduce((a, p) => a + p.stock * p.cost, 0);
   setMain(`${head('Yedek parçalar', 'Parça kataloğu, stok seviyeleri ve kritik stok uyarıları.', `<button class="btn sm" id="csv">CSV</button><a class="btn sm" href="#/parts/order">Sipariş listesi oluştur</a>${w ? '<button class="btn sm" id="move">Stok girişi / çıkışı</button><button class="btn primary sm" id="new">+ Parça</button>' : ''}`)}
     <div class="toolbar"><input type="search" id="q" placeholder="Kod, ad, uyumlu model, raf…" value="${esc(q.q || '')}"><div class="chips"><a class="chip ${!q.low ? 'on' : ''}" href="#/parts">Tümü</a><a class="chip ${q.low ? 'on' : ''}" href="#/parts?low=1">Kritik stok</a></div><span class="muted">${rows.length} parça · stok değeri <b>${money(value)}</b></span></div>
-    ${card('', table(rows, cols, { link: (r) => `#/parts/${r.id}` }), 'flush')}`);
+    ${w ? bulkBar() : ''}${card('', table(rows, cols, { link: (r) => `#/parts/${r.id}`, select: w }), 'flush')}`);
   $('#csv').onclick = () => csv(rows, cols, 'yedek-parcalar');
+  if (w) bindBulkDelete('parts', rows);
   $('#new')?.addEventListener('click', () => editForm('parts', null, { onSaved: route }));
   $('#move')?.addEventListener('click', () => editForm('stock_moves', null, { defaults: { type: 'giriş' }, onSaved: route }));
   let tm; $('#q').oninput = (e) => { clearTimeout(tm); tm = setTimeout(() => { location.hash = `#/parts?${new URLSearchParams({ ...q, q: e.target.value })}`; }, 350); };

@@ -157,14 +157,24 @@ export function csv(rows, cols, name) {
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `${name}-${todayISO()}.csv`; a.click();
 }
 // cols: [{k, l, f?: (row)=>html, cls?}]
-export function table(rows, cols, { link, empty = 'Kayıt yok.', id } = {}) {
+export function table(rows, cols, { link, empty = 'Kayıt yok.', id, select } = {}) {
   if (!rows.length) return `<div class="empty">${esc(empty)}</div>`;
-  return `<div class="table-wrap"><table class="tbl" ${id ? `id="${id}"` : ''}><thead><tr>${cols.map((c, i) => `<th data-i="${i}" class="${c.cls || ''}">${esc(c.l)}</th>`).join('')}</tr></thead>
-  <tbody>${rows.map((r) => `<tr ${link ? `data-href="${esc(link(r))}" class="clickable"` : ''}>${cols.map((c) => `<td class="${c.cls || ''}" data-l="${esc(c.l)}">${c.f ? c.f(r) : esc(r[c.k] ?? '—')}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+  // select: adds a checkbox column at the end of each row (bulk actions, see bindSelect)
+  return `<div class="table-wrap"><table class="tbl" ${id ? `id="${id}"` : ''}><thead><tr>${cols.map((c, i) => `<th data-i="${i}" class="${c.cls || ''}">${esc(c.l)}</th>`).join('')}${select ? '<th class="sel-c nosort"><input type="checkbox" class="sel-all" aria-label="Tümünü seç" title="Tümünü seç"></th>' : ''}</tr></thead>
+  <tbody>${rows.map((r) => `<tr ${link ? `data-href="${esc(link(r))}" class="clickable"` : ''}>${cols.map((c) => `<td class="${c.cls || ''}" data-l="${esc(c.l)}">${c.f ? c.f(r) : esc(r[c.k] ?? '—')}</td>`).join('')}${select ? `<td class="sel-c" data-l="Seç"><input type="checkbox" class="sel" value="${esc(r.id)}" aria-label="Seç"></td>` : ''}</tr>`).join('')}</tbody></table></div>`;
+}
+// wires the checkbox column: onChange(selectedIds) after every change
+export function bindSelect(root, onChange) {
+  const boxes = () => [...root.querySelectorAll('input.sel')];
+  const fire = () => { const ids = boxes().filter((b) => b.checked).map((b) => Number(b.value)); boxes().forEach((b) => b.closest('tr').classList.toggle('selected', b.checked)); const all = root.querySelector('.sel-all'); if (all) { all.checked = ids.length > 0 && ids.length === boxes().length; all.indeterminate = ids.length > 0 && ids.length < boxes().length; } onChange(ids); };
+  root.querySelector('.sel-all')?.addEventListener('change', (e) => { boxes().forEach((b) => (b.checked = e.target.checked)); fire(); });
+  boxes().forEach((b) => b.addEventListener('change', fire));
+  root.querySelectorAll('td.sel-c').forEach((td) => td.addEventListener('click', (e) => { if (e.target === td) { const b = td.querySelector('input'); b.checked = !b.checked; fire(); } }));
+  return { clear: () => { boxes().forEach((b) => (b.checked = false)); fire(); } };
 }
 export function bindTable(root) {
   root.querySelectorAll('tr[data-href]').forEach((tr) => tr.addEventListener('click', (e) => { if (e.target.closest('button,a,input')) return; location.hash = tr.dataset.href; }));
-  root.querySelectorAll('table.tbl th').forEach((th) => th.addEventListener('click', () => {
+  root.querySelectorAll('table.tbl th:not(.nosort)').forEach((th) => th.addEventListener('click', () => {
     const tb = th.closest('table').tBodies[0]; const i = [...th.parentNode.children].indexOf(th);
     const dir = th.dataset.dir === 'asc' ? 'desc' : 'asc'; th.parentNode.querySelectorAll('th').forEach((x) => delete x.dataset.dir); th.dataset.dir = dir;
     const val = (tr) => { const t = tr.children[i].textContent.trim(); const n = Number(t.replace(/[€\s.%]/g, '').replace(',', '.')); return /^\d{2}\.\d{2}\.\d{4}/.test(t) ? t.slice(6, 10) + t.slice(3, 5) + t.slice(0, 2) : Number.isFinite(n) && t !== '—' && t !== '' ? n : t.toLowerCase(); };
