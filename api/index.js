@@ -6,12 +6,19 @@ import { seedRemote } from '../shared/dump.js';
 import { crypto } from '../shared/node-crypto.js';
 
 let ready;
+const looksUrl = (v) => /^(libsql|https?|wss?):|turso\.io/i.test(v);
+const looksJwt = (v) => /^ey[\w-]+\.[\w-]+\.[\w-]+$/.test(v);
+// If the two values were entered into each other's fields, use them the right way round.
+const swapped = () => { const u = envFind(/^(TURSO|LIBSQL)_?(DATABASE|DB)?_?URL$/i); const t = rawToken(); return looksJwt(u) && looksUrl(t); };
+const dbUrl = () => (swapped() ? withScheme(rawToken()) : rawUrl());
+const dbToken = () => (swapped() ? envFind(/^(TURSO|LIBSQL)_?(DATABASE|DB)?_?URL$/i) : rawToken());
 // Diagnostics for /api/_mode?check=1: raw HTTP calls to the database, and the token's shape (never its value).
 async function probe() {
   const url = dbUrl().replace(/^libsql:/, 'https:').replace(/\/+$/, '');
   const tok = dbToken();
   const out = {
-    host: url.replace(/^https?:\/\//, '').replace(/\?.*$/, ''),
+    host: looksUrl(url) && !/ey[\w-]{10,}\./.test(url) ? url.replace(/^https?:\/\//, '').replace(/\?.*$/, '') : '(adres değil, gizlendi)',
+    swapped: swapped(),
     token_shape: { length: tok.length, parts: tok.split('.').length, starts_ey: tok.startsWith('ey'), has_space: /\s/.test(tok), has_quote: /["']/.test(tok), has_bearer: /^bearer/i.test(tok) },
   };
   const body = JSON.stringify({ requests: [{ type: 'execute', stmt: { sql: 'SELECT 1' } }, { type: 'close' }] });
@@ -29,9 +36,10 @@ function envFind(re) {
   return '';
 }
 const withScheme = (u) => (u && !/^[a-z]+:/i.test(u) ? `libsql://${u.replace(/^\/+/, '')}` : u);
-const dbUrl = () => withScheme(envFind(/^(TURSO|LIBSQL)_?(DATABASE|DB)?_?URL$/i) || envFind(/^DATABASE_URL$/i).replace(/^(?!libsql:|https?:|wss?:|file:).*$/, ''));
-const dbToken = () => envFind(/^(TURSO|LIBSQL)_?(AUTH)?_?TOKEN$/i).replace(/^bearer\s+/i, '').replace(/^["']|["']$/g, '').replace(/\s+/g, '');
+const rawUrl = () => withScheme(envFind(/^(TURSO|LIBSQL)_?(DATABASE|DB)?_?URL$/i) || envFind(/^DATABASE_URL$/i).replace(/^(?!libsql:|https?:|wss?:|file:).*$/, ''));
+const rawToken = () => envFind(/^(TURSO|LIBSQL)_?(AUTH)?_?TOKEN$/i).replace(/^bearer\s+/i, '').replace(/^["']|["']$/g, '').replace(/\s+/g, '');
 async function getApi() {
+  if (/ey[\w-]{10,}\./.test(dbUrl())) throw new Error('TURSO_DATABASE_URL içinde token var. Buraya Turso\'daki libsql://….turso.io adresi yazılmalı.');
   if (/^(libsql|https?):|turso\.io/i.test(dbToken())) throw new Error('TURSO_AUTH_TOKEN içinde veritabanı adresi var. Buraya Turso\'da "Create Token" ile alınan, eyJ… ile başlayan uzun token yazılmalı.');
   if (!dbUrl()) throw new Error('TURSO_DATABASE_URL ortam değişkeni tanımlı değil.');
   const db = libsqlDb(dbUrl(), dbToken());
