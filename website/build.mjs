@@ -101,6 +101,8 @@ function page(lang) {
   <script type="application/ld+json">${JSON.stringify(ld)}</script>
 </head>
 <body>
+<div class="pdl-intro" aria-hidden="true"><div class="pdl-loader"></div></div>
+<script>try{if(sessionStorage.getItem('pdl-seen'))document.documentElement.classList.add('ready');sessionStorage.setItem('pdl-seen','1')}catch(e){}</script>
 <a class="skip" href="#main">Skip</a>
 <header class="top" id="top">
   <div class="wrap top-in">

@@ -220,6 +220,8 @@
         if (!f.consent.checked) return step2(T.r_err_consent);
       } else if (!d.email || !d.password) return step2(T.r_err_fill);
       btn.disabled = true; btn.textContent = T.r_sending;
+      const busy = document.createElement('div'); busy.className = 'm-busy'; busy.setAttribute('role', 'status'); busy.innerHTML = `<div class="pdl-loader"></div><span>${T.r_sending}</span>`; $('.modal-card', modal).appendChild(busy);
+      const unbusy = () => busy.remove();
       let token;
       try {
         const auth = isNew
@@ -229,8 +231,9 @@
         const m = byId(st.model);
         const note = ['Website' + (P.lang !== 'de' ? ' (' + P.lang.toUpperCase() + ')' : ''), d.notes].filter(Boolean).join(' · ');
         const me = await api('requests', { method: 'POST', token, body: JSON.stringify({ type: 'yeni kiralama', bike_type: m?.type || '', period: m?.period || 'ay', duration: st.dur, preferred_date: st.date, notes: note }) });
-        done(me?.rider?.name || d.name || '', token);
+        unbusy(); done(me?.rider?.name || d.name || '', token);
       } catch (err) {
+        unbusy();
         if (!err.status) return step2(`${T.r_err_net} <a href="${waLink()}" target="_blank" rel="noopener">${T.r_wa} →</a>`);
         if (err.status === 409 && token) return step2(`${T.r_err_pending} <a href="${portalUrl(token)}">${T.r_ok_portal} →</a>`);
         if (err.status === 409) { st.tab = 'have'; return step2(T.r_err_taken); }
@@ -269,4 +272,9 @@
   // only animate what is still below the fold; never keep content hidden if the observer does not fire
   rv.filter((el) => el.getBoundingClientRect().top > window.innerHeight).forEach((el) => { el.classList.add('rv'); io.observe(el); });
   setTimeout(() => rv.forEach((el) => el.classList.add('in')), 4000);
+
+  // ---------- intro loader: hide when the page has loaded (max 1.2 s) ----------
+  const ready = () => document.documentElement.classList.add('ready');
+  if (document.readyState === 'complete') ready(); else addEventListener('load', ready, { once: true });
+  setTimeout(ready, 1200);
 })();

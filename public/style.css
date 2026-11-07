@@ -205,7 +205,19 @@ a.kpi:hover { text-decoration: none; border-color: var(--brand); }
 .modal-b { padding: 18px 20px; overflow-y: auto; }
 .toast { position: fixed; bottom: 22px; left: 50%; transform: translate(-50%, 20px); opacity: 0; transition: .25s; background: var(--slate-d); color: #fff; padding: 11px 18px; border-radius: 12px; z-index: 3000; font-weight: 600; box-shadow: 0 10px 30px rgba(0, 0, 0, .2); max-width: calc(100% - 32px); }
 .toast.show { opacity: 1; transform: translate(-50%, 0); } .toast.t-err { background: var(--danger); } .toast.t-info { background: #34495e; }
-.loading { display: grid; place-items: center; padding: 100px; } .spin { width: 32px; height: 32px; border: 3px solid var(--line); border-top-color: var(--brand); border-radius: 50%; animation: sp 0.8s linear infinite; }
+.loading { display: grid; place-items: center; padding: 100px; } .loading.full { min-height: 100vh; padding: 0; }
+.login-busy { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; background: rgba(246, 248, 249, .86); backdrop-filter: blur(3px); animation: pdl-in .2s ease-out; }
+@keyframes pdl-in { from { opacity: 0; } }
+.login-busy .pdl-loader { width: 84px; }
+/* Pedalla loader: the logo mark fills with a diagonal red sweep (mask = img/mark.svg) */
+.pdl-loader { width: 64px; aspect-ratio: 481 / 302; display: block;
+  -webkit-mask: url(img/mark.svg) center / contain no-repeat; mask: url(img/mark.svg) center / contain no-repeat;
+  background: linear-gradient(115deg, #f6c9d0 0 34%, #eb4056 34% 66%, #f6c9d0 66% 100%) 100% 0 / 300% 100%;
+  animation: pdl-sweep 1.3s cubic-bezier(.65, 0, .35, 1) infinite, pdl-bob 1.3s ease-in-out infinite; }
+@keyframes pdl-sweep { 0% { background-position: 100% 0; } 100% { background-position: 0 0; } }
+@keyframes pdl-bob { 0%, 100% { transform: scale(1); } 50% { transform: scale(.94); } }
+@media (prefers-reduced-motion: reduce) { .pdl-loader { animation: pdl-fade 1.6s ease-in-out infinite; background: #eb4056; } @keyframes pdl-fade { 50% { opacity: .45; } } }
+
 @keyframes sp { to { transform: rotate(360deg); } }
 
 /* login */

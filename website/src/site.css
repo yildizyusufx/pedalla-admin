@@ -389,3 +389,21 @@ body.locked { overflow: hidden; }
 .rv { opacity: 0; transform: translateY(18px); transition: opacity .6s ease, transform .6s ease; }
 .rv.in { opacity: 1; transform: none; }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .rv { opacity: 1; transform: none; } * { animation: none !important; transition: none !important; } }
+
+/* Pedalla loader – logo mark with a diagonal red sweep */
+.pdl-loader { width: 72px; aspect-ratio: 481 / 302; display: block;
+  -webkit-mask: url(img/mark.svg) center / contain no-repeat; mask: url(img/mark.svg) center / contain no-repeat;
+  background: linear-gradient(115deg, #f6c9d0 0 34%, var(--red) 34% 66%, #f6c9d0 66% 100%) 100% 0 / 300% 100%;
+  animation: pdl-sweep 1.3s cubic-bezier(.65, 0, .35, 1) infinite, pdl-bob 1.3s ease-in-out infinite; }
+@keyframes pdl-sweep { 0% { background-position: 100% 0; } 100% { background-position: 0 0; } }
+@keyframes pdl-bob { 0%, 100% { transform: scale(1); } 50% { transform: scale(.94); } }
+.pdl-intro { position: fixed; inset: 0; z-index: 2000; display: grid; place-items: center; background: var(--bg, #eef1f2);
+  transition: opacity .35s ease, visibility .35s; animation: pdl-auto-hide .35s ease 2.5s forwards; }
+html.ready .pdl-intro { opacity: 0; visibility: hidden; pointer-events: none; }
+@keyframes pdl-auto-hide { to { opacity: 0; visibility: hidden; pointer-events: none; } }
+.m-busy { position: absolute; inset: 0; z-index: 5; display: grid; place-content: center; justify-items: center; gap: 14px; background: rgba(255,255,255,.9); border-radius: inherit; font-weight: 600; color: var(--ink); animation: fade .2s; }
+@media (prefers-reduced-motion: reduce) {
+  .pdl-loader { animation: pdl-fade 1.6s ease-in-out infinite; background: var(--red); }
+  @keyframes pdl-fade { 50% { opacity: .45; } }
+  .pdl-intro { transition: none; }
+}

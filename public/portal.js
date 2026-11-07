@@ -382,7 +382,7 @@ function startLoc(ask) {
 }
 function stopLoc() { clearInterval(locTimer); locTimer = null; }
 async function load() {
-  root().innerHTML = '<div class="loading"><div class="spin"></div></div>';
+  root().innerHTML = '<div class="loading"><div class="pdl-loader" role="status" aria-label="Loading"></div></div>';
   data = await api('GET', 'me');
   if (!btypes) api('GET', 'bike-types').then((x) => { btypes = x; if (tab === 'req') shell(); }).catch(() => {});
   if (store.get(LOC_KEY) !== 'off') startLoc(false);
