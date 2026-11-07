@@ -46,7 +46,7 @@ const ICONS = {
   inbox: '<path d="M3 13h5l2 3h4l2-3h5"/><path d="M5 5h14l2 8v6H3v-6z"/>',
 };
 const icon = (n) => `<svg viewBox="0 0 24 24" class="ic" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS[n] || ''}</svg>`;
-export const LOGO = `<span class="logo"><img src="img/logo.png" alt="pedalla app"></span>`;
+export const LOGO = `<span class="logo"><img src="img/logo.png" alt="pedalla.bike"></span>`;
 
 function shell() {
   const u = session.user;

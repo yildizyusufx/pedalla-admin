@@ -29,7 +29,7 @@ export function legalPage(name, SITE, V) {
   return `<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${name === 'impressum' ? 'Impressum' : 'Datenschutz'} – Pedalla</title><meta name="robots" content="noindex"><link rel="icon" href="img/favicon.png">
 <link rel="stylesheet" href="site.css?v=${V}"></head><body class="legal">
-<header class="top"><div class="wrap top-in"><a class="logo" href="./${process.env.PREVIEW ? 'index.html' : ''}"><img src="img/logo.png" alt="Pedalla" width="160" height="29"></a><div class="top-r"><a class="btn sm ghost" href="./${process.env.PREVIEW ? 'index.html' : ''}">← pedalla.bike</a></div></div></header>
+<header class="top"><div class="wrap top-in"><a class="logo" href="./${process.env.PREVIEW ? 'index.html' : ''}"><img src="img/logo.png" alt="pedalla.bike" width="194" height="24"></a><div class="top-r"><a class="btn sm ghost" href="./${process.env.PREVIEW ? 'index.html' : ''}">← pedalla.bike</a></div></div></header>
 <main class="wrap legal-body">${body}</main>
 <footer class="foot"><div class="wrap foot-b">© ${new Date().getFullYear()} Pedalla · <a href="impressum${process.env.PREVIEW ? '.html' : ''}">Impressum</a> · <a href="datenschutz${process.env.PREVIEW ? '.html' : ''}">Datenschutz</a></div></footer>
 </body></html>`;

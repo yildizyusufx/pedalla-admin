@@ -94,7 +94,7 @@ function page(lang) {
   <link rel="alternate" hreflang="x-default" href="${SITE.url}/">
   <meta property="og:type" content="website"><meta property="og:title" content="${esc(t.meta_title)}"><meta property="og:description" content="${esc(t.meta_desc)}">
   <meta property="og:image" content="${SITE.url}/img/og.jpg"><meta property="og:url" content="${SITE.url}${base(lang)}"><meta name="twitter:card" content="summary_large_image">
-  <link rel="icon" href="${pre}img/favicon.png">
+  <link rel="icon" href="${pre}img/favicon.png"><link rel="apple-touch-icon" href="${pre}img/apple-touch-icon.png">
   <link rel="preload" href="${pre}fonts/sora-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="${pre}site.css?v=${V}">
   <link rel="stylesheet" href="${pre}vendor/leaflet/leaflet.css">
@@ -112,7 +112,7 @@ function page(lang) {
         <div class="nav-x nav-lang">${Object.keys(LANGS).map((l) => `<a href="${l === lang ? '#' : (lang === 'de' ? '' : '../') + (l === 'de' ? '' : l + '/') + IDX}" class="${l === lang ? 'on' : ''}" hreflang="${l}">${LANGS[l]}</a>`).join('')}</div>
       </nav>
     </div>
-    <a class="logo" href="${base(lang)}" aria-label="Pedalla"><img src="${pre}img/logo.png" alt="Pedalla" width="160" height="29"></a>
+    <a class="logo" href="${base(lang)}" aria-label="Pedalla"><img src="${pre}img/logo.png" alt="pedalla.bike" width="194" height="24"></a>
     <div class="top-r">
       <div class="lang" role="navigation" aria-label="Language">${Object.keys(LANGS).map((l) => `<a href="${l === lang ? '#' : (lang === 'de' ? '' : '../') + (l === 'de' ? '' : l + '/') + IDX}" class="${l === lang ? 'on' : ''}" hreflang="${l}" lang="${l}" title="${LANGS[l]}">${l.toUpperCase()}</a>`).join('')}</div>
       <div class="contact hide-m"><a class="pillbtn" href="https://wa.me/${SITE.whatsapp}" target="_blank" rel="noopener">${t.foot_contact}</a><a class="round light" href="tel:${SITE.phone.replace(/\s/g, '')}" aria-label="${SITE.phone}">${ic('phone')}</a></div>
@@ -207,7 +207,7 @@ function page(lang) {
 
 <footer class="foot">
   <div class="wrap foot-in">
-    <div><img src="${pre}img/logo-light.png" alt="Pedalla" width="150" height="27"><p>${t.foot_tag}</p></div>
+    <div><img src="${pre}img/logo-light.png" alt="pedalla.bike" width="170" height="21"><p>${t.foot_tag}</p></div>
     <div><h4>${t.foot_contact}</h4><p>${esc(SITE.address.street)}<br>${SITE.address.zip} ${SITE.address.city}</p><p><a href="tel:${SITE.phone.replace(/\s/g, '')}">${SITE.phone}</a><br><a href="https://wa.me/${SITE.whatsapp}" target="_blank" rel="noopener">WhatsApp</a> · <a href="mailto:${SITE.email}">${SITE.email}</a></p></div>
     <div><h4>Pedalla</h4><p><a href="#modelle">${t.nav_models}</a><br><a href="#business">${t.nav_business}</a><br><a href="${SITE.portal}?lang=${lang}">${t.nav_login}</a></p></div>
     <div><h4>${t.foot_legal}</h4><p><a href="${pre}impressum${EXT}">${t.foot_imprint}</a><br><a href="${pre}datenschutz${EXT}">${t.foot_privacy}</a></p></div>

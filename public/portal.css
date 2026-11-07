@@ -3,7 +3,7 @@ body.portal { font-size: 15px; background: var(--bg); }
 .portal .ic { width: 20px; height: 20px; }
 .p-top { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 10px; padding: 10px 16px; padding-top: max(10px, env(safe-area-inset-top));
   background: var(--surface); border-bottom: 1px solid var(--line); }
-.p-top-logo { height: 24px; }
+.p-top-logo { height: 20px; width: auto; flex: none; }
 .p-top-tag { font-size: 11px; font-weight: 700; background: var(--slate-d); color: #fff; padding: 2px 8px; border-radius: 99px; white-space: nowrap; }
 .p-main { max-width: 640px; margin: 0 auto; padding: 16px 16px calc(96px + env(safe-area-inset-bottom)); }
 .p-hello { font-size: 20px; margin: 4px 0 14px; }
@@ -62,12 +62,12 @@ section:first-of-type .p-h { margin-top: 6px; }
 .p-login { min-height: 100vh; display: grid; place-items: center; padding: 20px 16px; }
 .p-login-card { width: 100%; max-width: 400px; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 24px 20px; box-shadow: var(--shadow); }
 .p-login-card .p-lang { float: right; }
-.p-logo { height: 38px; display: block; margin: 4px 0 18px; }
+.p-logo { height: 30px; width: auto; display: block; margin: 4px 0 18px; }
 .p-login-card h1 { font-size: 22px; margin-bottom: 4px; } .p-login-card p { margin: 0 0 18px; }
 .p-login-card .field { margin-bottom: 12px; }
 @media (min-width: 900px) { .p-nav { max-width: 640px; margin: 0 auto; border: 1px solid var(--line); border-radius: 16px 16px 0 0; } }
 .p-top .p-lang button { padding: 5px 8px; font-size: 12px; }
-@media (max-width: 440px) { .p-top-tag { display: none; } .p-top-logo { height: 22px; } }
+@media (max-width: 440px) { .p-top-tag { display: none; } .p-top-logo { height: 18px; } }
 .p-loc { margin-bottom: 16px; border: 1px solid color-mix(in srgb, var(--brand, #EB4056) 30%, transparent); } .p-loc p { margin: 6px 0 12px; }
 .p-alt { text-align: center; margin-top: 16px; font-size: 14px; } .p-alt a { font-weight: 700; }
 .p-hp { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }

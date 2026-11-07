@@ -21,11 +21,11 @@ code, pre { font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; }
 .ic { width: 18px; height: 18px; flex: none; }
 
 /* logo */
-.logo { display: inline-flex; align-items: center; }
-.logo img { height: 26px; width: auto; max-width: 100%; display: block; }
+.logo { display: inline-flex; align-items: center; min-width: 0; }
+.logo img { height: 22px; width: auto; max-width: 100%; object-fit: contain; object-position: left center; display: block; flex: none; }
 [hidden] { display: none !important; }
-.login-card .logo img { height: 40px; }
-.doc-h .logo img { height: 36px; }
+.login-card .logo img { height: 32px; }
+.doc-h .logo img { height: 28px; }
 
 /* layout */
 .app { display: flex; min-height: 100vh; }
