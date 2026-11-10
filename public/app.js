@@ -494,7 +494,7 @@ async function rentalPage(id) {
       <label class="field"><span>İade km</span><input name="end_km" type="number" step="any" value="${r.bike.odometer_km ?? ''}"></label>
       <label class="field span2"><span>Bisikletin durumu / eksikler</span><textarea name="return_condition" rows="2" placeholder="Örn. sorunsuz; ön çamurlukta çizik…"></textarea></label>
       <label class="field"><span>Hasar bedeli (net, faturalanır)</span><input name="damage_fee" type="number" step="0.01" value="0"></label>
-      <label class="field"><span>Depo / konum</span><input name="location_name" value="Depo Stresemannstraße"></label>
+      <label class="field"><span>Depo / konum</span><input name="location_name" value="Depo Missundestraße"></label>
       ${r.late_days ? `<label class="check span2"><input type="checkbox" name="charge_late" checked> Geç iade bedeli faturala (${r.late_days} gün × ${money(r.late_return_fee_per_day)} = ${money(lateFee)})</label>` : ''}
       ${r.deposit_held > 0 ? `<label class="check span2"><input type="checkbox" name="deduct_from_deposit"> Açık faturaları depozitodan (${money(r.deposit_held)}) mahsup et, kalanı iade et</label>` : ''}
       ${r.deposit_held > 0 ? `<label class="field"><span>Depozito iadesi nasıl yapılacak?</span><select name="refund_method">${['nakit', 'banka havalesi', 'kredi kartı', 'PayPal'].map((m) => `<option>${m}</option>`).join('')}</select></label><div></div>` : ''}
@@ -1079,7 +1079,7 @@ async function rolesPage() {
 
 // ---------- settings ----------
 const SETTINGS_FORM = [
-  ['Şirket', [['company_name', 'Şirket adı'], ['company_address', 'Adres'], ['company_phone', 'Telefon'], ['company_email', 'E-posta'], ['company_tax_no', 'USt-IdNr / vergi no'], ['company_iban', 'IBAN']]],
+  ['Şirket', [['company_name', 'Şirket adı'], ['company_address', 'Adres'], ['pickup_address', 'Teslim alma adresi (site ve sürücü ekranı)'], ['company_phone', 'Telefon'], ['company_email', 'E-posta'], ['company_tax_no', 'USt-IdNr / vergi no'], ['company_iban', 'IBAN']]],
   ['Finans', [['currency', 'Para birimi'], ['vat_rate', 'KDV oranı %', 'number'], ['payment_terms_days', 'Ödeme vadesi (gün)', 'number'], ['late_fee_per_day', 'Geç ödeme bedeli / gün (€)', 'number'], ['late_return_fee_per_day', 'Geç iade bedeli / gün (€)', 'number']]],
   ['Sürücü ekranı', [['portal_signup', 'Sürücüler sürücü ekranından kendi hesabını oluşturabilsin', 'select', [{ v: '1', l: 'Açık' }, { v: '0', l: 'Kapalı' }]]]],
   ['Kiralama periyotları', [['rental_periods', 'Sürücülerin ve sizin seçebileceğiniz periyotlar (kapalı olanlar tarife, kiralama ve sürücü ekranında görünmez)', 'periods']]],

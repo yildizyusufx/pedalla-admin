@@ -114,7 +114,7 @@ export async function seed(api, hashPassword) {
       ['Winterhude', 53.5917, 10.0011], ['Barmbek', 53.5854, 10.0444], ['HafenCity', 53.5413, 9.9984], ['St. Georg', 53.5554, 10.0124],
       ['Eppendorf', 53.5895, 9.9840], ['Rothenburgsort', 53.5354, 10.0400], ['Wilhelmsburg', 53.4986, 10.0068], ['Bahrenfeld', 53.5655, 9.9067],
     ];
-    const depot = ['Depo Stresemannstraße', 53.5636, 9.9425];
+    const depot = ['Depo Missundestraße', 53.5636, 9.9425];
     const bikes = [];
     for (let i = 0; i < 26; i++) {
       const m = models[i < 8 ? i % 2 : i < 20 ? 2 + (i % 3) : 5 + (i % 2)];

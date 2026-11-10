@@ -846,7 +846,7 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
       customer: cust ? { name: cust.company_name || cust.name, type: cust.type } : null, payer,
       rentals, invoices, payments, services, requests, documents, required_docs: required, missing_docs: missing, notifications: n,
       summary: { open_balance: r2(open.reduce((a, i) => a + i.balance, 0)), overdue: r2(open.filter((i) => i.days_late > 0).reduce((a, i) => a + i.balance, 0)), next_due: open.slice().sort((a, b) => (a.due_date < b.due_date ? -1 : 1))[0] || null },
-      company: { name: setting('company_name'), phone: setting('company_phone'), email: setting('company_email'), address: setting('company_address'), iban: setting('company_iban') },
+      company: { name: setting('company_name'), phone: setting('company_phone'), email: setting('company_email'), address: setting('company_address'), pickup: setting('pickup_address') || setting('company_address'), iban: setting('company_iban') },
       request_types: PORTAL_REQ,
       bike_types: String(setting('bike_types') || '').split(/\r?\n|,/).map((x) => x.trim()).filter(Boolean),
       plans: (await db.all('SELECT bike_type, period, price, deposit FROM pricing_plans WHERE active=1 ORDER BY bike_type, price')).filter((p) => enabledPeriods(SETTINGS).includes(p.period)),
@@ -856,7 +856,7 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
   }
   async function portalHandle(seg, method, body, token) {
     const [, b, c] = seg;
-    if (b === 'config' && method === 'GET') return ok({ signup: setting('portal_signup') !== '0', company: setting('company_name'), id_types: ID_TYPES });
+    if (b === 'config' && method === 'GET') return ok({ signup: setting('portal_signup') !== '0', company: setting('company_name'), pickup: setting('pickup_address') || setting('company_address'), id_types: ID_TYPES });
     if (b === 'bike-types' && method === 'GET') return ok(await bikeTypeList());
     if (b === 'catalog' && method === 'GET') {
       // public data for the marketing website: bike types, cheapest active plan per type, free bikes and
@@ -867,13 +867,39 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
       const types = (await bikeTypeList()).map((x) => {
         const pl = plans.filter((p) => p.bike_type === x.name);
         const best = pl.find((p) => p.period === 'ay') || pl[0] || null;
-        return { ...x, price: best?.price ?? null, deposit: best?.deposit ?? null, period: best?.period ?? null, available: free.filter((f) => f.type === x.name).length };
+        // plans: cheapest active plan per enabled period, so the website can offer exactly the periods switched on in Settings
+        const per = periods.map((pp) => pl.find((p) => p.period === pp)).filter(Boolean).map((p) => ({ period: p.period, price: p.price, deposit: p.deposit }));
+        return { ...x, price: best?.price ?? null, deposit: best?.deposit ?? null, period: best?.period ?? null, plans: per, available: free.filter((f) => f.type === x.name).length };
       });
       const rnd = (n) => Math.round(n * 1000) / 1000;
       return ok({
-        signup: setting('portal_signup') !== '0', periods, types, id_types: ID_TYPES,
+        signup: setting('portal_signup') !== '0', periods, types, id_types: ID_TYPES, pickup: setting('pickup_address') || setting('company_address'),
         fleet: free.filter((f) => Number.isFinite(f.lat) && Number.isFinite(f.lng) && f.lat && f.lng).map((f) => ({ type: f.type, lat: rnd(f.lat), lng: rnd(f.lng) })),
       });
+    }
+    if (b === 'availability' && method === 'GET') {
+      // live availability for a date range (website booking calendar): bikes of each type that are not lost/retired and
+      // have no active rental or reservation overlapping [from, to]. Bikes in the workshop count only if the start is ≥ 3 days away.
+      const q = body || {};
+      const iso = (v) => (/^\d{4}-\d{2}-\d{2}$/.test(String(v || '')) ? String(v) : null);
+      const t = today(); const from = iso(q.from) && iso(q.from) > t ? iso(q.from) : t;
+      let to = iso(q.to) || from; if (to < from) to = from;
+      if (daysBetween(from, to) > 400) to = addDays(from, 400);
+      const bikes = await db.all("SELECT id, type, status FROM bikes WHERE status NOT IN ('kayıp/çalıntı','hizmet dışı')");
+      const busy = new Set((await db.all(`SELECT DISTINCT bike_id FROM rentals WHERE status IN ('aktif','rezervasyon') AND bike_id IS NOT NULL
+          AND start_date <= ? AND (CASE WHEN status='aktif' AND (end_date IS NULL OR end_date < ?) THEN '9999-12-31' ELSE end_date END) >= ?`, [to, t, from])).map((x) => x.bike_id));
+      const workshopOk = daysBetween(t, from) >= 3;
+      const counts = {};
+      for (const k of bikes) {
+        if (busy.has(k.id)) continue;
+        if (['serviste', 'arızalı'].includes(k.status) && !workshopOk) continue;
+        if (k.status === 'kirada' || k.status === 'rezerve') continue; // status set by hand without a rental row: treat as taken
+        counts[k.type] = (counts[k.type] || 0) + 1;
+      }
+      // open website/portal requests that are not handled yet also hold a bike of that type
+      const pending = await db.all("SELECT bike_type, COUNT(*) AS n FROM portal_requests WHERE type='yeni kiralama' AND status='yeni' AND bike_type IS NOT NULL GROUP BY bike_type");
+      for (const p of pending) if (counts[p.bike_type]) counts[p.bike_type] = Math.max(0, counts[p.bike_type] - p.n);
+      return ok({ from, to, types: (await bikeTypeList()).map((x) => ({ name: x.name, available: counts[x.name] || 0 })) });
     }
     if (b === 'signup' && method === 'POST') {
       // self-registration from the rider screen: creates a rider + an individual customer; staff checks the ID before renting
@@ -990,7 +1016,7 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
         if (Array.isArray(body.points)) { const out = []; for (const pt of body.points) out.push(await telemetry(pt)); return ok(out); }
         return ok(await telemetry(body));
       }
-      if (a === 'portal') return await portalHandle(seg, method, body, token);
+      if (a === 'portal') return await portalHandle(seg, method, method === 'GET' ? query : body, token);
       const user = await userFromToken(token);
       if (!user) err(401, 'Oturum açın.');
       if (a === 'logout') { await db.run('DELETE FROM sessions WHERE token=?', [token]); return ok({ ok: true }); }

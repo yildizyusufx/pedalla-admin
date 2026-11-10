@@ -413,7 +413,9 @@ export const DEFAULT_SETTINGS = {
   portal_signup: '1',
   bike_types: BIKE_TYPES.join('\n'),
   company_name: 'Pedalla GmbH',
-  company_address: 'Stresemannstraße 250–252, 22769 Hamburg',
+  company_address: 'Missundestraße 50, 22769 Hamburg',
+  // where renters collect their bike (website booking, rider screen)
+  pickup_address: 'Missundestraße 50, 22769 Hamburg-Altona',
   company_phone: '+49 176 72241488',
   company_email: 'info@pedalla.bike',
   company_tax_no: '',

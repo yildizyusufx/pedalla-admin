@@ -71,7 +71,7 @@ function page(lang) {
     geo: { '@type': 'GeoCoordinates', latitude: SITE.stations[0].lat, longitude: SITE.stations[0].lng }, areaServed: 'Hamburg',
   };
   const runtime = {
-    lang, api: SITE.api, portal: SITE.portal, whatsapp: SITE.whatsapp, priceMode: SITE.priceMode, vat: SITE.vat, durations: SITE.durations,
+    lang, api: SITE.api, portal: SITE.portal, whatsapp: SITE.whatsapp, priceMode: SITE.priceMode, vat: SITE.vat, durations: SITE.durations, periods: SITE.periods, pickup: `${SITE.stations[0].street}, ${SITE.stations[0].zip}`,
     stations: SITE.stations, area: SITE.area, privacy: `${pre}datenschutz${EXT}`, pre,
     models: MODELS.map((m) => ({ sub: m.sub[lang], id: m.id, match: m.match.source, flags: m.match.flags, adminType: m.adminType, name: m.name, image: m.image, price: m.fallbackPrice, deposit: m.fallbackDeposit, tag: m.tag?.[lang] || '', desc: m.desc[lang], specs: m.specs[lang] })),
     generic: { sub: GENERIC.sub[lang], image: GENERIC.image, desc: GENERIC.desc[lang] },
@@ -79,7 +79,7 @@ function page(lang) {
   };
   const steps = [['bike', 'how1'], ['user', 'how2'], ['key', 'how3'], ['bolt', 'how4']];
   const inc = [['wrench', 'inc1'], ['shield', 'inc2'], ['phone', 'inc3'], ['chat', 'inc4'], ['calendar', 'inc5'], ['coin', 'inc6']];
-  const faq = [1, 2, 3, 4, 5, 6];
+  const faq = [7, 1, 2, 3, 4, 5, 6];
 
   return `<!doctype html>
 <html lang="${lang}">
@@ -106,43 +106,74 @@ function page(lang) {
 <a class="skip" href="#main">Skip</a>
 <header class="top" id="top">
   <div class="wrap top-in">
-    <div class="top-l">
-      <button class="round dark" id="burger" aria-label="${t.menu}" aria-expanded="false" aria-controls="nav">${ic('menu')}</button>
-      <nav class="nav" id="nav">
-        <a href="#modelle">${t.nav_models}</a><a href="#so-gehts">${t.nav_how}</a><a href="#karte">${t.nav_map}</a><a href="#business">${t.nav_business}</a><a class="nav-x" href="#faq">${t.nav_faq}</a>
-        <a class="nav-x" href="${SITE.portal}?lang=${lang}">${t.nav_login}</a>
-        <div class="nav-x nav-lang">${Object.keys(LANGS).map((l) => `<a href="${l === lang ? '#' : (lang === 'de' ? '' : '../') + (l === 'de' ? '' : l + '/') + IDX}" class="${l === lang ? 'on' : ''}" hreflang="${l}">${LANGS[l]}</a>`).join('')}</div>
-      </nav>
-    </div>
-    <a class="logo" href="${base(lang)}" aria-label="Pedalla"><img src="${pre}img/logo.png" alt="pedalla.bike" width="194" height="24"></a>
+    <a class="logo-pill" href="${base(lang)}" aria-label="Pedalla"><i><img src="${pre}img/mark.png" alt="" width="30" height="19"></i><img class="lp-word" src="${pre}img/wordmark-light.png" alt="pedalla.bike" width="120" height="19"></a>
+    <nav class="nav" id="nav" aria-label="${t.menu}">
+      <a href="#book" class="on">${ic('calendar')}<span>${t.nav_book}</span></a><a href="#modelle">${ic('bike')}<span>${t.nav_models}</span></a><a href="#so-gehts">${ic('route')}<span>${t.nav_how}</span></a><a href="#karte">${ic('pin')}<span>${t.nav_map}</span></a><a href="#business">${ic('globe')}<span>${t.nav_business}</span></a><a href="#faq">${ic('chat')}<span>${t.nav_faq}</span></a>
+      <div class="nav-x nav-lang">${Object.keys(LANGS).map((l) => `<a href="${l === lang ? '#' : (lang === 'de' ? '' : '../') + (l === 'de' ? '' : l + '/') + IDX}" class="${l === lang ? 'on' : ''}" hreflang="${l}">${LANGS[l]}</a>`).join('')}</div>
+    </nav>
     <div class="top-r">
       <div class="lang" role="navigation" aria-label="Language">${Object.keys(LANGS).map((l) => `<a href="${l === lang ? '#' : (lang === 'de' ? '' : '../') + (l === 'de' ? '' : l + '/') + IDX}" class="${l === lang ? 'on' : ''}" hreflang="${l}" lang="${l}" title="${LANGS[l]}">${l.toUpperCase()}</a>`).join('')}</div>
-      <div class="contact hide-m"><a class="pillbtn" href="https://wa.me/${SITE.whatsapp}" target="_blank" rel="noopener">${t.foot_contact}</a><a class="round light" href="tel:${SITE.phone.replace(/\s/g, '')}" aria-label="${SITE.phone}">${ic('phone')}</a></div>
-      <button class="rentbtn" data-rent=""><span>${t.cta_rent}</span><i>${ic('bike')}</i></button>
+      <a class="round light hide-s" href="https://wa.me/${SITE.whatsapp}" target="_blank" rel="noopener" aria-label="WhatsApp">${ic('wa')}</a>
+      <a class="login-pill" href="${SITE.portal}?lang=${lang}" title="${t.nav_login}"><span>${t.nav_login}</span><i>${ic('user')}</i></a>
+      <button class="round dark burger" id="burger" aria-label="${t.menu}" aria-expanded="false" aria-controls="nav">${ic('menu')}</button>
     </div>
   </div>
 </header>
 
 <main id="main">
-<section class="hero wrap">
-  <div class="hero-box" id="hero">
-    <div class="stage" aria-hidden="true"><i class="st-main"></i><i class="st-tab"></i><i class="st-join"></i><i class="st-notch"></i><i class="st-c1"></i><i class="st-c2"></i></div>
-    <h1 class="hero-h"><span>${t.hero_h1a}</span><span class="badges" aria-hidden="true"><i class="bd-img"><img src="${pre}img/mark.png" alt=""></i><i class="bd-bolt">${ic('bolt')}</i></span><br><span class="red">${t.hero_h1b}</span> ${t.hero_h1c}</h1>
-    <div class="hero-live" id="heroFree">
-      <div class="stack">${MODELS.slice(0, 2).map((m) => `<i><img src="${pre}${m.image}" alt=""></i>`).join('')}<i class="plus">+</i></div>
-      <p><b class="lv1">${t.chip_service} · ${t.chip_ins}</b><span class="lv2">${t.chip_fees}</span></p>
+<section class="book wrap" id="book" aria-label="${t.sched_h}">
+  <div class="bk">
+    <div class="bk-col bk-left">
+      <div class="card hello">
+        <span class="eyebrow"><span class="dot"></span>${t.hello_eyebrow}</span>
+        <h1>${t.hero_h1a} <span class="red">${t.hero_h1b}</span> ${t.hero_h1c}</h1>
+        <p class="muted">${t.hello_p}</p>
+        <div class="hello-b"><a class="btn dark" href="#sched">${ic('calendar')} ${t.hello_cta}</a><span class="chips"><span>${ic('wrench')}${t.chip_service}</span><span>${ic('shield')}${t.chip_ins}</span></span></div>
+        <img class="hello-mark" src="${pre}img/mark.png" alt="" aria-hidden="true">
+      </div>
+      <div class="card types">
+        <div class="card-h"><h2>${t.types_h}</h2><span class="live-dot" id="liveDot" hidden></span></div>
+        <div class="tt" role="table"><div class="tt-h" role="row"><span role="columnheader">${t.col_bike}</span><span role="columnheader">${t.col_price}</span><span role="columnheader">${t.col_status}</span></div>
+          <div id="typeRows">${MODELS.slice(0, 2).map((m) => `<button class="tt-r" data-pick="${m.id}" role="row"><span class="tt-b"><i><img src="${pre}${m.image}" alt=""></i><b>${esc(m.name)}</b></span><span>€${price(m.fallbackPrice)}${t.per_month}</span><span><em class="st">${t.st_req}</em></span></button>`).join('')}</div></div>
+      </div>
     </div>
-    <img class="hero-bike" id="heroBike" src="${pre}${fat.image}" alt="${esc(fat.name)}" width="1069" height="1100" fetchpriority="high">
-    <div class="spot" id="spot">
-      <h2 class="spot-name">${esc(fat.name)}</h2>
-      <span class="spot-sub">${esc(fat.sub[lang])}</span>
-      <p class="spot-desc">${esc(fat.desc[lang])}</p>
-      <p class="spot-price">${t.starting_from} <b data-from="${fat.id}">€${price(fat.fallbackPrice)}</b>${t.per_month} · <a href="#" data-details="${fat.id}">${t.more_details}</a></p>
+
+    <div class="bk-col bk-mid">
+      <div class="card hero-card" id="heroCard">
+        <i class="hc-stripe" aria-hidden="true"></i>
+        <img class="hc-bike" id="heroBike" src="${pre}${fat.image}" alt="${esc(fat.name)}" width="1069" height="1100" fetchpriority="high">
+        <div class="hc-dots" id="heroDots" role="tablist" aria-label="${t.nav_models}"></div>
+        <div class="bubbles">
+          <div class="bub"><i>${ic('shield')}</i><b id="bDeposit">€${price(fat.fallbackDeposit)}</b><small>${t.b_deposit}</small></div>
+          <div class="bub dark"><i>${ic('coin')}</i><b id="bPrice">€${price(fat.fallbackPrice)}</b><small id="bPer">${t.per_month.replace('/', '')}</small></div>
+          <div class="bub"><i>${ic('bike')}</i><b id="bFree">–</b><small>${t.b_free}</small></div>
+        </div>
+        <div class="glass">
+          <div class="glass-h"><h2 id="hcName">${esc(fat.name)}</h2><span class="tag" id="hcSub">${esc(fat.sub[lang])}</span></div>
+          <p id="hcDesc">${esc(fat.desc[lang])}</p>
+          <a href="#" class="link" data-details="${fat.id}" id="hcMore">${t.more_details} ${ic('arrow')}</a>
+        </div>
+        <button class="btn black xl" id="hcBook" data-book>${t.b_book}</button>
+      </div>
     </div>
-    <button class="btn red lg hero-cta-m" data-rent="">${t.cta_rent} ${ic('arrow')}</button>
-    <button class="hero-go" data-rent="${fat.id}" aria-label="${t.cta_rent}">${ic('arrow')}</button>
-    <div class="hero-models" id="heroModels" role="tablist" aria-label="${t.nav_models}">
-      ${MODELS.slice(0, 2).map((m, i) => `<button class="hm ${i === 0 ? 'on' : ''}" data-hero="${m.id}" role="tab" aria-selected="${i === 0}"><span class="hm-img"><img src="${pre}${m.image}" alt=""></span><span><b>${esc(m.name)}</b><small>€${price(m.fallbackPrice)}${t.per_month}</small></span></button>`).join('')}
+
+    <div class="bk-col bk-right" id="sched">
+      <div class="card sched-h"><h2>${t.sched_h}</h2><span class="round soft">${ic('calendar')}</span></div>
+      <div class="card sched">
+        <div class="per-tabs" id="perTabs" role="tablist" aria-label="${t.sched_dur}"></div>
+        <div class="sched-in">
+          <div class="durs-l" id="durList" role="radiogroup" aria-label="${t.sched_dur}"></div>
+          <div class="cal" id="cal" aria-live="polite"></div>
+        </div>
+        <div class="bsum" id="bsum"></div>
+        <p class="bavail" id="bAvail" aria-live="polite"></p>
+        <div class="sched-a"><button class="btn ghost" id="bReset" type="button">${t.b_reset}</button><button class="btn red" id="bNext" type="button" data-go>${t.b_next} ${ic('arrow')}</button></div>
+      </div>
+      <div class="card pick">
+        <span class="pick-ic">${ic('pin')}</span>
+        <div><h3>${t.pick_h}</h3><b>${esc(SITE.stations[0].street)}, ${esc(SITE.stations[0].zip)}</b><p class="muted">${t.pick_p}</p>
+          <a class="link" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(SITE.stations[0].street + ', ' + SITE.stations[0].zip)}">${ic('route')} ${t.map_route}</a></div>
+      </div>
     </div>
   </div>
 </section>

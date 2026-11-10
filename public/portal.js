@@ -109,6 +109,10 @@ const L = {
     n_service_ready: 'Your bike {bike} is ready ({no}). You can pick it up.',
   },
 };
+// stat bubbles on the home screen + pick-up address (2026-11 redesign)
+Object.assign(L.tr, { st_h: 'Özet', st_left: 'gün kaldı', st_late: 'gün gecikti', st_of: '{n} günden', st_pay: 'ödemeye', st_pay_none: 'açık ödeme yok', st_battery: 'batarya', st_service: 'bakıma', st_service_late: 'bakım gecikti', st_km: 'km', st_start: 'gün sonra başlıyor', pickup_h: 'Bisikletini buradan teslim alırsın', pickup_p: 'Teslim saatini telefon veya WhatsApp ile onaylıyoruz. Kimliğinin aslını ve depozitoyu getir.', pickup_route: 'Yol tarifi', pickup_req: 'Kiralama talebin alındı ({date}).' });
+Object.assign(L.de, { st_h: 'Überblick', st_left: 'Tage übrig', st_late: 'Tage überfällig', st_of: 'von {n} Tagen', st_pay: 'bis zur Zahlung', st_pay_none: 'nichts offen', st_battery: 'Akku', st_service: 'bis Inspektion', st_service_late: 'Inspektion fällig', st_km: 'km', st_start: 'Tage bis Start', pickup_h: 'Hier holst du dein Rad ab', pickup_p: 'Den Abholtermin bestätigen wir per Telefon oder WhatsApp. Bitte Ausweis im Original und Kaution mitbringen.', pickup_route: 'Route planen', pickup_req: 'Deine Mietanfrage ist eingegangen ({date}).' });
+Object.assign(L.en, { st_h: 'Overview', st_left: 'days left', st_late: 'days overdue', st_of: 'of {n} days', st_pay: 'to payment', st_pay_none: 'nothing due', st_battery: 'battery', st_service: 'to service', st_service_late: 'service due', st_km: 'km', st_start: 'days to start', pickup_h: 'Pick up your bike here', pickup_p: 'We confirm the pick-up time by phone or WhatsApp. Please bring your original ID and the deposit.', pickup_route: 'Get directions', pickup_req: 'We received your rental request ({date}).' });
 const LANGS = [['tr', 'TR'], ['de', 'DE'], ['en', 'EN']];
 const store = { get: (k) => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} } };
 const guessLang = () => { const n = (navigator.language || 'de').slice(0, 2); return L[n] ? n : 'de'; };
@@ -162,7 +166,7 @@ const IC = {
   wrench: '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.5-.5-.5-2.5z"/>', alert: '<path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17h.01"/>',
   back: '<path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-2"/>', plus: '<path d="M12 6v12M6 12h12"/>', cam: '<path d="M4 7h3l2-3h6l2 3h3v13H4z"/><circle cx="12" cy="13" r="4"/>',
   phone: '<path d="M5 3h4l2 5-3 2a11 11 0 0 0 6 6l2-3 5 2v4a2 2 0 0 1-2 2A17 17 0 0 1 3 5a2 2 0 0 1 2-2"/>', mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>',
-  check: '<path d="m5 12 5 5 9-10"/>', x: '<path d="M6 6l12 12M18 6 6 18"/>', bell: '<path d="M6 8a6 6 0 1 1 12 0c0 7 3 8 3 8H3s3-1 3-8"/><path d="M10 20a2 2 0 0 0 4 0"/>',
+  check: '<path d="m5 12 5 5 9-10"/>', pin: '<path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>', bolt: '<path d="M13 2 4.5 13.5H12L11 22l8.5-11.5H12z"/>', x: '<path d="M6 6l12 12M18 6 6 18"/>', bell: '<path d="M6 8a6 6 0 1 1 12 0c0 7 3 8 3 8H3s3-1 3-8"/><path d="M10 20a2 2 0 0 0 4 0"/>',
 };
 const ic = (n) => `<svg viewBox="0 0 24 24" class="ic" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${IC[n] || ''}</svg>`;
 const badge = (s) => `<span class="badge b-${{ aktif: 'brand', rezervasyon: 'info', 'açık': 'warn', 'kısmi': 'info', 'ödendi': 'ok', yeni: 'info', 'onaylandı': 'ok', 'reddedildi': 'danger', 'tamamlandı': 'muted', iptal: 'muted', 'hazır': 'ok', 'teslim edildi': 'muted' }[s] || 'warn'}">${esc(v(s))}</span>`;
@@ -225,10 +229,44 @@ function bikeCard(x) {
     <div><dt>${t('next_service')}</dt><dd class="${x.next_service_date && x.next_service_date <= addDays(todayISO(), 14) ? 't-warn' : ''}">${date(x.next_service_date)}</dd></div>
     ${x.deposit_amount ? `<div><dt>${t('deposit')}</dt><dd>${money(x.deposit_held || 0)} / ${money(x.deposit_amount)}</dd></div>` : ''}${x.plan_name ? `<div><dt>${t('plan')}</dt><dd>${esc(x.plan_name)}</dd></div>` : ''}</dl></div>`;
 }
+const dDiff = (a, b) => Math.round((new Date(b + 'T00:00:00Z') - new Date(a + 'T00:00:00Z')) / 864e5);
+// round stat bubbles: days left in the rental (ring), next payment, battery, next service
+function statsView() {
+  const d = data; const x = d.rentals.find((r) => r.status === 'aktif') || d.rentals.find((r) => r.status === 'rezervasyon');
+  if (!x) return '';
+  const today = todayISO(); const b = [];
+  if (x.status === 'rezervasyon') {
+    const n = Math.max(0, dDiff(today, x.start_date));
+    b.push(`<div class="st-bub big dark" style="--p:0"><b>${n}</b><small>${t('st_start')}</small></div>`);
+  } else {
+    const total = Math.max(1, dDiff(x.start_date, x.end_date)); const left = dDiff(today, x.end_date);
+    const pct = Math.min(100, Math.max(0, Math.round(((total - Math.max(0, left)) / total) * 100)));
+    b.push(`<div class="st-bub big dark ${left < 0 ? 'late' : left <= 7 ? 'soon' : ''}" style="--p:${left < 0 ? 100 : pct}"><b>${Math.abs(left)}</b><small>${t(left < 0 ? 'st_late' : 'st_left')}</small><em>${t('st_of', { n: total })}</em></div>`);
+  }
+  const nd = d.summary.next_due; const nc = d.rentals.find((r) => r.next_charge)?.next_charge;
+  if (d.payer) {
+    if (nd) { const n = dDiff(today, nd.due_date); b.push(`<div class="st-bub ${n < 0 ? 'bad' : ''}" data-tab="pay"><i>${ic('pay')}</i><b>${n < 0 ? '!' : n}</b><small>${n < 0 ? t('overdue') : t('st_pay')}</small><em>${money(nd.balance)}</em></div>`); }
+    else if (nc) { const n = Math.max(0, dDiff(today, nc.date)); b.push(`<div class="st-bub" data-tab="pay"><i>${ic('pay')}</i><b>${n}</b><small>${t('st_pay')}</small><em>${money(nc.amount)}</em></div>`); }
+    else b.push(`<div class="st-bub" data-tab="pay"><i>${ic('check')}</i><b>€0</b><small>${t('st_pay_none')}</small></div>`);
+  }
+  if (x.battery_level != null) b.push(`<div class="st-bub ${x.battery_level < 20 ? 'bad' : ''}"><i>${ic('bolt')}</i><b>${x.battery_level}%</b><small>${t('st_battery')}</small></div>`);
+  if (x.next_service_date) { const n = dDiff(today, x.next_service_date); b.push(`<div class="st-bub ${n < 0 ? 'bad' : n <= 14 ? 'warn' : ''}" ${n <= 14 ? 'data-new="servis randevusu"' : ''}><i>${ic('wrench')}</i><b>${n < 0 ? '!' : n}</b><small>${t(n < 0 ? 'st_service_late' : 'st_service')}</small></div>`); }
+  else if (x.odometer_km != null) b.push(`<div class="st-bub"><i>${ic('bike')}</i><b>${num(x.odometer_km)}</b><small>${t('st_km')}</small></div>`);
+  return `<section class="p-stats"><div class="st-row">${b.join('')}</div></section>`;
+}
+function pickupView() {
+  const d = data; const addr = d.company?.pickup || d.company?.address; if (!addr) return '';
+  const req = d.requests.find((q) => q.type === 'yeni kiralama' && ['yeni', 'onaylandı'].includes(q.status));
+  const res = d.rentals.find((r) => r.status === 'rezervasyon');
+  if (!req && !res) return '';
+  return `<section class="p-card p-pick"><span class="p-pick-ic">${ic('pin')}</span><div><small class="muted">${req ? t('pickup_req', { date: date(req.preferred_date) }) : ''}</small><b>${t('pickup_h')}</b>
+    <div class="p-pick-addr">${esc(addr)}</div><p class="muted">${t('pickup_p')}</p>
+    <a class="btn sm" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(addr)}">${ic('pin')} ${t('pickup_route')}</a></div></section>`;
+}
 function homeView() {
   const d = data; const act = d.rentals.filter((x) => ['aktif', 'rezervasyon'].includes(x.status));
   const nd = d.summary.next_due; const nc = d.rentals.find((x) => x.next_charge)?.next_charge;
-  return `${locDenied && store.get(LOC_KEY) !== 'off' && navigator.geolocation ? `<section class="p-card p-loc"><b>📍 ${t('loc_h')}</b><p class="muted">${t('loc_denied')}</p><div class="p-row"><button class="btn primary" data-loc="on">${t('loc_allow')}</button><button class="btn ghost" data-loc="off">${t('loc_later')}</button></div></section>` : ''}<section><h2 class="p-h">${t('notices')}</h2>${d.notifications.length ? d.notifications.map(notice).join('') : `<div class="p-card p-empty">${ic('check')} ${t('no_notices')}</div>`}</section>
+  return `${locDenied && store.get(LOC_KEY) !== 'off' && navigator.geolocation ? `<section class="p-card p-loc"><b>📍 ${t('loc_h')}</b><p class="muted">${t('loc_denied')}</p><div class="p-row"><button class="btn primary" data-loc="on">${t('loc_allow')}</button><button class="btn ghost" data-loc="off">${t('loc_later')}</button></div></section>` : ''}${statsView()}${pickupView()}<section><h2 class="p-h">${t('notices')}</h2>${d.notifications.length ? d.notifications.map(notice).join('') : `<div class="p-card p-empty">${ic('check')} ${t('no_notices')}</div>`}</section>
   ${fresh || (d.self_registered && !d.rentals.length && !d.requests.length) ? `<div class="p-card p-welcome">${ic('check')} ${t('welcome_new')}</div>` : ''}
   <section><h2 class="p-h">${t('my_bike')}</h2>${act.length ? act.map(bikeCard).join('') : `<div class="p-card p-empty">${t('no_rental')}${d.requests.some((q) => q.type === 'yeni kiralama' && q.status === 'yeni') ? '' : `<p><b>${t('rent_cta')}</b></p><button class="btn primary p-big" data-new="yeni kiralama">${ic('bike')} ${t('rent_btn')}</button>`}</div>`}</section>
   ${act.length ? `<section><h2 class="p-h">${t('quick')}</h2><div class="p-quick">
@@ -304,7 +342,7 @@ function shell(pre) {
   const d = data; if (!TABS.some(([k]) => k === tab)) tab = 'home';
   const body = { home: homeView, req: () => requestsView(pre), pay: paymentsView, docs: docsView, me: profileView }[tab]();
   const dots = { home: d.notifications.filter((n) => n.level === 'danger' || n.level === 'warn').length, docs: d.missing_docs.length, pay: d.invoices.filter((i) => i.days_late).length };
-  root().innerHTML = `<header class="p-top"><img src="img/logo.png" alt="pedalla" class="p-top-logo"><span class="p-top-tag">${t('title')}</span><span class="grow"></span>${tab === 'me' ? '' : langSw()}</header>
+  root().innerHTML = `<header class="p-top"><span class="p-logo-pill"><i><img src="img/mark.png" alt=""></i><img src="img/wordmark-light.png" alt="pedalla" class="p-top-logo"></span><span class="p-top-tag">${t('title')}</span><span class="grow"></span>${tab === 'me' ? '' : langSw()}</header>
   <main class="p-main">${tab === 'home' ? `<div class="p-hello">${t('hello')}, <b>${esc(d.rider.name.split(' ')[0])}</b> 👋</div>` : `<h1 class="p-title">${t(TABS.find(([k]) => k === tab)[1])}</h1>`}${body}</main>
   <nav class="p-nav">${TABS.map(([k, l, i]) => `<a href="#${k}" class="${k === tab ? 'on' : ''}">${ic(i)}<span>${t(l)}</span>${dots[k] ? `<i class="p-dot">${dots[k]}</i>` : ''}</a>`).join('')}</nav>`;
   bind();
