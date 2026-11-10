@@ -166,7 +166,7 @@
     if (!stay && window.innerWidth < 1100) $('#heroCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
   function renderBox(swap) {
-    if (!bk.model || !byId(bk.model)) bk.model = (models.find((m) => m.id === 'fat' && freeOf(m) !== 0) || models.find((m) => freeOf(m) > 0) || models[0])?.id;
+    if (!bk.model || !byId(bk.model)) bk.model = (models.find((m) => freeOf(m) > 0 && planOf(m)?.price != null) || models.find((m) => planOf(m)?.price != null) || models.find((m) => freeOf(m) > 0) || models[0])?.id;
     const m = cur(); if (!m) return;
     const pl = planOf(m);
     // type rows
@@ -181,11 +181,12 @@
     const apply = () => {
       if (bike.getAttribute('src') !== img(m.image)) bike.src = img(m.image);
       bike.alt = m.name; bike.classList.remove('swap');
+      bike.classList.toggle('png', /^data:image\/(png|webp)|\.(png|webp|svg)(\?|$)/i.test(bike.getAttribute('src') || ''));
     };
     if (swap && bike.getAttribute('src') !== img(m.image)) { bike.classList.add('swap'); setTimeout(apply, 200); } else apply();
     $('#hcName').textContent = m.name; $('#hcSub').textContent = m.sub || P.generic.sub; $('#hcDesc').textContent = m.desc; $('#hcMore').dataset.details = m.id;
     $('#bPrice').textContent = pl?.price != null ? money(pl.price) : pl ? '?' : '–'; $('#bPer').textContent = per(bk.period).replace('/', '');
-    $('#bDeposit').textContent = pl?.deposit ? money(pl.deposit) : '€0';
+    $('#bDeposit').textContent = pl?.price == null ? '?' : pl.deposit ? money(pl.deposit) : '€0';
     const f = freeOf(m); $('#bFree').textContent = f == null ? '–' : f;
     // period tabs (only when more than one period is switched on in the admin panel)
     const tabs = $('#perTabs'); tabs.hidden = periods.length < 2;

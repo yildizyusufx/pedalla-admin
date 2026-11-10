@@ -1115,8 +1115,14 @@ async function settingsPage() {
       const f = inp.files[0]; if (!f) return;
       const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('Görsel okunamadı.')); i.src = URL.createObjectURL(f); });
       const k = Math.min(1, 900 / Math.max(img.width, img.height)); const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
-      const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height);
-      await PUT('bike-types', { type: list[inp.dataset.bt].name, data: c.toDataURL('image/jpeg', 0.82) }); toast('Görsel kaydedildi'); drawTypeImgs();
+      // PNG/WebP keep their transparent background (stored as WebP, or PNG where the browser cannot write WebP); photos become JPEG
+      const alpha = /png|webp|gif/i.test(f.type); const g = c.getContext('2d');
+      if (!alpha) { g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); }
+      g.drawImage(img, 0, 0, c.width, c.height);
+      let data = alpha ? c.toDataURL('image/webp', 0.86) : c.toDataURL('image/jpeg', 0.82);
+      if (alpha && !data.startsWith('data:image/webp')) data = c.toDataURL('image/png');
+      if (data.length > 690000) { const s2 = document.createElement('canvas'); s2.width = Math.round(c.width * 0.6); s2.height = Math.round(c.height * 0.6); s2.getContext('2d').drawImage(c, 0, 0, s2.width, s2.height); data = s2.toDataURL(data.startsWith('data:image/jpeg') ? 'image/jpeg' : 'image/png', 0.82); }
+      await PUT('bike-types', { type: list[inp.dataset.bt].name, data }); toast('Görsel kaydedildi'); drawTypeImgs();
     }));
     box.querySelectorAll('[data-btdel]').forEach((b) => b.onclick = guard(async () => { await PUT('bike-types', { type: list[b.dataset.btdel].name, data: null }); drawTypeImgs(); }));
   };
