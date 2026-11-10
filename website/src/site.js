@@ -14,18 +14,20 @@
   // ---------- models: marketing data + live catalog from the admin panel ----------
   const fallback = P.models.slice(0, 2).map((m) => ({ ...m, type: m.adminType, available: null, period: 'ay', plans: [{ period: 'ay', price: m.price, deposit: m.deposit }] }));
   let models = fallback; let catalog = null;
-  const marketing = (name) => P.models.find((m) => new RegExp(m.match, m.flags).test(name));
+  // marketing texts only for a type with exactly that name in the admin panel; other types show their own name
+  const marketing = (name) => P.models.find((m) => m.adminType === name);
   function fromCatalog(c) {
     const used = new Set();
-    return c.types.filter((x) => x.price != null).map((x) => {
+    // every bike type from Ayarlar → Bisiklet tipleri is offered; a type without a price plan is bookable "on request"
+    return c.types.map((x) => {
       let m = marketing(x.name); if (m && used.has(m.id)) m = null; if (m) used.add(m.id);
       return {
         id: m?.id || 'type-' + x.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'), type: x.name, name: m?.name || x.name, tag: m?.tag || '',
         sub: m?.sub || P.generic.sub, desc: m?.desc || P.generic.desc, specs: m?.specs || [], image: x.image || m?.image || P.generic.image,
         price: x.price, deposit: x.deposit, period: x.period || 'ay', available: x.available,
-        plans: x.plans?.length ? x.plans : [{ period: x.period || 'ay', price: x.price, deposit: x.deposit }],
+        plans: x.plans?.length ? x.plans : x.price != null ? [{ period: x.period || 'ay', price: x.price, deposit: x.deposit }] : [],
       };
-    }).sort((a, b) => (b.available > 0) - (a.available > 0) || a.price - b.price);
+    }).sort((a, b) => (b.available > 0) - (a.available > 0) || (a.price ?? 1e9) - (b.price ?? 1e9));
   }
   const byId = (id) => models.find((m) => m.id === id);
 
@@ -33,7 +35,7 @@
     return `<article class="bike rv in" data-model="${esc(m.id)}">
       <div class="bike-img"><span class="bike-tag">${esc(m.tag)}</span><img src="${esc(img(m.image))}" alt="${esc(m.name)}" loading="lazy"></div>
       <div class="bike-body"><h3>${esc(m.name)}</h3><p>${esc(m.desc)}</p>
-        <div class="bike-price"><span class="muted">${T.starting_from}</span><b class="pill">${money(m.price)}${per(m.period)}</b>${m.available == null ? '' : `<span class="avail ${m.available ? '' : 'none'}">${m.available ? fill(T.available_n, { n: m.available }) : T.available_0}</span>`}</div></div>
+        <div class="bike-price">${m.price == null ? `<b class="pill">${T.st_req}</b>` : `<span class="muted">${T.starting_from}</span><b class="pill">${money(m.price)}${per(m.period)}</b>`}${m.available == null ? '' : `<span class="avail ${m.available ? '' : 'none'}">${m.available ? fill(T.available_n, { n: m.available }) : T.available_0}</span>`}</div></div>
       <div class="bike-actions"><button class="btn ghost" data-details="${esc(m.id)}">${T.more_details}</button><button class="btn dark" data-rent="${esc(m.id)}">${T.rent_now}</button></div></article>`;
   }
   function renderCards() {
@@ -76,7 +78,7 @@
       // spread bikes that share the same rounded spot a little so each dot is visible
       const lat = f.lat + (n - 1) * 0.0004 * Math.sin(n * 2.4); const lng = f.lng + (n - 1) * 0.0006 * Math.cos(n * 2.4);
       const m = models.find((x) => x.type === f.type);
-      L.marker([lat, lng], { icon }).addTo(fleetLayer).bindPopup(`<b>${esc(m?.name || f.type)}</b><br>${m ? `${T.starting_from} ${money(m.price)}${per(m.period)}<br>` : ''}<a href="#" data-rent="${esc(m?.id || '')}">${T.rent_now} →</a>`);
+      L.marker([lat, lng], { icon }).addTo(fleetLayer).bindPopup(`<b>${esc(m?.name || f.type)}</b><br>${m && m.price != null ? `${T.starting_from} ${money(m.price)}${per(m.period)}<br>` : ''}<a href="#" data-rent="${esc(m?.id || '')}">${T.rent_now} →</a>`);
     }
   }
   const mapObs = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) { initMap(); mapObs.disconnect(); } }, { rootMargin: '300px' });
@@ -114,7 +116,7 @@
     open(`<div class="det"><div class="det-img"><img src="${esc(img(m.image))}" alt="${esc(m.name)}"></div><div>
       ${m.tag ? `<span class="bike-tag" style="position:static">${esc(m.tag)}</span>` : ''}
       <h2 id="modalTitle">${esc(m.name)}</h2><p class="muted">${esc(m.desc)}</p>
-      <div class="price-big">${money(m.price)} <small>${per(m.period)} · ${P.priceMode === 'gross' ? T.vat_gross : T.vat_net}</small></div>
+      <div class="price-big">${m.price == null ? T.st_req : `${money(m.price)} <small>${per(m.period)} · ${P.priceMode === 'gross' ? T.vat_gross : T.vat_net}</small>`}</div>
       ${m.deposit ? `<small class="muted">${T.deposit}: ${money(m.deposit)}</small>` : ''}
       ${m.specs.length ? `<ul>${m.specs.map((s) => `<li>${IC.check}${esc(s)}</li>`).join('')}</ul>` : ''}
       <div class="incl-note">${IC.shield}${T.d_incl}</div>
@@ -135,7 +137,9 @@
   let periods = (P.periods || ['ay']).slice();
   const bk = { model: null, period: periods[0], dur: durOpts(periods[0])[0], date: tomorrow(), month: tomorrow().slice(0, 7), avail: null, checking: false };
   const endOf = () => (bk.period === 'ay' ? addD(addM(bk.date, bk.dur), -1) : addD(bk.date, (bk.period === 'hafta' ? 7 : 1) * bk.dur - 1));
-  const planOf = (m, p = bk.period) => (m?.plans || []).find((x) => x.period === p && x.price != null) || null;
+  // no price plan at all → bookable on request (price null); plans exist but not for this period → not bookable
+  const planOf = (m, p = bk.period) => (!m ? null : !(m.plans || []).length ? { period: p, price: null, deposit: null } : m.plans.find((x) => x.period === p && x.price != null) || null);
+  const priceTxt = (pl, mult = 1) => (pl?.price == null ? T.st_req : money(pl.price * mult));
   const freeOf = (m) => (bk.avail && m && m.type in bk.avail ? bk.avail[m.type] : m?.available ?? null);
   const cur = () => byId(bk.model);
 
@@ -169,7 +173,7 @@
     $('#typeRows').innerHTML = models.map((x) => {
       const p = planOf(x); const f = freeOf(x);
       const st = !p ? `<em class="st off">${T.no_plan}</em>` : f == null ? `<em class="st">${T.st_req}</em>` : f > 0 ? `<em class="st ok">${fill(T.st_free, { n: f })}</em>` : `<em class="st no">${T.st_none}</em>`;
-      return `<button class="tt-r ${x.id === bk.model ? 'on' : ''}" data-pick="${esc(x.id)}" role="row" aria-pressed="${x.id === bk.model}"><span class="tt-b"><i><img src="${esc(img(x.image))}" alt=""></i><b>${esc(x.name)}</b></span><span>${p ? money(p.price) + per(bk.period) : '–'}</span><span>${st}</span></button>`;
+      return `<button class="tt-r ${x.id === bk.model ? 'on' : ''}" data-pick="${esc(x.id)}" role="row" aria-pressed="${x.id === bk.model}"><span class="tt-b"><i><img src="${esc(img(x.image))}" alt=""></i><b>${esc(x.name)}</b></span><span>${!p ? '–' : p.price == null ? T.st_req : money(p.price) + per(bk.period)}</span><span>${st}</span></button>`;
     }).join('');
     // hero card
     $('#heroDots').innerHTML = models.map((x) => `<button class="${x.id === bk.model ? 'on' : ''}" data-pick="${esc(x.id)}" role="tab" aria-selected="${x.id === bk.model}" aria-label="${esc(x.name)}"></button>`).join('');
@@ -180,7 +184,7 @@
     };
     if (swap && bike.getAttribute('src') !== img(m.image)) { bike.classList.add('swap'); setTimeout(apply, 200); } else apply();
     $('#hcName').textContent = m.name; $('#hcSub').textContent = m.sub || P.generic.sub; $('#hcDesc').textContent = m.desc; $('#hcMore').dataset.details = m.id;
-    $('#bPrice').textContent = pl ? money(pl.price) : '–'; $('#bPer').textContent = per(bk.period).replace('/', '');
+    $('#bPrice').textContent = pl?.price != null ? money(pl.price) : pl ? '?' : '–'; $('#bPer').textContent = per(bk.period).replace('/', '');
     $('#bDeposit').textContent = pl?.deposit ? money(pl.deposit) : '€0';
     const f = freeOf(m); $('#bFree').textContent = f == null ? '–' : f;
     // period tabs (only when more than one period is switched on in the admin panel)
@@ -191,7 +195,7 @@
     // summary
     const end = endOf();
     $('#bsum').innerHTML = `<div class="bs-d"><span><small>${T.sum_pick}</small><b>${fmtNice(bk.date)}</b></span><i>${ICON('<path d="M5 12h14M13 6l6 6-6 6"/>')}</i><span><small>${T.sum_ret}</small><b>${fmtNice(end)}</b></span></div>
-      <div class="bs-r"><span>${fill(T.sum_total, { dur: durLabel(bk.period, bk.dur) })}</span><b>${pl ? money(pl.price * bk.dur) : '–'}</b></div>
+      <div class="bs-r"><span>${fill(T.sum_total, { dur: durLabel(bk.period, bk.dur) })}</span><b>${pl ? priceTxt(pl, bk.dur) : '–'}</b></div>
       ${pl?.deposit ? `<div class="bs-r"><span>${T.r_sum_dep}</span><b>${money(pl.deposit)}</b></div>` : ''}
       <small class="muted">${P.priceMode === 'gross' ? T.vat_gross : T.vat_net}</small>`;
     const av = $('#bAvail');
@@ -259,9 +263,9 @@
   const stepper = (n) => `<div class="stepper">${[T.r_step1, T.r_step2, T.r_step3].map((s, i) => `<span class="${i < n ? 'on' : ''}">${i + 1}. ${s}</span>`).join('')}</div>`;
   function summary() {
     const m = cur(); const pl = planOf(m); if (!m || !pl) return '';
-    return `<div class="sum"><div class="sum-bike"><img src="${esc(img(m.image))}" alt=""><span><b>${esc(m.name)}</b><small>${money(pl.price)}${per(bk.period)}</small></span></div>
+    return `<div class="sum"><div class="sum-bike"><img src="${esc(img(m.image))}" alt=""><span><b>${esc(m.name)}</b><small>${pl.price == null ? T.st_req : money(pl.price) + per(bk.period)}</small></span></div>
       <div><span>${T.r_when}</span><b>${fmtDate(bk.date)} – ${fmtDate(endOf())}</b></div>
-      <div><span>${T.r_sum_total} (${durLabel(bk.period, bk.dur)})</span><b>${money(pl.price * bk.dur)}</b></div>
+      <div><span>${T.r_sum_total} (${durLabel(bk.period, bk.dur)})</span><b>${priceTxt(pl, bk.dur)}</b></div>
       ${pl.deposit ? `<div><span>${T.r_sum_dep}</span><b>${money(pl.deposit)}</b></div>` : ''}
       <div class="tot pick-row"><span>${T.sum_pick}</span><b>${esc(P.pickup)}</b></div>
       <div><small class="muted">${P.priceMode === 'gross' ? T.vat_gross : T.vat_net}</small></div></div>`;
@@ -346,6 +350,15 @@
   // header: shadow on scroll + mobile menu
   const top = $('#top'); const nav = $('#nav'); const burger = $('#burger');
   const onScroll = () => top.classList.toggle('scrolled', window.scrollY > 8); onScroll(); window.addEventListener('scroll', onScroll, { passive: true });
+  // header fit: long labels (TR/EN) must never be cut off – first drop icons/extra buttons, then fall back to the menu button
+  function fitNav() {
+    top.classList.remove('compact', 'collapsed');
+    if (window.innerWidth <= 1100) return;
+    const over = () => nav.scrollWidth > nav.clientWidth + 1 || top.querySelector('.top-in').scrollWidth > top.querySelector('.top-in').clientWidth + 1;
+    if (over()) top.classList.add('compact');
+    if (over()) top.classList.add('collapsed');
+  }
+  fitNav(); window.addEventListener('resize', fitNav); document.fonts?.ready.then(fitNav);
   function toggleNav(on) { nav.classList.toggle('open', on); burger.setAttribute('aria-expanded', on); }
   burger.addEventListener('click', () => toggleNav(!nav.classList.contains('open')));
 

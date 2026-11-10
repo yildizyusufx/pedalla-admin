@@ -487,3 +487,17 @@ html.ready .pdl-intro { opacity: 0; visibility: hidden; pointer-events: none; }
 .sum-bike b { display: block; } .sum-bike small { color: var(--ink-2); }
 .sum .pick-row b { text-align: right; }
 .done .pick-tip { background: var(--red-l); color: var(--red-d); font-weight: 600; }
+
+/* header fit (set by site.js when labels do not fit, e.g. Turkish) */
+.top.compact .nav > a .ic, .top.compact .top-r .hide-s, .top.compact .login-pill span { display: none; }
+.top.compact .nav > a { padding: 0 11px; font-size: 14px; }
+.top.compact .login-pill { padding: 0 4px; background: none; }
+.top.collapsed .burger { display: inline-grid; }
+.top.collapsed .top-in { justify-content: space-between; }
+.top.collapsed .nav:not(.open) { display: none; }
+.top.collapsed .nav.open { position: fixed; top: 86px; right: 16px; left: auto; width: 420px; height: auto; flex-direction: column; align-items: stretch; border-radius: 28px; padding: 10px; box-shadow: var(--shadow); }
+.top.collapsed .nav.open > a { height: 52px; font-size: 16px; }
+.top.collapsed .nav.open > a .ic { display: inline; }
+.top.collapsed .nav.open .nav-lang { display: flex; gap: 6px; padding: 10px 6px 4px; border-top: 1px solid var(--line); margin-top: 6px; }
+.top.collapsed .nav.open .nav-lang a { font-size: 14px; padding: 9px 13px; border-radius: 999px; background: var(--soft); text-decoration: none; }
+.top.collapsed .nav.open .nav-lang a.on { background: var(--night); color: #fff; }
