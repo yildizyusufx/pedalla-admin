@@ -180,3 +180,44 @@ export const T = {
     d_specs: 'Donanım', d_incl: 'Bakım, onarım ve sigorta dahil', close: 'Kapat',
   },
 };
+
+// ---------- booking box in the header (2026-11 redesign) + pick-up address ----------
+Object.assign(T.de, {
+  nav_book: 'Buchen', hello_eyebrow: 'Moin Hamburg', hello_p: 'Rad, Startdatum und Laufzeit wählen – in zwei Minuten angefragt. Wartung und Versicherung sind inklusive.', hello_cta: 'Zeitraum wählen',
+  types_h: 'Unsere Räder', col_bike: 'Rad', col_price: 'Preis', col_status: 'Status', st_free: '{n} frei', st_none: 'Ausgebucht', st_req: 'Auf Anfrage',
+  b_price: 'Preis', b_deposit: 'Kaution', b_free: 'frei', b_book: 'Jetzt buchen', b_choose: 'Auswählen',
+  sched_h: 'Buchung planen', sched_dur: 'Laufzeit', p_ay: 'Monatlich', p_hafta: 'Wöchentlich', 'p_gün': 'Täglich', cal_prev: 'Vorheriger Monat', cal_next: 'Nächster Monat',
+  sum_pick: 'Abholung', sum_ret: 'Rückgabe', sum_total: 'Gesamt · {dur}', b_reset: 'Zurücksetzen', b_next: 'Weiter',
+  pick_h: 'Abholung in Altona', pick_p: 'Du holst dein Rad bei uns ab. Den genauen Termin bestätigen wir dir per Telefon oder WhatsApp.', pick_bring: 'Bitte Ausweis und Kaution mitbringen.',
+  avail_check: 'Verfügbarkeit wird geprüft …', avail_live: 'Live-Verfügbarkeit für deinen Zeitraum', avail_none: 'In diesem Zeitraum ausgebucht – wähle ein späteres Datum oder frag uns per WhatsApp.', no_plan: 'Für diese Laufzeit nicht buchbar',
+  r_ok_pick: 'Abholung: {addr}. Bring deinen Ausweis im Original mit.', r_when: 'Zeitraum',
+  how3_h: 'Abholung in Altona', how3_p: 'Hol dein Rad in der Missundestraße 50 ab: Ausweis zeigen, Vertrag digital unterschreiben, kurze Einweisung – fertig.',
+  map_sub: 'Grüne Punkte zeigen freie Räder (ungefähre Position). Abholung und Service an unserem Hub in Altona, Missundestraße 50.', map_hub_p: 'Abholung & Werkstatt – nach Termin',
+  q7: 'Wo hole ich mein Rad ab?', a7: 'Bei uns in Altona: Missundestraße 50, 22769 Hamburg. Nach deiner Buchung bestätigen wir dir den Abholtermin per Telefon oder WhatsApp.',
+});
+Object.assign(T.en, {
+  nav_book: 'Book', hello_eyebrow: 'Moin Hamburg', hello_p: 'Pick a bike, start date and duration – requested in two minutes. Maintenance and insurance included.', hello_cta: 'Choose dates',
+  types_h: 'Our bikes', col_bike: 'Bike', col_price: 'Price', col_status: 'Status', st_free: '{n} free', st_none: 'Booked out', st_req: 'On request',
+  b_price: 'Price', b_deposit: 'Deposit', b_free: 'free', b_book: 'Book now', b_choose: 'Select',
+  sched_h: 'Schedule booking', sched_dur: 'Duration', p_ay: 'Monthly', p_hafta: 'Weekly', 'p_gün': 'Daily', cal_prev: 'Previous month', cal_next: 'Next month',
+  sum_pick: 'Pick-up', sum_ret: 'Return', sum_total: 'Total · {dur}', b_reset: 'Reset', b_next: 'Continue',
+  pick_h: 'Pick-up in Altona', pick_p: 'You collect your bike from us. We confirm the exact time by phone or WhatsApp.', pick_bring: 'Please bring your ID and the deposit.',
+  avail_check: 'Checking availability …', avail_live: 'Live availability for your dates', avail_none: 'Booked out for these dates – pick a later date or ask us on WhatsApp.', no_plan: 'Not available for this duration',
+  r_ok_pick: 'Pick-up: {addr}. Please bring your original ID.', r_when: 'Dates',
+  how3_h: 'Pick-up in Altona', how3_p: 'Collect your bike at Missundestraße 50: show your ID, sign the contract digitally, quick introduction – done.',
+  map_sub: 'Green dots show free bikes (approximate position). Pick-up and service at our hub in Altona, Missundestraße 50.', map_hub_p: 'Pick-up & workshop – by appointment',
+  q7: 'Where do I pick up my bike?', a7: 'At our place in Altona: Missundestraße 50, 22769 Hamburg. After you book we confirm the pick-up time by phone or WhatsApp.',
+});
+Object.assign(T.tr, {
+  nav_book: 'Rezervasyon', hello_eyebrow: 'Moin Hamburg', hello_p: 'Bisikleti, başlangıç tarihini ve süreyi seç – iki dakikada talep et. Bakım ve sigorta dahil.', hello_cta: 'Tarih seç',
+  types_h: 'Bisikletlerimiz', col_bike: 'Bisiklet', col_price: 'Fiyat', col_status: 'Durum', st_free: '{n} boş', st_none: 'Dolu', st_req: 'Sorunuz',
+  b_price: 'Fiyat', b_deposit: 'Depozito', b_free: 'boş', b_book: 'Hemen rezerve et', b_choose: 'Seç',
+  sched_h: 'Rezervasyon planla', sched_dur: 'Süre', p_ay: 'Aylık', p_hafta: 'Haftalık', 'p_gün': 'Günlük', cal_prev: 'Önceki ay', cal_next: 'Sonraki ay',
+  sum_pick: 'Teslim alma', sum_ret: 'İade', sum_total: 'Toplam · {dur}', b_reset: 'Sıfırla', b_next: 'Devam',
+  pick_h: 'Altona\'da teslim alma', pick_p: 'Bisikletini bizden teslim alırsın. Kesin saati telefon veya WhatsApp ile onaylarız.', pick_bring: 'Lütfen kimliğini ve depozitoyu getir.',
+  avail_check: 'Müsaitlik kontrol ediliyor …', avail_live: 'Seçtiğin tarihler için canlı müsaitlik', avail_none: 'Bu tarihlerde dolu – daha sonraki bir tarih seç ya da WhatsApp\'tan sor.', no_plan: 'Bu süre için kiralanamaz',
+  r_ok_pick: 'Teslim alma: {addr}. Kimliğinin aslını getir.', r_when: 'Tarihler',
+  how3_h: 'Altona\'da teslim alma', how3_p: 'Bisikletini Missundestraße 50\'den al: kimliğini göster, sözleşmeyi dijital imzala, kısa tanıtım – hazırsın.',
+  map_sub: 'Yeşil noktalar boştaki bisikletleri gösterir (yaklaşık konum). Teslim alma ve servis Altona\'daki merkezimizde, Missundestraße 50.', map_hub_p: 'Teslim alma ve atölye – randevuyla',
+  q7: 'Bisikletimi nereden alırım?', a7: 'Altona\'daki yerimizden: Missundestraße 50, 22769 Hamburg. Rezervasyondan sonra teslim saatini telefon veya WhatsApp ile onaylarız.',
+});
