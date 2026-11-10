@@ -346,6 +346,15 @@
   // header: shadow on scroll + mobile menu
   const top = $('#top'); const nav = $('#nav'); const burger = $('#burger');
   const onScroll = () => top.classList.toggle('scrolled', window.scrollY > 8); onScroll(); window.addEventListener('scroll', onScroll, { passive: true });
+  // header fit: long labels (TR/EN) must never be cut off – first drop icons/extra buttons, then fall back to the menu button
+  function fitNav() {
+    top.classList.remove('compact', 'collapsed');
+    if (window.innerWidth <= 1100) return;
+    const over = () => nav.scrollWidth > nav.clientWidth + 1 || top.querySelector('.top-in').scrollWidth > top.querySelector('.top-in').clientWidth + 1;
+    if (over()) top.classList.add('compact');
+    if (over()) top.classList.add('collapsed');
+  }
+  fitNav(); window.addEventListener('resize', fitNav); document.fonts?.ready.then(fitNav);
   function toggleNav(on) { nav.classList.toggle('open', on); burger.setAttribute('aria-expanded', on); }
   burger.addEventListener('click', () => toggleNav(!nav.classList.contains('open')));
 
