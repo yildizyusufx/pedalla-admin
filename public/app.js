@@ -19,7 +19,7 @@ const kpi = (label, value, sub = '', cls = '', href = '') => `<${href ? `a href=
 const dl = (pairs) => `<dl class="dl">${pairs.filter(Boolean).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${v ?? '—'}</dd>`).join('')}</dl>`;
 const tabs = (items, cur) => `<div class="tabs">${items.map(([k, l, n]) => `<button class="tab ${k === cur ? 'on' : ''}" data-tab="${k}">${l}${n != null ? ` <span class="cnt">${n}</span>` : ''}</button>`).join('')}</div>`;
 const field = (res, k) => RESOURCES[res].fields.find((f) => f.k === k);
-const loading = () => setMain('<div class="loading"><div class="spin"></div></div>');
+const loading = () => setMain('<div class="loading"><div class="pdl-loader" role="status" aria-label="Loading"></div></div>');
 
 // ---------- navigation ----------
 const NAV = [
@@ -46,7 +46,7 @@ const ICONS = {
   inbox: '<path d="M3 13h5l2 3h4l2-3h5"/><path d="M5 5h14l2 8v6H3v-6z"/>',
 };
 const icon = (n) => `<svg viewBox="0 0 24 24" class="ic" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS[n] || ''}</svg>`;
-export const LOGO = `<span class="logo"><img src="img/logo.png" alt="pedalla app"></span>`;
+export const LOGO = `<span class="logo"><img src="img/logo.png" alt="pedalla.bike"></span>`;
 
 function shell() {
   const u = session.user;
@@ -97,7 +97,10 @@ function loginPage() {
     <button class="btn primary block">Giriş yap</button>${window.PEDALLA_DEMO ? '<p class="hint">Demo hesapları: admin@, operasyon@, servis@, muhasebe@pedalla.bike · şifre <code>pedalla123</code></p>' : ''}<p class="hint"><a href="portal.html">Sürücü müsünüz? Sürücü girişi →</a></p></form></div>`;
   bindLangSwitch(appRoot());
   $('#lf').onsubmit = guard(async (e) => {
-    e.preventDefault(); const r = await POST('login', readForm(e.target)); setToken(r.token); await boot();
+    e.preventDefault();
+    const ov = document.createElement('div'); ov.className = 'login-busy'; ov.innerHTML = '<div class="pdl-loader" role="status" aria-label="Yükleniyor"></div>';
+    document.body.appendChild(ov);
+    try { const r = await POST('login', readForm(e.target)); setToken(r.token); await boot(); } finally { ov.remove(); }
   });
 }
 

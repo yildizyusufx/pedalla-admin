@@ -118,3 +118,8 @@ public/            Arayüz (index.html, app.js, core.js, style.css, brand.css, d
 * Demo kullanıcılarının şifrelerini değiştirin veya pasif yapın, Ayarlar'dan GPS cihaz anahtarını değiştirin.
 * Sunucuyu HTTPS arkasında (ör. Caddy / Nginx) çalıştırın ve `data/` klasörünü düzenli yedekleyin.
 * Fatura numaraları ve vergi metinleri Almanya'daki yasal gereklilikler (GoBD, e-fatura) açısından muhasebecinizle kontrol edilmelidir; panel muhasebe yazılımının yerine geçmez, CSV ile aktarım yapılabilir.
+
+## Herkese açık web sitesi (`website/`)
+
+`website/` klasörü pedalla.bike için ayrı bir statik sitedir (DE/EN/TR). Vercel'de **ayrı bir proje** olarak, *Root Directory = `website`* ile yayınlanır. Ayrıntılar: [website/README.md](website/README.md).
+Sitedeki "Jetzt mieten" formu bu paneldeki sürücü ekranı API'sini kullanır (`/api/portal/catalog`, `signup`, `login`, `requests`); talepler **Sürücü talepleri** sayfasına düşer. Siteden gelen istekler için CORS izni `shared/cors.js` içindedir (ek alan adları: `SITE_ORIGINS` ortam değişkeni).

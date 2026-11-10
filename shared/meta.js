@@ -66,7 +66,7 @@ export function applyBikeTypes(settings) {
 
 export const RESOURCES = {
   bikes: {
-    label: 'Bisikletler', single: 'Bisiklet', perm: 'fleet', order: 'code', search: ['code', 'brand', 'model', 'frame_no', 'gps_tracker_id', 'uid'],
+    label: 'Bisikletler', single: 'Bisiklet', perm: 'fleet', order: 'id DESC', search: ['code', 'brand', 'model', 'frame_no', 'gps_tracker_id', 'uid'],
     title: (r) => `${r.code} · ${r.brand || ''} ${r.model || ''}`,
     fields: [
       { k: 'code', l: 'Filo kodu', req: 1, list: 1 },
@@ -96,7 +96,7 @@ export const RESOURCES = {
     ],
   },
   customers: {
-    label: 'Müşteriler', single: 'Müşteri', perm: 'customers', order: 'name', search: ['name', 'company_name', 'email', 'phone', 'tax_no'],
+    label: 'Müşteriler', single: 'Müşteri', perm: 'customers', order: 'id DESC', search: ['name', 'company_name', 'email', 'phone', 'tax_no'],
     title: (r) => r.company_name || r.name,
     fields: [
       { k: 'type', l: 'Müşteri tipi', t: 'select', o: opt(['kurumsal', 'bireysel']), def: 'kurumsal', list: 1 },
@@ -116,7 +116,7 @@ export const RESOURCES = {
     ],
   },
   riders: {
-    label: 'Sürücüler (bisiklet kullanıcıları)', single: 'Sürücü', perm: 'customers', order: 'name', search: ['name', 'phone', 'email', 'customer_label'],
+    label: 'Sürücüler (bisiklet kullanıcıları)', single: 'Sürücü', perm: 'customers', order: 'id DESC', search: ['name', 'phone', 'email', 'customer_label'],
     title: (r) => r.name,
     // rider's own balance = deposit held (+) − open invoices of the rider's rentals (−) − deposits not yet collected (−)
     listSql: `SELECT q.*, ROUND(q.deposit_held - q.open_balance - q.deposit_pending, 2) AS balance,
@@ -155,7 +155,7 @@ export const RESOURCES = {
     ],
   },
   pricing_plans: {
-    label: 'Tarifeler', single: 'Tarife', perm: 'rentals', order: 'bike_type, period', search: ['name'],
+    label: 'Tarifeler', single: 'Tarife', perm: 'rentals', order: 'id DESC', search: ['name'],
     title: (r) => r.name,
     fields: [
       { k: 'name', l: 'Tarife adı', req: 1, list: 1 },
@@ -287,7 +287,7 @@ export const RESOURCES = {
     ],
   },
   parts: {
-    label: 'Yedek parçalar', single: 'Yedek parça', perm: 'stock', order: 'name', search: ['sku', 'name', 'compatible', 'location'],
+    label: 'Yedek parçalar', single: 'Yedek parça', perm: 'stock', order: 'id DESC', search: ['sku', 'name', 'compatible', 'location'],
     title: (r) => `${r.sku} · ${r.name}`,
     listSql: `SELECT p.*, s.name AS supplier_name, CASE WHEN p.stock <= p.min_stock THEN 1 ELSE 0 END AS low FROM parts p LEFT JOIN suppliers s ON s.id=p.supplier_id`,
     fields: [
@@ -322,7 +322,7 @@ export const RESOURCES = {
     ],
   },
   portal_requests: {
-    label: 'Sürücü talepleri', single: 'Talep', perm: 'rentals', order: "CASE status WHEN 'yeni' THEN 0 ELSE 1 END, id DESC", search: ['rider_name', 'customer_label', 'bike_code', 'notes', 'type'],
+    label: 'Sürücü talepleri', single: 'Talep', perm: 'rentals', order: 'id DESC', search: ['rider_name', 'customer_label', 'bike_code', 'notes', 'type'],
     title: (r) => `Talep #${r.id ?? ''}`, noCreate: 1,
     listSql: `SELECT q.*, rd.name AS rider_name, rd.phone AS rider_phone, COALESCE(c.company_name,c.name) AS customer_label, b.code AS bike_code, x.contract_no, s.order_no
       FROM portal_requests q LEFT JOIN riders rd ON rd.id=q.rider_id LEFT JOIN customers c ON c.id=q.customer_id LEFT JOIN bikes b ON b.id=q.bike_id
@@ -369,7 +369,7 @@ export const RESOURCES = {
     ],
   },
   suppliers: {
-    label: 'Tedarikçiler', single: 'Tedarikçi', perm: 'stock', order: 'name', search: ['name', 'contact', 'email'],
+    label: 'Tedarikçiler', single: 'Tedarikçi', perm: 'stock', order: 'id DESC', search: ['name', 'contact', 'email'],
     title: (r) => r.name,
     fields: [
       { k: 'name', l: 'Firma', req: 1, list: 1 },
@@ -381,7 +381,7 @@ export const RESOURCES = {
     ],
   },
   users: {
-    label: 'Kullanıcılar', single: 'Kullanıcı', perm: 'admin', order: 'name', search: ['name', 'email'],
+    label: 'Kullanıcılar', single: 'Kullanıcı', perm: 'admin', order: 'id DESC', search: ['name', 'email'],
     title: (r) => r.name,
     listSql: `SELECT id, name, email, role, active, last_login, created_at FROM users`,
     fields: [

@@ -609,7 +609,7 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
       add('warn', 'service', 'Servis gecikti', `${s.order_no} · ${s.code} · tahmini ${s.estimated_ready}`, `#/service/${s.id}`);
     for (const x of await db.all("SELECT id, name, created_at FROM riders WHERE self_registered=1 AND id_checked=0 AND active=1 ORDER BY id DESC LIMIT 30"))
       add('info', 'customers', 'Yeni sürücü kaydı', `${x.name} · ${String(x.created_at || '').slice(0, 10)} · kimlik kontrolü bekliyor`, `#/riders/${x.id}`);
-    for (const q of await db.all("SELECT q.*, rd.name AS rn, b.code FROM portal_requests q LEFT JOIN riders rd ON rd.id=q.rider_id LEFT JOIN bikes b ON b.id=q.bike_id WHERE q.status='yeni' ORDER BY q.id"))
+    for (const q of await db.all("SELECT q.*, rd.name AS rn, b.code FROM portal_requests q LEFT JOIN riders rd ON rd.id=q.rider_id LEFT JOIN bikes b ON b.id=q.bike_id WHERE q.status='yeni' ORDER BY q.id DESC"))
       add('info', 'rentals', 'Yeni sürücü talebi', `${q.rn} · ${q.type}${q.code ? ' · ' + q.code : ''}${q.preferred_date ? ' · ' + q.preferred_date : ''}`, `#/portal_requests/${q.id}`);
     const rank = { danger: 0, warn: 1, info: 2 };
     return n.sort((a, b) => rank[a.level] - rank[b.level]);
@@ -727,7 +727,7 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
     r.bike = await db.get('SELECT * FROM bikes WHERE id=?', [r.bike_id]);
     r.plan = r.plan_id ? await db.get('SELECT * FROM pricing_plans WHERE id=?', [r.plan_id]) : null;
     r.invoices = await list('invoices', { rental_id: id });
-    r.deposits = await db.all('SELECT * FROM deposits WHERE rental_id=? ORDER BY date, id', [id]);
+    r.deposits = await db.all('SELECT * FROM deposits WHERE rental_id=? ORDER BY date DESC, id DESC', [id]);
     r.deposit_held = r2(r.deposits.reduce((a, d) => a + (d.type === 'tahsil' ? d.amount : -d.amount), 0));
     r.services = await list('service_orders', { rental_id: id });
     r.documents = await listDocuments('rental', id);
@@ -765,7 +765,7 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
     const i = await getOne('invoices', id);
     i.customer = await db.get('SELECT * FROM customers WHERE id=?', [i.customer_id]);
     i.rental = i.rental_id ? await db.get('SELECT r.*, b.code AS bike_code FROM rentals r LEFT JOIN bikes b ON b.id=r.bike_id WHERE r.id=?', [i.rental_id]) : null;
-    i.payments = await db.all('SELECT * FROM payments WHERE invoice_id=? ORDER BY date', [id]);
+    i.payments = await db.all('SELECT * FROM payments WHERE invoice_id=? ORDER BY date DESC, id DESC', [id]);
     i.suggested_late_fee = lateFeeFor(i);
     return i;
   }
@@ -858,6 +858,23 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
     const [, b, c] = seg;
     if (b === 'config' && method === 'GET') return ok({ signup: setting('portal_signup') !== '0', company: setting('company_name'), id_types: ID_TYPES });
     if (b === 'bike-types' && method === 'GET') return ok(await bikeTypeList());
+    if (b === 'catalog' && method === 'GET') {
+      // public data for the marketing website: bike types, cheapest active plan per type, free bikes and
+      // their rough position (rounded to ~100 m, no codes) for the map
+      const periods = enabledPeriods(SETTINGS);
+      const plans = (await db.all('SELECT bike_type, period, price, deposit FROM pricing_plans WHERE active=1 ORDER BY price')).filter((p) => periods.includes(p.period));
+      const free = await db.all("SELECT type, lat, lng FROM bikes WHERE status='müsait'");
+      const types = (await bikeTypeList()).map((x) => {
+        const pl = plans.filter((p) => p.bike_type === x.name);
+        const best = pl.find((p) => p.period === 'ay') || pl[0] || null;
+        return { ...x, price: best?.price ?? null, deposit: best?.deposit ?? null, period: best?.period ?? null, available: free.filter((f) => f.type === x.name).length };
+      });
+      const rnd = (n) => Math.round(n * 1000) / 1000;
+      return ok({
+        signup: setting('portal_signup') !== '0', periods, types, id_types: ID_TYPES,
+        fleet: free.filter((f) => Number.isFinite(f.lat) && Number.isFinite(f.lng) && f.lat && f.lng).map((f) => ({ type: f.type, lat: rnd(f.lat), lng: rnd(f.lng) })),
+      });
+    }
     if (b === 'signup' && method === 'POST') {
       // self-registration from the rider screen: creates a rider + an individual customer; staff checks the ID before renting
       if (setting('portal_signup') === '0') err(403, 'Kayıt şu an kapalı. Lütfen bizimle iletişime geçin.');
@@ -984,12 +1001,13 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
       if (a === 'simulate' && method === 'POST') { need(user, 'fleet', 'w'); return ok(await simulate()); }
       if (a === 'lookup' && b === 'users') {
         // staff list (names only) – needed by every role for technician / assignee pickers
-        return ok((await list('users', { ...query, active: 1 })).map((r) => ({ id: r.id, label: r.name, raw: { id: r.id, name: r.name, role: r.role } })));
+        return ok((await list('users', { ...query, active: 1 })).map((r) => ({ id: r.id, label: r.name, raw: { id: r.id, name: r.name, role: r.role } })).sort((x, y) => String(x.label).localeCompare(String(y.label), 'tr')));
       }
       if (a === 'lookup') {
         need(user, permOf(b) || 'admin');
         const meta = RESOURCES[b];
-        return ok((await list(b, { ...query, limit: 2000 })).map((r) => ({ id: r.id, label: meta.title ? meta.title(r) : r.name, raw: r })));
+        // pickers stay alphabetical; list screens show newest first
+        return ok((await list(b, { ...query, limit: 2000 })).map((r) => ({ id: r.id, label: meta.title ? meta.title(r) : r.name, raw: r })).sort((x, y) => String(x.label ?? '').localeCompare(String(y.label ?? ''), 'tr', { numeric: true })));
       }
       if (a === 'settings') {
         need(user, 'admin', method === 'GET' ? 'r' : 'w');
