@@ -181,6 +181,7 @@
     const apply = () => {
       if (bike.getAttribute('src') !== img(m.image)) bike.src = img(m.image);
       bike.alt = m.name; bike.classList.remove('swap');
+      bike.classList.toggle('png', /^data:image\/(png|webp)|\.(png|webp|svg)(\?|$)/i.test(bike.getAttribute('src') || ''));
     };
     if (swap && bike.getAttribute('src') !== img(m.image)) { bike.classList.add('swap'); setTimeout(apply, 200); } else apply();
     $('#hcName').textContent = m.name; $('#hcSub').textContent = m.sub || P.generic.sub; $('#hcDesc').textContent = m.desc; $('#hcMore').dataset.details = m.id;
