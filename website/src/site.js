@@ -56,7 +56,8 @@
     if (!window.L || !$('#map') || map) return;
     const L = window.L; const st = P.stations[0];
     map = L.map('map', { scrollWheelZoom: false, zoomControl: true, attributionControl: true }).setView([P.area.lat, P.area.lng], 12);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { maxZoom: 19, subdomains: 'abcd', attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>' }).addTo(map);
+    // OpenStreetMap's own free tiles (no API key). CARTO's basemaps now need a key, which is why the map showed an API message.
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' }).addTo(map);
     const area = L.circle([P.area.lat, P.area.lng], { radius: P.area.radius, color: '#7a929e', weight: 1.5, dashArray: '6 6', fillColor: '#7a929e', fillOpacity: 0.08 }).addTo(map);
     map.attributionControl.setPrefix('<a href="https://leafletjs.com">Leaflet</a>');
     map.fitBounds(area.getBounds(), { padding: [10, 10] });
