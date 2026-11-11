@@ -505,3 +505,11 @@ html.ready .pdl-intro { opacity: 0; visibility: hidden; pointer-events: none; }
 /* bike photos with a white background (JPEG) sit on a white rounded plate; transparent PNG/WebP float on the red card */
 .hero-card .hc-bike:not(.png) { background: #fff; border-radius: 26px; padding: 14px 18px; box-shadow: 0 18px 36px -18px rgba(80,10,20,.45); filter: none; }
 .tt-b img, .bike-img img, .det-img img, .sum-bike img { mix-blend-mode: multiply; }
+/* very small phones (≤ 360 px) */
+@media (max-width: 360px) {
+  .card { padding: 16px; }
+  .bub { width: 74px; height: 74px; } .bub.dark { width: 88px; height: 88px; } .bub i { width: 22px; height: 22px; margin-bottom: 2px; } .bub b { font-size: 14px; } .bub.dark b { font-size: 17px; } .bub small { font-size: 10px; }
+  .sched { padding: 12px; } .cal-g button { font-size: 12px; }
+  .hello h1 { font-size: 30px; }
+}
+.sched-in > *, .bk-col, .cal { min-width: 0; }

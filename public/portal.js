@@ -166,7 +166,7 @@ const IC = {
   wrench: '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.5-.5-.5-2.5z"/>', alert: '<path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17h.01"/>',
   back: '<path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-2"/>', plus: '<path d="M12 6v12M6 12h12"/>', cam: '<path d="M4 7h3l2-3h6l2 3h3v13H4z"/><circle cx="12" cy="13" r="4"/>',
   phone: '<path d="M5 3h4l2 5-3 2a11 11 0 0 0 6 6l2-3 5 2v4a2 2 0 0 1-2 2A17 17 0 0 1 3 5a2 2 0 0 1 2-2"/>', mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>',
-  check: '<path d="m5 12 5 5 9-10"/>', pin: '<path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>', bolt: '<path d="M13 2 4.5 13.5H12L11 22l8.5-11.5H12z"/>', x: '<path d="M6 6l12 12M18 6 6 18"/>', bell: '<path d="M6 8a6 6 0 1 1 12 0c0 7 3 8 3 8H3s3-1 3-8"/><path d="M10 20a2 2 0 0 0 4 0"/>',
+  check: '<path d="m5 12 5 5 9-10"/>', down: '<path d="m6 9 6 6 6-6"/>', pin: '<path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>', bolt: '<path d="M13 2 4.5 13.5H12L11 22l8.5-11.5H12z"/>', x: '<path d="M6 6l12 12M18 6 6 18"/>', bell: '<path d="M6 8a6 6 0 1 1 12 0c0 7 3 8 3 8H3s3-1 3-8"/><path d="M10 20a2 2 0 0 0 4 0"/>',
 };
 const ic = (n) => `<svg viewBox="0 0 24 24" class="ic" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${IC[n] || ''}</svg>`;
 const badge = (s) => `<span class="badge b-${{ aktif: 'brand', rezervasyon: 'info', 'açık': 'warn', 'kısmi': 'info', 'ödendi': 'ok', yeni: 'info', 'onaylandı': 'ok', 'reddedildi': 'danger', 'tamamlandı': 'muted', iptal: 'muted', 'hazır': 'ok', 'teslim edildi': 'muted' }[s] || 'warn'}">${esc(v(s))}</span>`;
@@ -263,10 +263,19 @@ function pickupView() {
     <div class="p-pick-addr">${esc(addr)}</div><p class="muted">${t('pickup_p')}</p>
     <a class="btn sm" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(addr)}">${ic('pin')} ${t('pickup_route')}</a></div></section>`;
 }
+// home stays clean: only notices that need action now stay open, everything else sits in a collapsed list
+const MUST = ['return_late', 'invoice_overdue', 'id_expired', 'docs_missing'];
+function noticesBlock(list) {
+  if (!list.length) return '';
+  const must = list.filter((n) => MUST.includes(n.code)).slice(0, 2);
+  const rest = list.filter((n) => !must.includes(n));
+  return `${must.length ? `<section class="p-must">${must.map(notice).join('')}</section>` : ''}
+  ${rest.length ? `<details class="p-card p-notes"><summary>${ic('bell')}<span>${t('notices')}</span><i class="p-count">${rest.length}</i><span class="grow"></span>${ic('down')}</summary><div class="p-notes-in">${rest.map(notice).join('')}</div></details>` : ''}`;
+}
 function homeView() {
   const d = data; const act = d.rentals.filter((x) => ['aktif', 'rezervasyon'].includes(x.status));
   const nd = d.summary.next_due; const nc = d.rentals.find((x) => x.next_charge)?.next_charge;
-  return `${locDenied && store.get(LOC_KEY) !== 'off' && navigator.geolocation ? `<section class="p-card p-loc"><b>📍 ${t('loc_h')}</b><p class="muted">${t('loc_denied')}</p><div class="p-row"><button class="btn primary" data-loc="on">${t('loc_allow')}</button><button class="btn ghost" data-loc="off">${t('loc_later')}</button></div></section>` : ''}${statsView()}${pickupView()}<section><h2 class="p-h">${t('notices')}</h2>${d.notifications.length ? d.notifications.map(notice).join('') : `<div class="p-card p-empty">${ic('check')} ${t('no_notices')}</div>`}</section>
+  return `${locDenied && store.get(LOC_KEY) !== 'off' && navigator.geolocation ? `<section class="p-card p-loc"><b>📍 ${t('loc_h')}</b><p class="muted">${t('loc_denied')}</p><div class="p-row"><button class="btn primary" data-loc="on">${t('loc_allow')}</button><button class="btn ghost" data-loc="off">${t('loc_later')}</button></div></section>` : ''}${statsView()}${pickupView()}${noticesBlock(d.notifications)}
   ${fresh || (d.self_registered && !d.rentals.length && !d.requests.length) ? `<div class="p-card p-welcome">${ic('check')} ${t('welcome_new')}</div>` : ''}
   <section><h2 class="p-h">${t('my_bike')}</h2>${act.length ? act.map(bikeCard).join('') : `<div class="p-card p-empty">${t('no_rental')}${d.requests.some((q) => q.type === 'yeni kiralama' && q.status === 'yeni') ? '' : `<p><b>${t('rent_cta')}</b></p><button class="btn primary p-big" data-new="yeni kiralama">${ic('bike')} ${t('rent_btn')}</button>`}</div>`}</section>
   ${act.length ? `<section><h2 class="p-h">${t('quick')}</h2><div class="p-quick">

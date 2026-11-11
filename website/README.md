@@ -8,7 +8,7 @@ Static HTML/CSS/JS, no dependencies, no cookies, fonts self-hosted (GDPR-friendl
 - **Booking box at the top of the page** (bike type list · big bike card with price/deposit/free bubbles · calendar). The rider picks a start date and a duration; return date and total are shown at once. The periods offered follow *Ayarlar → Kiralama periyotları* in the admin panel (only `ay` today; `hafta`/`gün` appear automatically when switched on; durations per period in `content/site.mjs`). Availability for the chosen dates is live from `GET /api/portal/availability?from&to` (bikes without an overlapping active rental/reservation, minus open website requests).
 - **Weiter** opens the contact step: creates the rider account (`/api/portal/signup` or `/login`) and sends a **"yeni kiralama"** request with bike type, period, duration and start date (`/api/portal/requests`) → admin *Sürücü talepleri*. "Zum Fahrerkonto" logs the rider straight into `portal.html`.
 - **Pick-up address** (Missundestraße 50, 22769 Hamburg-Altona) is shown in the box, summary, confirmation, FAQ and the rider screen (admin setting `pickup_address`).
-- **Live map** (Leaflet + CARTO/OSM tiles): free bikes (position rounded to ~100 m), the Pedalla hub, the service area.
+- **Live map** (Leaflet + OpenStreetMap tiles, no API key): free bikes (position rounded to ~100 m), the Pedalla hub, the service area.
 - Business section, FAQ, Impressum and Datenschutz (drafts – fill in `[BITTE ERGÄNZEN]` in `content/legal.mjs`).
 
 ## Edit content
