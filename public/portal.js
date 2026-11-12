@@ -113,6 +113,13 @@ const L = {
 Object.assign(L.tr, { st_h: 'Özet', st_left: 'gün kaldı', st_late: 'gün gecikti', st_of: '{n} günden', st_pay: 'ödemeye', st_pay_none: 'açık ödeme yok', st_battery: 'batarya', st_service: 'bakıma', st_service_late: 'bakım gecikti', st_km: 'km', st_start: 'gün sonra başlıyor', pickup_h: 'Bisikletini buradan teslim alırsın', pickup_p: 'Teslim saatini telefon veya WhatsApp ile onaylıyoruz. Kimliğinin aslını ve depozitoyu getir.', pickup_route: 'Yol tarifi', pickup_req: 'Kiralama talebin alındı ({date}).' });
 Object.assign(L.de, { st_h: 'Überblick', st_left: 'Tage übrig', st_late: 'Tage überfällig', st_of: 'von {n} Tagen', st_pay: 'bis zur Zahlung', st_pay_none: 'nichts offen', st_battery: 'Akku', st_service: 'bis Inspektion', st_service_late: 'Inspektion fällig', st_km: 'km', st_start: 'Tage bis Start', pickup_h: 'Hier holst du dein Rad ab', pickup_p: 'Den Abholtermin bestätigen wir per Telefon oder WhatsApp. Bitte Ausweis im Original und Kaution mitbringen.', pickup_route: 'Route planen', pickup_req: 'Deine Mietanfrage ist eingegangen ({date}).' });
 Object.assign(L.en, { st_h: 'Overview', st_left: 'days left', st_late: 'days overdue', st_of: 'of {n} days', st_pay: 'to payment', st_pay_none: 'nothing due', st_battery: 'battery', st_service: 'to service', st_service_late: 'service due', st_km: 'km', st_start: 'days to start', pickup_h: 'Pick up your bike here', pickup_p: 'We confirm the pick-up time by phone or WhatsApp. Please bring your original ID and the deposit.', pickup_route: 'Get directions', pickup_req: 'We received your rental request ({date}).' });
+// photo tasks: pick-up selfie + bike photos, photos asked for by Pedalla (2026-11)
+Object.assign(L.tr, { ph_pick_h: 'Teslim alma kontrolü', ph_pick_p: 'Bisikleti teslim alırken bir selfie ve bisikletin en az {n} fotoğrafını çekin (sağ ve sol taraf; çizik veya hasar varsa yakından). Fotoğraflar bisikletin geçmişine tarihle kaydedilir.',
+  ph_req_h: 'Pedalla fotoğraf istiyor', ph_req_p: 'Lütfen şimdi çekip gönderin. Fotoğraf bisikletin geçmişine kaydedilir.', ph_selfie: 'Selfie çek', ph_bike: 'Bisikleti çek', ph_more: 'Bir tane daha', ph_done: 'Teşekkürler, fotoğraflar gönderildi.', ph_sending: 'Fotoğraf gönderiliyor…', ph_sent: 'Fotoğraf gönderildi', ph_send: 'Fotoğraf gönder', ph_bad: 'Fotoğraf okunamadı. Lütfen kamerayla tekrar çekin.', ph_note: 'Not' });
+Object.assign(L.de, { ph_pick_h: 'Übergabe-Check', ph_pick_p: 'Mach bei der Abholung ein Selfie und mindestens {n} Fotos vom Rad (rechte und linke Seite; Kratzer oder Schäden aus der Nähe). Die Fotos werden mit Datum in der Fahrrad-Historie gespeichert.',
+  ph_req_h: 'Pedalla bittet um ein Foto', ph_req_p: 'Bitte jetzt aufnehmen und senden. Das Foto wird in der Fahrrad-Historie gespeichert.', ph_selfie: 'Selfie machen', ph_bike: 'Rad fotografieren', ph_more: 'Noch eins', ph_done: 'Danke, die Fotos sind angekommen.', ph_sending: 'Foto wird gesendet…', ph_sent: 'Foto gesendet', ph_send: 'Foto senden', ph_bad: 'Foto konnte nicht gelesen werden. Bitte noch einmal mit der Kamera aufnehmen.', ph_note: 'Notiz' });
+Object.assign(L.en, { ph_pick_h: 'Pick-up check', ph_pick_p: 'When you collect the bike, take a selfie and at least {n} photos of the bike (right and left side; scratches or damage close up). The photos are saved with the date in the bike\'s history.',
+  ph_req_h: 'Pedalla asks for a photo', ph_req_p: 'Please take it now and send it. The photo is saved in the bike\'s history.', ph_selfie: 'Take a selfie', ph_bike: 'Photo of the bike', ph_more: 'One more', ph_done: 'Thanks, the photos were received.', ph_sending: 'Sending photo…', ph_sent: 'Photo sent', ph_send: 'Send a photo', ph_bad: 'The photo could not be read. Please take it again with the camera.', ph_note: 'Note' });
 const LANGS = [['tr', 'TR'], ['de', 'DE'], ['en', 'EN']];
 const store = { get: (k) => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} } };
 const guessLang = () => { const n = (navigator.language || 'de').slice(0, 2); return L[n] ? n : 'de'; };
@@ -222,12 +229,51 @@ function notice(n) {
   return `<div class="p-note l-${n.level}"><div class="p-note-ic">${ic(n.level === 'ok' ? 'check' : n.level === 'info' ? 'bell' : 'alert')}</div><div><p>${t('n_' + n.code, p)}</p>
     ${act ? `<button class="btn sm" data-new="${act}">${esc(cv(act))}</button>` : ''}${go ? `<button class="btn sm" data-tab="${go}">${t(go === 'docs' ? 'upload' : 'payments')}</button>` : ''}</div></div>`;
 }
+// photo tasks on top of the home screen; each button opens the camera directly (front camera for the selfie)
+function photoTasksView() {
+  const list = (data.photo_tasks || []).slice().sort((a, b) => a.done - b.done); if (!list.length) return '';
+  return list.map((k) => {
+    const attrs = k.type === 'request' ? `data-req="${k.request_id}"` : `data-purpose="pickup" data-rental="${k.rental_id}"`;
+    const btn = (kind) => {
+      const n = k.need[kind]; if (!n) return '';
+      const have = k.have[kind] || 0; const ok = have >= n; const last = k.photos.filter((p) => p.kind === kind).pop();
+      return `<button type="button" class="p-shot ${ok ? 'ok' : ''} ${kind === 'selfie' ? 'selfie' : ''}" data-shot="${kind}" ${attrs}>
+        <span class="p-shot-img">${last?.thumb ? `<img src="data:image/jpeg;base64,${last.thumb}" alt="">` : ic(kind === 'selfie' ? 'me' : 'bike')}${ok ? `<i>${ic('check')}</i>` : ''}</span>
+        <b>${ok && kind === 'bisiklet' && k.type === 'pickup' ? t('ph_more') : t(kind === 'selfie' ? 'ph_selfie' : 'ph_bike')}</b><small>${Math.min(have, n)}/${n}</small></button>`;
+    };
+    return `<section class="p-card p-photo ${k.done ? 'done' : ''}"><div class="p-photo-h">${ic('cam')}<div><b>${t(k.type === 'request' ? 'ph_req_h' : 'ph_pick_h')}</b><small class="muted">${esc(k.bike)}</small></div></div>
+      ${k.done ? `<p class="t-ok">${ic('check')} ${t('ph_done')}</p>` : `<p class="muted">${k.type === 'request' ? t('ph_req_p') : t('ph_pick_p', { n: k.need.bisiklet })}</p>`}
+      ${k.note ? `<p class="p-reply"><b>${t('ph_note')}:</b> ${esc(k.note)}</p>` : ''}
+      ${k.done && k.type === 'request' ? '' : `<div class="p-shots">${btn('selfie')}${btn('bisiklet')}</div>`}</section>`;
+  }).join('');
+}
+// resize in the browser: full photo ≈ 1600 px + thumbnail ≈ 320 px, both JPEG (keeps uploads small on mobile data)
+async function photoData(file) {
+  const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error(t('ph_bad'))); i.src = URL.createObjectURL(file); });
+  const shot = (max, q) => { const k = Math.min(1, max / Math.max(img.width, img.height)); const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); return c.toDataURL('image/jpeg', q); };
+  const out = { data: shot(1600, 0.8), thumb: shot(320, 0.7) }; URL.revokeObjectURL(img.src); return out;
+}
+function takePhoto(b) {
+  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*';
+  inp.setAttribute('capture', b.dataset.shot === 'selfie' ? 'user' : 'environment');
+  inp.style.display = 'none'; document.body.appendChild(inp);
+  inp.onchange = guard(async () => {
+    const file = inp.files[0]; inp.remove(); if (!file) return;
+    toast(t('ph_sending'), 'info');
+    const d = await photoData(file);
+    const body = { kind: b.dataset.shot, ...d };
+    if (b.dataset.req) body.request_id = Number(b.dataset.req); else { body.rental_id = Number(b.dataset.rental); body.purpose = b.dataset.purpose; }
+    const r = await api('POST', 'photos', body); delete r.id; data = r; toast(t('ph_sent')); shell();
+  });
+  inp.click();
+}
 function bikeCard(x) {
   return `<div class="p-card p-bike"><div class="p-bike-h">${ic('bike')}<div><b>${esc(x.bike_code)}</b> ${badge(x.status)}<small>${esc(v(x.bike_type) || '')} · ${esc([x.brand, x.model].filter(Boolean).join(' '))}</small></div></div>
     <dl class="p-dl"><div><dt>${t('contract')}</dt><dd>${esc(x.contract_no)}</dd></div><div><dt>${t('until')}</dt><dd class="${x.late_days ? 't-danger' : ''}">${date(x.end_date)}</dd></div>
     ${x.battery_level != null ? `<div><dt>${t('battery')}</dt><dd>${x.battery_level} %</dd></div>` : ''}<div><dt>${t('km')}</dt><dd>${num(x.odometer_km)} km</dd></div>
     <div><dt>${t('next_service')}</dt><dd class="${x.next_service_date && x.next_service_date <= addDays(todayISO(), 14) ? 't-warn' : ''}">${date(x.next_service_date)}</dd></div>
-    ${x.deposit_amount ? `<div><dt>${t('deposit')}</dt><dd>${money(x.deposit_held || 0)} / ${money(x.deposit_amount)}</dd></div>` : ''}${x.plan_name ? `<div><dt>${t('plan')}</dt><dd>${esc(x.plan_name)}</dd></div>` : ''}</dl></div>`;
+    ${x.deposit_amount ? `<div><dt>${t('deposit')}</dt><dd>${money(x.deposit_held || 0)} / ${money(x.deposit_amount)}</dd></div>` : ''}${x.plan_name ? `<div><dt>${t('plan')}</dt><dd>${esc(x.plan_name)}</dd></div>` : ''}</dl>
+    <button class="btn sm p-shot-free" data-shot="bisiklet" data-purpose="free" data-rental="${x.id}">${ic('cam')} ${t('ph_send')}</button></div>`;
 }
 const dDiff = (a, b) => Math.round((new Date(b + 'T00:00:00Z') - new Date(a + 'T00:00:00Z')) / 864e5);
 // round stat bubbles: days left in the rental (ring), next payment, battery, next service
@@ -275,7 +321,7 @@ function noticesBlock(list) {
 function homeView() {
   const d = data; const act = d.rentals.filter((x) => ['aktif', 'rezervasyon'].includes(x.status));
   const nd = d.summary.next_due; const nc = d.rentals.find((x) => x.next_charge)?.next_charge;
-  return `${locDenied && store.get(LOC_KEY) !== 'off' && navigator.geolocation ? `<section class="p-card p-loc"><b>📍 ${t('loc_h')}</b><p class="muted">${t('loc_denied')}</p><div class="p-row"><button class="btn primary" data-loc="on">${t('loc_allow')}</button><button class="btn ghost" data-loc="off">${t('loc_later')}</button></div></section>` : ''}${statsView()}${pickupView()}${noticesBlock(d.notifications)}
+  return `${photoTasksView()}${locDenied && store.get(LOC_KEY) !== 'off' && navigator.geolocation ? `<section class="p-card p-loc"><b>📍 ${t('loc_h')}</b><p class="muted">${t('loc_denied')}</p><div class="p-row"><button class="btn primary" data-loc="on">${t('loc_allow')}</button><button class="btn ghost" data-loc="off">${t('loc_later')}</button></div></section>` : ''}${statsView()}${pickupView()}${noticesBlock(d.notifications)}
   ${fresh || (d.self_registered && !d.rentals.length && !d.requests.length) ? `<div class="p-card p-welcome">${ic('check')} ${t('welcome_new')}</div>` : ''}
   <section><h2 class="p-h">${t('my_bike')}</h2>${act.length ? act.map(bikeCard).join('') : `<div class="p-card p-empty">${t('no_rental')}${d.requests.some((q) => q.type === 'yeni kiralama' && q.status === 'yeni') ? '' : `<p><b>${t('rent_cta')}</b></p><button class="btn primary p-big" data-new="yeni kiralama">${ic('bike')} ${t('rent_btn')}</button>`}</div>`}</section>
   ${act.length ? `<section><h2 class="p-h">${t('quick')}</h2><div class="p-quick">
@@ -350,7 +396,7 @@ const TABS = [['home', 'home', 'home'], ['req', 'requests', 'req'], ['pay', 'pay
 function shell(pre) {
   const d = data; if (!TABS.some(([k]) => k === tab)) tab = 'home';
   const body = { home: homeView, req: () => requestsView(pre), pay: paymentsView, docs: docsView, me: profileView }[tab]();
-  const dots = { home: d.notifications.filter((n) => n.level === 'danger' || n.level === 'warn').length, docs: d.missing_docs.length, pay: d.invoices.filter((i) => i.days_late).length };
+  const dots = { home: d.notifications.filter((n) => n.level === 'danger' || n.level === 'warn').length + (d.photo_tasks || []).filter((k) => !k.done).length, docs: d.missing_docs.length, pay: d.invoices.filter((i) => i.days_late).length };
   root().innerHTML = `<header class="p-top"><span class="p-logo-pill"><i><img src="img/mark.png" alt=""></i><img src="img/wordmark-light.png" alt="pedalla" class="p-top-logo"></span><span class="p-top-tag">${t('title')}</span><span class="grow"></span>${tab === 'me' ? '' : langSw()}</header>
   <main class="p-main">${tab === 'home' ? `<div class="p-hello">${t('hello')}, <b>${esc(d.rider.name.split(' ')[0])}</b> 👋</div>` : `<h1 class="p-title">${t(TABS.find(([k]) => k === tab)[1])}</h1>`}${body}</main>
   <nav class="p-nav">${TABS.map(([k, l, i]) => `<a href="#${k}" class="${k === tab ? 'on' : ''}">${ic(i)}<span>${t(l)}</span>${dots[k] ? `<i class="p-dot">${dots[k]}</i>` : ''}</a>`).join('')}</nav>`;
@@ -361,6 +407,7 @@ function bind() {
   const el = root(); bindLang(el);
   el.querySelectorAll('[data-new]').forEach((b) => (b.onclick = (e) => { e.stopPropagation(); tab = 'req'; history.replaceState(null, '', '#req'); shell(b.dataset.new); }));
   el.querySelectorAll('[data-tab]').forEach((b) => (b.onclick = () => { location.hash = b.dataset.tab; }));
+  el.querySelectorAll('[data-shot]').forEach((b) => (b.onclick = (e) => { e.stopPropagation(); takePhoto(b); }));
   el.querySelector('#rf')?.addEventListener('submit', guard(async (e) => {
     e.preventDefault(); const f = Object.fromEntries(new FormData(e.target)); if (f.type === 'arıza bildirimi' && !f.preferred_date) delete f.preferred_date;
     data = await api('POST', 'requests', f); toast(t('sent')); shell();

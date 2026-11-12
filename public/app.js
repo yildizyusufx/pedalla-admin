@@ -247,7 +247,7 @@ async function bikePage(id) {
   const b = await GET(`detail/bikes/${id}`); const w = can('fleet', 'w');
   const cur = b.current;
   setMain(`${head(`${esc(b.code)} <span class="h-badge">${badge(b.status)}</span>`, `${esc(b.type || '')} · ${esc(b.brand || '')} ${esc(b.model || '')} · ${esc(b.color || '')}`,
-    `${w ? '<button class="btn sm" id="edit">Düzenle</button><button class="btn sm" id="stat">Durum değiştir</button>' : ''}<a class="btn sm" href="#/bikes/${b.id}/qr">QR etiketi</a>${quickBtns(b, false)}${can('service', 'w') ? `<a class="btn sm" href="#/service/new?bike_id=${b.id}">Servise al</a>` : ''}${can('rentals', 'w') && b.status === 'müsait' ? `<a class="btn primary sm" href="#/rentals/new?bike_id=${b.id}">Kirala</a>` : ''}`)}
+    `${w ? '<button class="btn sm" id="edit">Düzenle</button><button class="btn sm" id="stat">Durum değiştir</button>' : ''}<a class="btn sm" href="#/bikes/${b.id}/qr">QR etiketi</a>${w && cur?.rider_name ? '<button class="btn sm" id="askphoto">📷 Fotoğraf iste</button>' : ''}${quickBtns(b, false)}${can('service', 'w') ? `<a class="btn sm" href="#/service/new?bike_id=${b.id}">Servise al</a>` : ''}${can('rentals', 'w') && b.status === 'müsait' ? `<a class="btn primary sm" href="#/rentals/new?bike_id=${b.id}">Kirala</a>` : ''}`)}
   ${b.status === 'kayıp/çalıntı' ? `<div class="alert danger"><b>Çalıntı / kayıp bildirildi</b>${b.stolen_at ? ` · ${dt(b.stolen_at)}` : ''}${b.lat != null ? ` · Son konum: <a href="https://www.google.com/maps?q=${b.lat},${b.lng}" target="_blank" rel="noopener">${b.lat}, ${b.lng}</a> · ${ago(b.last_seen)}` : ''}</div>` : b.lock_requested ? '<div class="alert warn">🔒 Bisiklet durduruldu: GPS cihazına kilit komutu gönderildi. Tekrar kullanıma açmak için "Tekrar aktif et"e basın.</div>' : ''}
   ${b.economics ? econCard(b) : ''}
   <div class="grid g-1-2">
@@ -257,6 +257,7 @@ async function bikePage(id) {
     </div>
     ${card(`Konum · ${esc(b.location_name || '')} <small class="muted">son sinyal ${ago(b.last_seen)}</small>`, '<div id="bmap" class="map sm"></div>')}
   </div>
+  ${photoCard('bike_id', b.id, w, `Fotoğraf geçmişi <span class="cnt">${b.photo_count}</span>`, w ? '<button class="btn sm" id="addphoto">+ Fotoğraf ekle</button>' : '')}
   ${card('Kiralama geçmişi', table(b.rentals, [{ k: 'contract_no', l: 'Sözleşme' }, { k: 'customer_label', l: 'Kiracı' }, { k: 'rider_name', l: 'Sürücü', f: (r) => esc(r.rider_name || '—') }, { l: 'Başlangıç', f: (r) => date(r.start_date) }, { l: 'Dönüş', f: (r) => date(r.returned_at || r.end_date) }, { l: 'Ücret', f: (r) => `${money(r.rate)}/${r.period}`, cls: 'num' }, { l: 'Durum', f: (r) => badge(r.status) }], { link: (r) => `#/rentals/${r.id}` }))}
   ${card(`Giderler <small class="muted">kaza, dış onarım, sigorta… (kazançtan düşülür)</small>${w ? '<button class="btn sm right" id="addcost">+ Gider ekle</button>' : ''}`, table(b.costs, [{ l: 'Tarih', f: (r) => date(r.date) }, { l: 'Gider türü', f: (r) => esc(r.category) }, { k: 'description', l: 'Açıklama' }, { l: 'Tutar', f: (r) => money(r.amount), cls: 'num' }, { l: 'Kullanıcı', f: (r) => esc(r.user_name || '—') }, w ? { l: '', f: (r) => `<button class="btn ghost sm" data-delcost="${r.id}" title="Sil">✕</button>` } : null].filter(Boolean), { empty: 'Kayıtlı gider yok' }))}
   ${card('Servis geçmişi', table(b.services, [{ k: 'order_no', l: 'No' }, { l: 'Kabul', f: (r) => dt(r.received_at) }, { l: 'Tip', f: (r) => esc(r.type) }, { k: 'complaint', l: 'Şikayet', f: (r) => esc((r.complaint || '').slice(0, 70)) }, { l: 'Teknisyen', f: (r) => esc(r.technician_name || '—') }, { l: 'Parça', f: (r) => money(r.parts_total), cls: 'num' }, { l: 'Durum', f: (r) => badge(r.status) }], { link: (r) => `#/service/${r.id}` }))}`);
@@ -269,11 +270,98 @@ async function bikePage(id) {
   } else $('#bmap').innerHTML = '<div class="empty">Konum bilgisi yok</div>';
   $('#edit')?.addEventListener('click', () => editForm('bikes', b, { onSaved: (x) => (x ? route() : (location.hash = '#/bikes')) }));
   bindQuick(main(), () => b, route);
+  loadPhotos(main());
+  $('#askphoto')?.addEventListener('click', () => askPhoto(b, cur));
+  $('#addphoto')?.addEventListener('click', () => addStaffPhoto(b));
   $('#addcost')?.addEventListener('click', () => editForm('bike_costs', null, { defaults: { bike_id: b.id, date: todayISO() }, onSaved: route }));
   main().querySelectorAll('[data-delcost]').forEach((x) => x.onclick = guard(async (e) => { e.stopPropagation(); if (await confirmBox('Gider kaydı silinsin mi?')) { await DEL(`bike_costs/${x.dataset.delcost}`); route(); } }));
   $('#stat')?.addEventListener('click', () => {
     const body = modal('Durum değiştir', `<form class="grid-form">${inputHtml(field('bikes', 'status'), b.status)}${inputHtml({ k: 'notes', l: 'Not', t: 'textarea' }, b.notes)}<div class="form-actions span2"><button class="btn primary">Kaydet</button></div></form>`);
     body.querySelector('form').onsubmit = guard(async (e) => { e.preventDefault(); await PUT(`bikes/${b.id}`, readForm(e.target)); closeModal(); toast('Durum güncellendi'); route(); });
+  });
+}
+
+// ---------- bike photo history (timeline) ----------
+// Photos come from the rider screen (pick-up selfie + bike photos, photos on request) or from staff.
+const PHOTO_STAGE = { 'teslim alma': 'Teslim alma kontrolü', talep: 'İstenen fotoğraf', 'sürücü': 'Sürücü gönderdi', personel: 'Personel ekledi' };
+const PHOTO_KIND = { selfie: 'Selfie', bisiklet: 'Bisiklet' };
+const photoCard = (col, id, w, title, actions = '') => card(`${title}${actions ? `<span class="card-act">${actions}</span>` : ''}`, `<div class="ptl" data-col="${col}" data-id="${id}" data-w="${w ? 1 : ''}"><div class="muted">Yükleniyor…</div></div>`);
+// shrink in the browser: full photo ≈ 1600 px, thumbnail ≈ 320 px (both JPEG) → about 200–400 KB per photo in the database
+async function photoData(file) {
+  const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('Fotoğraf okunamadı (JPEG/PNG seçin).')); i.src = URL.createObjectURL(file); });
+  const shot = (max, q) => { const k = Math.min(1, max / Math.max(img.width, img.height)); const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); return c.toDataURL('image/jpeg', q); };
+  const out = { data: shot(1600, 0.8), thumb: shot(320, 0.7) }; URL.revokeObjectURL(img.src); return out;
+}
+function photoEvents(photos) {
+  // consecutive photos of the same moment (same day, stage, person, request) form one event on the line
+  const ev = [];
+  for (const p of photos) {
+    const key = [String(p.created_at).slice(0, 10), p.stage, p.rider_id || 'u' + (p.user_name || ''), p.request_id || '', p.rental_id || ''].join('|');
+    const last = ev[ev.length - 1];
+    if (last && last.key === key && Math.abs(new Date(last.items[last.items.length - 1].created_at.replace(' ', 'T')) - new Date(p.created_at.replace(' ', 'T'))) < 3 * 3600e3) last.items.push(p);
+    else ev.push({ key, items: [p] });
+  }
+  return ev;
+}
+function photoTimelineHtml(box, h, append) {
+  const col = box.dataset.col; const w = !!box.dataset.w;
+  const reqs = append ? '' : h.requests.filter((q) => q.status === 'bekliyor').map((q) => {
+    const wa = waPhone(q.rider_phone); const url = `${location.origin}${location.pathname.replace(/[^/]*$/, '')}portal.html`;
+    const msg = `Pedalla: ${q.bike_code} – ${q.kind === 'selfie' ? 'bitte ein Selfie' : q.kind === 'bisiklet' ? 'bitte ein Foto vom Fahrrad' : 'bitte ein Selfie und ein Foto vom Fahrrad'} im Fahrerbereich senden${q.note ? ` (${q.note})` : ''}: ${url}`;
+    return `<div class="ptl-req"><span class="ptl-req-ic">⏳</span><div class="grow"><b>Fotoğraf bekleniyor · ${esc(PHOTO_KIND[q.kind] || q.kind)}</b><small>${esc(q.rider_name || '—')} · ${col !== 'bike_id' ? esc(q.bike_code) + ' · ' : ''}istendi ${ago(q.created_at)}${q.user_name ? ' · ' + esc(q.user_name) : ''}${q.note ? ` · “${esc(q.note)}”` : ''}</small></div>
+      ${wa ? `<a class="btn xs wa" target="_blank" rel="noopener" href="https://wa.me/${wa}?text=${encodeURIComponent(msg)}">WhatsApp ile hatırlat</a>` : ''}${w ? `<button class="btn xs ghost" data-preqx="${q.id}">İptal</button>` : ''}</div>`;
+  }).join('');
+  if (!append && !h.photos.length) return `${reqs}<p class="muted">Henüz fotoğraf yok. ${col === 'bike_id' ? 'Sürücü teslim alırken selfie ve bisiklet fotoğrafı çektiğinde ya da "Fotoğraf iste" ile istediğinizde burada tarih sırasıyla görünür.' : ''}</p>`;
+  let lastDay = append ? box.dataset.lastDay : '';
+  const rows = photoEvents(h.photos).map((e) => {
+    const p = e.items[0]; const day = String(p.created_at).slice(0, 10);
+    const dayHead = day !== lastDay ? `<li class="ptl-day"><span>${date(day)}</span></li>` : ''; lastDay = day;
+    const who = p.rider_name ? `<a href="#/riders/${p.rider_id}">${esc(p.rider_name)}</a>` : esc(p.user_name || '—');
+    const geo = p.lat != null ? ` · <a href="https://www.google.com/maps?q=${p.lat},${p.lng}" target="_blank" rel="noopener">📍 konum</a>` : '';
+    return `${dayHead}<li class="ptl-ev s-${(p.stage || '').replace(/\s+/g, '-')}"><div class="ptl-dot"></div><div class="ptl-body">
+      <div class="ptl-h"><b>${esc(PHOTO_STAGE[p.stage] || p.stage || 'Fotoğraf')}</b><small>${String(p.created_at).slice(11, 16)} · ${who}${col !== 'bike_id' ? ` · <a href="#/bikes/${p.bike_id}">${esc(p.bike_code)}</a>` : ''}${p.contract_no && col !== 'rental_id' ? ` · <a href="#/rentals/${p.rental_id}">${esc(p.contract_no)}</a>` : ''}${geo}</small></div>
+      ${p.request_note ? `<p class="ptl-note">İstek: “${esc(p.request_note)}”</p>` : ''}${e.items.filter((x) => x.note).map((x) => `<p class="ptl-note">${esc(x.note)}</p>`).join('')}
+      <div class="ptl-imgs">${e.items.map((x) => `<button type="button" class="ptl-img ${x.kind === 'selfie' ? 'selfie' : ''}" data-ph="${x.id}" title="${esc(PHOTO_KIND[x.kind] || '')}">${x.thumb ? `<img src="data:image/jpeg;base64,${x.thumb}" alt="" loading="lazy">` : '<span>JPG</span>'}<i>${esc(PHOTO_KIND[x.kind] || '')}</i></button>`).join('')}</div></div></li>`;
+  }).join('');
+  box.dataset.lastDay = lastDay;
+  return append ? rows : `${reqs}<ol class="ptl-line">${rows}</ol>${h.more ? '<button class="btn sm ghost ptl-more">Daha eski fotoğraflar</button>' : ''}`;
+}
+async function loadPhotos(root, box = null, before = 0) {
+  for (const el of box ? [box] : root.querySelectorAll('.ptl')) {
+    const h = await GET('photos', { [el.dataset.col]: el.dataset.id, ...(before ? { before } : {}) });
+    if (before) { el.querySelector('.ptl-more')?.remove(); el.querySelector('.ptl-line').insertAdjacentHTML('beforeend', photoTimelineHtml(el, h, true)); if (h.more) el.insertAdjacentHTML('beforeend', '<button class="btn sm ghost ptl-more">Daha eski fotoğraflar</button>'); }
+    else el.innerHTML = photoTimelineHtml(el, h, false);
+    el.dataset.oldest = h.photos.length ? h.photos[h.photos.length - 1].id : el.dataset.oldest;
+    el.querySelectorAll('[data-ph]').forEach((b) => b.onclick = guard(() => openPhoto(b.dataset.ph, !!el.dataset.w, () => loadPhotos(root, el))));
+    el.querySelectorAll('[data-preqx]').forEach((b) => b.onclick = guard(async () => { if (await confirmBox('Fotoğraf talebi iptal edilsin mi?')) { await POST(`photo_requests/${b.dataset.preqx}/cancel`); loadPhotos(root, el); } }));
+    const more = el.querySelector('.ptl-more'); if (more) more.onclick = guard(() => loadPhotos(root, el, Number(el.dataset.oldest)));
+  }
+}
+async function openPhoto(id, w, after) {
+  const body = modal('Fotoğraf', '<div class="loading"><div class="pdl-loader"></div></div>', { wide: true });
+  const p = await GET(`photos/${id}`);
+  body.innerHTML = `<figure class="ph-full"><img src="data:${p.mime || 'image/jpeg'};base64,${p.data}" alt=""><figcaption class="muted">${dt(p.created_at)} · ${esc(PHOTO_KIND[p.kind] || p.kind)} · ${esc(PHOTO_STAGE[p.stage] || p.stage || '')}${p.note ? ` · ${esc(p.note)}` : ''}</figcaption></figure>
+    <div class="form-actions"><a class="btn sm" download="pedalla-foto-${p.id}.jpg" href="data:image/jpeg;base64,${p.data}">İndir</a>${w ? '<button class="btn sm danger" id="phdel">Sil</button>' : ''}</div>`;
+  body.querySelector('#phdel')?.addEventListener('click', guard(async () => { if (await confirmBox('Fotoğraf silinsin mi? Bisikletin geçmişinden kalkar.')) { await DEL(`photos/${id}`); closeModal(); toast('Fotoğraf silindi'); after?.(); } }));
+}
+function askPhoto(b, cur) {
+  const body = modal(`Fotoğraf iste · ${b.code}`, `<form class="grid-form"><p class="span2">${esc(cur.rider_name)} sürücü ekranını açtığında en üstte "Fotoğraf çek" görevi görür; çektiği fotoğraf bu bisikletin fotoğraf geçmişine eklenir. Sürücü ekranı anlık bildirim gönderemez; acilse talepten sonra WhatsApp ile de hatırlatabilirsiniz.</p>
+    <label class="field"><span>Ne istensin?</span><select name="kind"><option value="bisiklet">Bisiklet fotoğrafı</option><option value="selfie + bisiklet">Selfie + bisiklet fotoğrafı</option><option value="selfie">Sadece selfie</option></select></label>
+    <label class="field span2"><span>Not (sürücü görür)</span><input name="note" maxlength="300" placeholder="Örn. arka tekerleği ve kilidi yakından çek"></label>
+    <div class="form-actions span2"><button class="btn primary">Talep gönder</button></div></form>`);
+  body.querySelector('form').onsubmit = guard(async (e) => {
+    e.preventDefault(); const x = await POST('photo_requests', { bike_id: b.id, ...readForm(e.target) }); closeModal();
+    toast(x.portal ? `${x.rider} için fotoğraf talebi gönderildi` : `Talep kaydedildi; ${x.rider} için sürücü ekranı girişi açık değil`, x.portal ? 'ok' : 'info'); route();
+  });
+}
+function addStaffPhoto(b) {
+  const body = modal(`Fotoğraf ekle · ${b.code}`, `<form class="grid-form"><label class="field span2"><span>Fotoğraflar</span><input type="file" name="f" accept="image/*" capture="environment" multiple required></label>
+    <label class="field span2"><span>Not</span><input name="note" maxlength="300" placeholder="Örn. iade kontrolü, ön çamurlukta çizik"></label>
+    <div class="form-actions span2"><button class="btn primary">Yükle</button></div></form>`);
+  body.querySelector('form').onsubmit = guard(async (e) => {
+    e.preventDefault(); const files = [...e.target.f.files]; const note = e.target.note.value; const btn = e.target.querySelector('button'); btn.disabled = true;
+    try { for (const f of files) { const d = await photoData(f); await POST('photos', { bike_id: b.id, kind: 'bisiklet', note, ...d }); } } finally { btn.disabled = false; }
+    closeModal(); toast(files.length > 1 ? `${files.length} fotoğraf eklendi` : 'Fotoğraf eklendi'); route();
   });
 }
 
@@ -472,10 +560,12 @@ async function rentalPage(id) {
   <div class="grid g-2">
     ${can('finance') ? card('Depozito hareketleri', table(r.deposits, [{ l: 'Tarih', f: (d) => date(d.date) }, { l: 'Hareket', f: (d) => badge(d.type) }, { l: 'Tutar', f: (d) => money(d.amount), cls: 'num' }, { k: 'notes', l: 'Açıklama' }], { empty: 'Depozito hareketi yok' })) : ''}
     ${docsCard('rental', r.id, r.documents, w, 'Kiralama belgeleri (imzalı sözleşme, teslim fotoğrafları)')}
+    ${photoCard('rental_id', r.id, false, 'Fotoğraflar (teslim alma selfie\'si, bisiklet fotoğrafları)')}
     ${card('Bu kiralamadaki servis kayıtları', table(r.services, [{ k: 'order_no', l: 'No' }, { l: 'Tip', f: (s) => esc(s.type) }, { l: 'Durum', f: (s) => badge(s.status) }], { link: (s) => `#/service/${s.id}`, empty: 'Servis kaydı yok' }))}
   </div>`);
   $('#edit')?.addEventListener('click', () => editForm('rentals', r, { onSaved: (x) => (x ? route() : (location.hash = '#/rentals')) }));
   bindDocs(main(), route);
+  loadPhotos(main());
   $('#act')?.addEventListener('click', guard(async () => { await POST(`rentals/${id}/activate`); toast('Bisiklet teslim edildi, kiralama aktif'); route(); }));
   $('#cancel')?.addEventListener('click', guard(async () => { if (await confirmBox('Rezervasyon iptal edilsin mi?')) { await POST(`rentals/${id}/cancel`); route(); } }));
   $('#bill')?.addEventListener('click', guard(async () => { const x = await POST(`rentals/${id}/bill`); toast(x.created ? `${x.created} fatura oluşturuldu` : 'Faturalanacak yeni dönem yok', x.created ? 'ok' : 'info'); route(); }));
@@ -617,9 +707,11 @@ async function riderPage(id) {
   ${card('Sürücü ekranı', `${dl([['Durum', r.portal_active && r.portal_email ? '<span class="badge b-ok">giriş açık</span>' : '<span class="badge b-muted">kapalı</span>'], ['Giriş e-postası', esc(r.portal_email || '—')], ['Son giriş', dt(r.portal_last_login)], ['Dil', esc({ tr: 'Türkçe', de: 'Deutsch', en: 'English' }[r.lang] || '—')], ['Adres', `<a href="${location.origin}${location.pathname.replace(/[^/]*$/, '')}portal.html" target="_blank">${location.host}${location.pathname.replace(/[^/]*$/, '')}portal.html</a>`]])}
     <p class="muted">${r.portal_email ? 'Sürücü bu e-posta ve sizin belirlediğiniz şifreyle girer. Şifreyi değiştirmek veya girişi kapatmak için "Düzenle".' : 'Sürücü ekranını açmak için "Düzenle"den giriş e-postası ve şifre belirleyin.'}</p>
     ${r.requests?.length ? table(r.requests, [{ l: 'Geliş', f: (x) => dt(x.created_at) }, { l: 'Talep', f: (x) => esc(x.type) }, { l: 'İstenen tarih', f: (x) => date(x.preferred_date) }, { l: 'Durum', f: (x) => badge(x.status) }], { link: (x) => `#/portal_requests/${x.id}` }) : ''}`)}
+  ${photoCard('rider_id', r.id, false, 'Selfie\'ler ve gönderdiği fotoğraflar')}
   ${card('Kiralamalar', table(r.rentals, [{ k: 'contract_no', l: 'Sözleşme' }, { k: 'bike_code', l: 'Bisiklet' }, { l: 'Dönem', f: (x) => `${date(x.start_date)} – ${date(x.returned_at || x.end_date)}` }, { l: 'Durum', f: (x) => badge(x.is_late ? 'gecikmede' : x.status) }], { link: (x) => `#/rentals/${x.id}`, empty: 'Kiralama yok' }))}`);
   $('#edit')?.addEventListener('click', () => editForm('riders', r, { onSaved: (x) => (x ? route() : (location.hash = '#/riders')) }));
   bindDocs(main(), route);
+  loadPhotos(main());
   if (window.L && r.last_lat != null && $('#rmap')) {
     const m = L.map('rmap').setView([r.last_lat, r.last_lng], 15);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(m);
@@ -1081,7 +1173,7 @@ async function rolesPage() {
 const SETTINGS_FORM = [
   ['Şirket', [['company_name', 'Şirket adı'], ['company_address', 'Adres'], ['pickup_address', 'Teslim alma adresi (site ve sürücü ekranı)'], ['company_phone', 'Telefon'], ['company_email', 'E-posta'], ['company_tax_no', 'USt-IdNr / vergi no'], ['company_iban', 'IBAN']]],
   ['Finans', [['currency', 'Para birimi'], ['vat_rate', 'KDV oranı %', 'number'], ['payment_terms_days', 'Ödeme vadesi (gün)', 'number'], ['late_fee_per_day', 'Geç ödeme bedeli / gün (€)', 'number'], ['late_return_fee_per_day', 'Geç iade bedeli / gün (€)', 'number']]],
-  ['Sürücü ekranı', [['portal_signup', 'Sürücüler sürücü ekranından kendi hesabını oluşturabilsin', 'select', [{ v: '1', l: 'Açık' }, { v: '0', l: 'Kapalı' }]]]],
+  ['Sürücü ekranı', [['portal_signup', 'Sürücüler sürücü ekranından kendi hesabını oluşturabilsin', 'select', [{ v: '1', l: 'Açık' }, { v: '0', l: 'Kapalı' }]], ['photo_pickup', 'Teslim almada selfie + bisiklet fotoğrafı iste (bisikletin fotoğraf geçmişine eklenir)', 'select', [{ v: '1', l: 'Açık' }, { v: '0', l: 'Kapalı' }]]]],
   ['Kiralama periyotları', [['rental_periods', 'Sürücülerin ve sizin seçebileceğiniz periyotlar (kapalı olanlar tarife, kiralama ve sürücü ekranında görünmez)', 'periods']]],
   ['Bisiklet tipleri', [['bike_types', 'Bisiklet tipleri (her satıra bir tip; bisiklet ve tarife formlarında seçilir)', 'textarea']]],
   ['Servis & filo', [['service_interval_days', 'Bakım aralığı (gün)', 'number'], ['service_interval_km', 'Bakım aralığı (km)', 'number'], ['labor_rate', 'Saatlik işçilik ücreti (€)', 'number'], ['low_battery_alert', 'Düşük batarya uyarısı %', 'number'], ['map_center_lat', 'Harita merkezi enlem'], ['map_center_lng', 'Harita merkezi boylam'], ['telemetry_key', 'GPS cihaz API anahtarı']]],

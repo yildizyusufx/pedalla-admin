@@ -411,6 +411,8 @@ export const RESOURCES = {
 export const DEFAULT_SETTINGS = {
   rental_periods: 'ay',
   portal_signup: '1',
+  // rider screen asks for a selfie + bike photos when a rental starts (pick-up check)
+  photo_pickup: '1',
   bike_types: BIKE_TYPES.join('\n'),
   company_name: 'Pedalla GmbH',
   company_address: 'Missundestraße 50, 22769 Hamburg',

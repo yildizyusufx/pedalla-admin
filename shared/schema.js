@@ -75,6 +75,20 @@ CREATE TABLE IF NOT EXISTS portal_requests (
 CREATE TABLE IF NOT EXISTS bike_costs (
   id INTEGER PRIMARY KEY, bike_id INTEGER NOT NULL REFERENCES bikes(id), date TEXT NOT NULL, category TEXT, amount REAL NOT NULL,
   description TEXT, user_id INTEGER, created_at TEXT DEFAULT (datetime('now')));
+-- bike photo history: pick-up selfies, bike photos sent from the rider screen (on request or at pick-up) and staff photos.
+-- data = full JPEG (resized in the browser), thumb = small JPEG for the timeline
+CREATE TABLE IF NOT EXISTS bike_photos (
+  id INTEGER PRIMARY KEY, bike_id INTEGER NOT NULL REFERENCES bikes(id), rider_id INTEGER, rental_id INTEGER, request_id INTEGER,
+  kind TEXT DEFAULT 'bisiklet', stage TEXT, mime TEXT, size INTEGER, data TEXT, thumb TEXT, note TEXT, lat REAL, lng REAL,
+  uploaded_by INTEGER, created_at TEXT DEFAULT (datetime('now')));
+CREATE INDEX IF NOT EXISTS ix_photo_bike ON bike_photos(bike_id, id);
+CREATE INDEX IF NOT EXISTS ix_photo_rider ON bike_photos(rider_id, id);
+CREATE INDEX IF NOT EXISTS ix_photo_rental ON bike_photos(rental_id, id);
+-- photo requests from staff to the rider of a bike ("bisikletin fotoğrafını çek")
+CREATE TABLE IF NOT EXISTS photo_requests (
+  id INTEGER PRIMARY KEY, bike_id INTEGER NOT NULL REFERENCES bikes(id), rider_id INTEGER, rental_id INTEGER, kind TEXT DEFAULT 'bisiklet',
+  note TEXT, status TEXT DEFAULT 'bekliyor', requested_by INTEGER, done_at TEXT, created_at TEXT DEFAULT (datetime('now')));
+CREATE INDEX IF NOT EXISTS ix_preq_rider ON photo_requests(rider_id, status);
 CREATE TABLE IF NOT EXISTS audit_log (
   id INTEGER PRIMARY KEY, ts TEXT DEFAULT (datetime('now')), user_id INTEGER, action TEXT, entity TEXT, entity_id INTEGER, details TEXT);
 `;

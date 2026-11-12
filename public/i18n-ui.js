@@ -374,6 +374,22 @@ export const UI = {
   "Bakım periyodu (gün, boşsa Ayarlar'daki)": ['Wartungsintervall (Tage, leer = aus Einstellungen)', 'Service interval (days, empty = from Settings)'],
   'Sonraki bakım (boşsa otomatik)': ['Nächste Wartung (leer = automatisch)', 'Next service (empty = automatic)'],
   'Örn. teslim saati, özel fiyat anlaşması, sürücüye verilen ek bilgi…': ['z. B. Übergabezeit, Sonderpreis, Zusatzinfos für den Fahrer…', 'e.g. handover time, special price agreement, extra info for the rider…'],
+  // ---- bike photo history (2026-11)
+  '📷 Fotoğraf iste': ['📷 Foto anfordern', '📷 Request photo'], 'Fotoğraf iste': ['Foto anfordern', 'Request photo'], 'Fotoğraf geçmişi': ['Foto-Historie', 'Photo history'], 'Fotoğraf ekle': ['Foto hinzufügen', 'Add photo'],
+  "Fotoğraflar (teslim alma selfie'si, bisiklet fotoğrafları)": ['Fotos (Selfie bei Übergabe, Fahrradfotos)', 'Photos (pick-up selfie, bike photos)'], "Selfie'ler ve gönderdiği fotoğraflar": ['Selfies und gesendete Fotos', 'Selfies and photos sent'],
+  'Teslim alma kontrolü': ['Übergabe-Check', 'Pick-up check'], 'İstenen fotoğraf': ['Angefordertes Foto', 'Requested photo'], 'Sürücü gönderdi': ['Vom Fahrer gesendet', 'Sent by rider'], 'Personel ekledi': ['Vom Team hinzugefügt', 'Added by staff'],
+  'Selfie': ['Selfie', 'Selfie'], 'Fotoğraf': ['Foto', 'Photo'], 'Fotoğraflar': ['Fotos', 'Photos'], 'Fotoğraf bekleniyor': ['Foto ausstehend', 'Photo pending'], 'İstenen fotoğraf geldi': ['Angefordertes Foto ist da', 'Requested photo received'],
+  'WhatsApp ile hatırlat': ['Per WhatsApp erinnern', 'Remind via WhatsApp'], '📍 konum': ['📍 Standort', '📍 location'], 'Daha eski fotoğraflar': ['Ältere Fotos', 'Older photos'], 'İndir': ['Herunterladen', 'Download'],
+  'Henüz fotoğraf yok.': ['Noch keine Fotos.', 'No photos yet.'],
+  'Henüz fotoğraf yok. Sürücü teslim alırken selfie ve bisiklet fotoğrafı çektiğinde ya da "Fotoğraf iste" ile istediğinizde burada tarih sırasıyla görünür.': ['Noch keine Fotos. Wenn der Fahrer bei der Abholung ein Selfie und Fahrradfotos macht oder Sie über „Foto anfordern" eins anfragen, erscheinen sie hier nach Datum.', 'No photos yet. When the rider takes a selfie and bike photos at pick-up, or you ask via "Request photo", they appear here by date.'],
+  'Fotoğraf silinsin mi? Bisikletin geçmişinden kalkar.': ['Foto löschen? Es verschwindet aus der Fahrrad-Historie.', 'Delete photo? It is removed from the bike history.'], 'Fotoğraf silindi': ['Foto gelöscht', 'Photo deleted'],
+  'Fotoğraf talebi iptal edilsin mi?': ['Fotoanfrage stornieren?', 'Cancel the photo request?'], 'Ne istensin?': ['Was wird benötigt?', 'What is needed?'], 'Bisiklet fotoğrafı': ['Fahrradfoto', 'Bike photo'],
+  'Selfie + bisiklet fotoğrafı': ['Selfie + Fahrradfoto', 'Selfie + bike photo'], 'Sadece selfie': ['Nur Selfie', 'Selfie only'], 'Not (sürücü görür)': ['Notiz (sieht der Fahrer)', 'Note (the rider sees it)'],
+  'Örn. arka tekerleği ve kilidi yakından çek': ['z. B. Hinterrad und Schloss aus der Nähe fotografieren', 'e.g. take the rear wheel and the lock close up'], 'Talep gönder': ['Anfrage senden', 'Send request'],
+  'Örn. iade kontrolü, ön çamurlukta çizik': ['z. B. Rückgabe-Check, Kratzer am vorderen Schutzblech', 'e.g. return check, scratch on the front mudguard'], 'Fotoğraf eklendi': ['Foto hinzugefügt', 'Photo added'], '# fotoğraf eklendi': ['# Fotos hinzugefügt', '# photos added'],
+  'Teslim almada selfie + bisiklet fotoğrafı iste (bisikletin fotoğraf geçmişine eklenir)': ['Bei Übergabe Selfie + Fahrradfotos verlangen (kommt in die Foto-Historie des Rads)', 'Ask for a selfie + bike photos at pick-up (added to the bike photo history)'],
+  'Bu bisiklet şu an bir sürücüde değil (aktif kiralama ve sürücü yok).': ['Dieses Rad ist gerade bei keinem Fahrer (keine aktive Miete mit Fahrer).', 'This bike is not with a rider right now (no active rental with a rider).'],
+  'Fotoğraf JPEG olmalı.': ['Das Foto muss ein JPEG sein.', 'The photo must be a JPEG.'], 'Fotoğraf çok büyük.': ['Foto zu groß.', 'Photo too large.'], 'Fotoğraf okunamadı (JPEG/PNG seçin).': ['Foto konnte nicht gelesen werden (JPEG/PNG wählen).', 'Could not read the photo (choose JPEG/PNG).'],
 };
 
 // Texts with a variable part (names, numbers) – tried after the exact lookups.
@@ -396,4 +412,9 @@ export const PATTERNS = [
   [/^“(.+)” için sonuçlar$/, (m) => [`Ergebnisse für „${m[1]}"`, `Results for "${m[1]}"`]],
   [/^(.+): ([\d.,]+) (\S+) \(min ([\d.,]+)\)$/, (m, tr) => [`${m[1]}: ${m[2]} ${tr(m[3])} (min. ${m[4]})`, `${m[1]}: ${m[2]} ${tr(m[3])} (min ${m[4]})`]],
   [/^(.+?) (\S+\.(?:jpe?g|png|pdf|webp|heic))$/i, (m, tr) => { const x = tr(m[1]); return x === m[1] ? null : [`${x} ${m[2]}`, `${x} ${m[2]}`]; }],
+  [/^istendi (.+)$/, (m, tr) => [`angefragt ${tr(m[1])}`, `requested ${tr(m[1])}`]],
+  [/^İstek: “(.+)”$/, (m) => [`Anfrage: „${m[1]}"`, `Request: "${m[1]}"`]],
+  [/^(.+) için fotoğraf talebi gönderildi$/, (m) => [`Fotoanfrage an ${m[1]} gesendet`, `Photo request sent to ${m[1]}`]],
+  [/^Talep kaydedildi; (.+) için sürücü ekranı girişi açık değil$/, (m) => [`Anfrage gespeichert; ${m[1]} hat keinen Zugang zum Fahrerbereich`, `Request saved; ${m[1]} has no rider-screen login`]],
+  [/^(.+) sürücü ekranını açtığında en üstte "Fotoğraf çek" görevi görür; (.+)$/, (m) => [`${m[1]} sieht beim Öffnen des Fahrerbereichs oben die Aufgabe „Foto aufnehmen"; das Foto kommt in die Foto-Historie dieses Rads. Der Fahrerbereich kann keine Push-Nachrichten senden; wenn es eilt, nach der Anfrage zusätzlich per WhatsApp erinnern.`, `${m[1]} sees a "Take a photo" task at the top of the rider screen; the photo is added to this bike's photo history. The rider screen cannot send push notifications; if it is urgent, also remind them via WhatsApp after the request.`]],
 ];

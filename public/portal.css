@@ -198,3 +198,24 @@ body.portal, .portal .p-hello, .portal .p-title, .portal .p-h { color: var(--ink
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .p-lang button.on { background: var(--brand); } }
 :root[data-theme="dark"] .p-lang button.on { background: var(--brand); }
+
+/* ---- photo tasks (pick-up selfie, photos on request) ---- */
+.p-photo { border: 2px solid var(--brand); }
+.p-photo.done { border-color: var(--ok); }
+.p-photo-h { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+.p-photo-h > .ic { width: 38px; height: 38px; padding: 8px; border-radius: 12px; color: #fff; background: var(--brand); flex: none; }
+.p-photo.done .p-photo-h > .ic { background: var(--ok); }
+.p-photo-h b { display: block; font-size: 16px; } .p-photo-h small { font-size: 12.5px; }
+.p-photo p { margin: 6px 0 10px; font-size: 14px; }
+.p-shots { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.p-shot { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 14px 8px 12px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: inherit; cursor: pointer; }
+.p-shot:active { background: var(--brand-l); }
+.p-shot b { font-size: 14px; } .p-shot small { color: var(--muted); font-size: 12px; font-weight: 700; }
+.p-shot-img { position: relative; width: 72px; height: 72px; border-radius: 16px; background: var(--brand-l); display: grid; place-items: center; overflow: visible; }
+.p-shot.selfie .p-shot-img { border-radius: 50%; }
+.p-shot-img img { position: absolute; inset: 0; width: 72px !important; height: 72px !important; max-width: none; object-fit: cover; border-radius: inherit; }
+.p-shot-img > .ic { width: 34px; height: 34px; color: var(--brand); }
+.p-shot-img i { position: absolute; right: -4px; bottom: -4px; width: 24px; height: 24px; border-radius: 50%; background: var(--ok); display: grid; place-items: center; box-shadow: 0 0 0 3px var(--surface); }
+.p-shot-img i .ic { width: 15px; height: 15px; color: #fff; stroke-width: 3; }
+.p-shot.ok { border-color: color-mix(in srgb, var(--ok) 50%, var(--line)); }
+.p-shot-free { margin-top: 10px; width: 100%; }

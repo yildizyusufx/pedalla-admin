@@ -2,6 +2,8 @@
 // Used by the rider portal and by the admin panel language switch.
 // [de, en]
 export const VALUES = {
+  // bike photo history
+  'bisiklet': ['Fahrrad', 'bike'], 'selfie': ['Selfie', 'selfie'], 'selfie + bisiklet': ['Selfie + Fahrrad', 'selfie + bike'], 'gönderildi': ['gesendet', 'sent'],
   // bike status
   'müsait': ['verfügbar', 'available'], 'kirada': ['vermietet', 'rented'], 'rezerve': ['reserviert', 'reserved'], 'serviste': ['im Service', 'in service'],
   'arızalı': ['defekt', 'faulty'], 'kayıp/çalıntı': ['verloren/gestohlen', 'lost/stolen'], 'hizmet dışı': ['außer Betrieb', 'out of service'],

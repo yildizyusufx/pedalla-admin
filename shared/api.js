@@ -182,7 +182,7 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
     if (res === 'users' && user.id === Number(id)) err(409, 'Kendi kullanıcınızı silemezsiniz.');
     if (res === 'payments') { await db.run('DELETE FROM cash_moves WHERE payment_id=?', [id]); await db.run('DELETE FROM payments WHERE id=?', [id]); await recalcInvoice(row.invoice_id); await audit(user, 'silme', res, id); return { ok: true }; }
     // linked records block the delete (checked here too, because Turso does not enforce foreign keys)
-    const cleanup = { bikes: ['bike_locations', 'bike_costs'], riders: ['portal_requests'] }[res] || [];
+    const cleanup = { bikes: ['bike_locations', 'bike_costs', 'bike_photos', 'photo_requests'], riders: ['portal_requests'] }[res] || [];
     for (const [t, col] of await refsTo(res)) {
       if (cleanup.includes(t)) continue;
       if (await db.get(`SELECT 1 FROM ${t} WHERE ${col}=? LIMIT 1`, [id])) err(409, `Bu kayda bağlı ${(RESOURCES[t]?.label || t).toLocaleLowerCase('tr')} olduğu için silinemiyor.`);
@@ -251,6 +251,61 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
     await audit(user, 'belge', own[0], Number(b.owner_id), `${b.doc_type || ''} ${b.name || ''}`);
     return r.lastId;
   }
+  // ---------- bike photo history (pick-up selfies, photos on request, staff photos) ----------
+  // Photos are resized in the browser (full ≈ 1600 px JPEG + ≈ 320 px thumbnail) and stored base64 in the database,
+  // like documents: Vercel has no lasting file storage. Lists only ever send thumbnails; the full photo is fetched on click.
+  const PHOTO_KINDS = ['bisiklet', 'selfie'];
+  const PHOTO_REQ_KINDS = ['bisiklet', 'selfie', 'selfie + bisiklet'];
+  const PICKUP_BIKE_PHOTOS = 2; // pick-up check: one selfie + at least this many bike photos
+  const jpeg = (d, max, label) => {
+    const m = /^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/.exec(String(d || ''));
+    if (!m) err(400, `${label} JPEG olmalı.`);
+    const size = Math.floor(m[1].length * 3 / 4);
+    if (size > max) err(413, `${label} çok büyük.`);
+    return [m[1], size];
+  };
+  async function addPhoto(p, user) {
+    const [data, size] = jpeg(p.data, 2.5 * 1048576, 'Fotoğraf');
+    const thumb = p.thumb ? jpeg(p.thumb, 120 * 1024, 'Küçük görsel')[0] : null;
+    const num = (v) => (v === '' || v == null || !Number.isFinite(Number(v)) ? null : Number(v));
+    const x = await db.run('INSERT INTO bike_photos(bike_id,rider_id,rental_id,request_id,kind,stage,mime,size,data,thumb,note,lat,lng,uploaded_by,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      [Number(p.bike_id), p.rider_id || null, p.rental_id || null, p.request_id || null, PHOTO_KINDS.includes(p.kind) ? p.kind : 'bisiklet', p.stage || null, 'image/jpeg', size, data, thumb,
+        String(p.note || '').slice(0, 500) || null, num(p.lat), num(p.lng), user?.id ?? null, nowTs()]);
+    return x.lastId;
+  }
+  // a request is done once every asked kind has arrived
+  async function settlePhotoRequest(id) {
+    const q = await db.get('SELECT * FROM photo_requests WHERE id=?', [id]); if (!q || q.status !== 'bekliyor') return;
+    const kinds = new Set((await db.all('SELECT DISTINCT kind FROM bike_photos WHERE request_id=?', [id])).map((r) => r.kind));
+    const need = q.kind === 'selfie + bisiklet' ? ['selfie', 'bisiklet'] : [q.kind];
+    if (need.every((k) => kinds.has(k))) await db.run("UPDATE photo_requests SET status='gönderildi', done_at=? WHERE id=?", [nowTs(), id]);
+  }
+  const PHOTO_SQL = `SELECT p.id, p.bike_id, p.rider_id, p.rental_id, p.request_id, p.kind, p.stage, p.size, p.thumb, p.note, p.lat, p.lng, p.created_at,
+      rd.name AS rider_name, u.name AS user_name, b.code AS bike_code, x.contract_no, q.note AS request_note
+    FROM bike_photos p LEFT JOIN riders rd ON rd.id=p.rider_id LEFT JOIN users u ON u.id=p.uploaded_by LEFT JOIN bikes b ON b.id=p.bike_id
+    LEFT JOIN rentals x ON x.id=p.rental_id LEFT JOIN photo_requests q ON q.id=p.request_id`;
+  async function photoHistory(query) {
+    const col = ['bike_id', 'rider_id', 'rental_id'].find((k) => query[k]) || err(400, 'Bisiklet, sürücü veya kiralama seçin.');
+    const id = Number(query[col]); const limit = Math.min(100, Math.max(1, Number(query.limit) || 40));
+    const before = Number(query.before) || 0;
+    const photos = await db.all(`${PHOTO_SQL} WHERE p.${col}=? ${before ? 'AND p.id<?' : ''} ORDER BY p.id DESC LIMIT ?`, before ? [id, before, limit + 1] : [id, limit + 1]);
+    const more = photos.length > limit; if (more) photos.pop();
+    const requests = before ? [] : await db.all(`SELECT q.*, rd.name AS rider_name, rd.phone AS rider_phone, u.name AS user_name, b.code AS bike_code FROM photo_requests q
+      LEFT JOIN riders rd ON rd.id=q.rider_id LEFT JOIN users u ON u.id=q.requested_by LEFT JOIN bikes b ON b.id=q.bike_id WHERE q.${col}=? ORDER BY q.id DESC LIMIT 20`, [id]);
+    return { photos, requests, more };
+  }
+  async function requestPhoto(b, user) {
+    const bike = await getOne('bikes', Number(b.bike_id));
+    const kind = PHOTO_REQ_KINDS.includes(b.kind) ? b.kind : 'bisiklet';
+    const r = await db.get("SELECT * FROM rentals WHERE bike_id=? AND status IN ('aktif','rezervasyon') AND rider_id IS NOT NULL ORDER BY status='aktif' DESC, id DESC LIMIT 1", [bike.id]);
+    if (!r) err(409, 'Bu bisiklet şu an bir sürücüde değil (aktif kiralama ve sürücü yok).');
+    const rd = await db.get('SELECT id, name, portal_active, portal_email FROM riders WHERE id=?', [r.rider_id]);
+    const x = await db.run('INSERT INTO photo_requests(bike_id,rider_id,rental_id,kind,note,status,requested_by,created_at) VALUES(?,?,?,?,?,?,?,?)',
+      [bike.id, r.rider_id, r.id, kind, String(b.note || '').slice(0, 300) || null, 'bekliyor', user?.id ?? null, nowTs()]);
+    await audit(user, 'fotoğraf talebi', 'bikes', bike.id, `${bike.code} · ${rd?.name || ''} · ${kind}`);
+    return { id: x.lastId, rider: rd?.name, portal: !!(rd?.portal_active && rd?.portal_email) };
+  }
+
   const listDocuments = (type, id) => db.all('SELECT d.id, d.owner_type, d.owner_id, d.doc_type, d.name, d.mime, d.size, d.notes, d.created_at, u.name AS uploaded_by_name FROM documents d LEFT JOIN users u ON u.id=d.uploaded_by WHERE d.owner_type=? AND d.owner_id=? ORDER BY d.id DESC', [type, id]);
 
   // ---------- finance ----------
@@ -611,6 +666,8 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
       add('info', 'customers', 'Yeni sürücü kaydı', `${x.name} · ${String(x.created_at || '').slice(0, 10)} · kimlik kontrolü bekliyor`, `#/riders/${x.id}`);
     for (const q of await db.all("SELECT q.*, rd.name AS rn, b.code FROM portal_requests q LEFT JOIN riders rd ON rd.id=q.rider_id LEFT JOIN bikes b ON b.id=q.bike_id WHERE q.status='yeni' ORDER BY q.id DESC"))
       add('info', 'rentals', 'Yeni sürücü talebi', `${q.rn} · ${q.type}${q.code ? ' · ' + q.code : ''}${q.preferred_date ? ' · ' + q.preferred_date : ''}`, `#/portal_requests/${q.id}`);
+    for (const q of await db.all("SELECT q.*, rd.name AS rn, b.code FROM photo_requests q LEFT JOIN riders rd ON rd.id=q.rider_id JOIN bikes b ON b.id=q.bike_id WHERE (q.status='bekliyor' AND q.created_at < datetime('now','-1 day')) OR (q.status='gönderildi' AND q.done_at > datetime('now','-3 day')) ORDER BY q.id DESC LIMIT 30"))
+      add(q.status === 'bekliyor' ? 'warn' : 'info', 'fleet', q.status === 'bekliyor' ? 'Fotoğraf bekleniyor' : 'İstenen fotoğraf geldi', `${q.code} · ${q.rn || '—'} · ${q.kind}${q.note ? ' · ' + q.note : ''}`, `#/bikes/${q.bike_id}`);
     const rank = { danger: 0, warn: 1, info: 2 };
     return n.sort((a, b) => rank[a.level] - rank[b.level]);
   }
@@ -696,6 +753,7 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
     if (user && !can(user, 'rentals')) b.rentals = [];
     b.revenue = r2((await db.get("SELECT COALESCE(SUM(i.net),0) AS s FROM invoices i JOIN rentals r ON r.id=i.rental_id WHERE r.bike_id=? AND i.status<>'iptal'", [id])).s);
     b.costs = await list('bike_costs', { bike_id: id });
+    b.photo_count = Number((await db.get('SELECT COUNT(*) AS n FROM bike_photos WHERE bike_id=?', [id]))?.n) || 0;
     b.economics = await bikeEconomics(b);
     if (user && !can(user, 'finance')) { b.economics = null; b.revenue = null; }
     return b;
@@ -835,6 +893,24 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
       else if (i.due_date <= addDays(t, 7)) add('warn', 'invoice_due', { no: i.invoice_no, amount: i.balance, date: i.due_date, days: daysBetween(t, i.due_date) });
     }
     if (missing.length) add('warn', 'docs_missing', { docs: missing });
+    // photo tasks: pick-up check (selfie + bike photos) for rentals that just started, and photo requests from staff
+    const photo_tasks = [];
+    const thumbs = (rows) => rows.map((p) => ({ id: p.id, kind: p.kind, thumb: p.thumb, created_at: p.created_at }));
+    if (setting('photo_pickup') !== '0') {
+      for (const x of rentals.filter((y) => (y.status === 'aktif' && y.start_date >= addDays(t, -7)) || (y.status === 'rezervasyon' && y.start_date <= addDays(t, 1)))) {
+        const ph = await db.all("SELECT id, kind, thumb, created_at FROM bike_photos WHERE rental_id=? AND stage='teslim alma' ORDER BY id", [x.id]);
+        const selfie = ph.filter((p) => p.kind === 'selfie').length; const bike = ph.filter((p) => p.kind === 'bisiklet').length;
+        const done = selfie > 0 && bike >= PICKUP_BIKE_PHOTOS;
+        // a finished check stays on screen for two hours so the rider sees it went through
+        if (!done || ph.some((p) => p.created_at > new Date(Date.now() - 2 * 3600e3).toISOString().slice(0, 19).replace('T', ' ')))
+          photo_tasks.push({ type: 'pickup', rental_id: x.id, bike: x.bike_code, need: { selfie: 1, bisiklet: PICKUP_BIKE_PHOTOS }, have: { selfie, bisiklet: bike }, done, photos: thumbs(ph) });
+      }
+    }
+    for (const q of await db.all("SELECT q.*, b.code FROM photo_requests q JOIN bikes b ON b.id=q.bike_id WHERE q.rider_id=? AND (q.status='bekliyor' OR (q.status='gönderildi' AND q.done_at > datetime('now','-2 hour'))) ORDER BY q.id", [r.id])) {
+      const ph = await db.all('SELECT id, kind, thumb, created_at FROM bike_photos WHERE request_id=? ORDER BY id', [q.id]);
+      const need = q.kind === 'selfie + bisiklet' ? { selfie: 1, bisiklet: 1 } : { [q.kind]: 1 };
+      photo_tasks.push({ type: 'request', request_id: q.id, bike: q.code, kind: q.kind, note: q.note, created_at: q.created_at, need, have: { selfie: ph.filter((p) => p.kind === 'selfie').length, bisiklet: ph.filter((p) => p.kind === 'bisiklet').length }, done: q.status !== 'bekliyor', photos: thumbs(ph) });
+    }
     if (r.id_expiry && r.id_expiry < addDays(t, 30)) add(r.id_expiry < t ? 'danger' : 'warn', r.id_expiry < t ? 'id_expired' : 'id_expiring', { date: r.id_expiry });
     for (const q of requests.filter((y) => y.handled_at && y.handled_at >= addDays(t, -7) && ['onaylandı', 'reddedildi', 'tamamlandı'].includes(y.status))) add(q.status === 'reddedildi' ? 'warn' : 'ok', 'request_' + ({ 'onaylandı': 'ok', 'reddedildi': 'no', 'tamamlandı': 'done' })[q.status], { type: q.type, date: q.preferred_date, note: q.admin_note });
     for (const sv of services.filter((y) => y.status === 'hazır')) add('ok', 'service_ready', { no: sv.order_no, bike: sv.bike_code });
@@ -844,7 +920,7 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
     return {
       rider: { id: r.id, name: r.name, phone: r.phone, email: r.email, portal_email: r.portal_email, lang: r.lang || cust?.doc_lang || setting('doc_lang') || 'de', id_type: r.id_type, id_no: r.id_no, id_expiry: r.id_expiry, address: r.address, birth_date: r.birth_date, nationality: r.nationality },
       customer: cust ? { name: cust.company_name || cust.name, type: cust.type } : null, payer,
-      rentals, invoices, payments, services, requests, documents, required_docs: required, missing_docs: missing, notifications: n,
+      rentals, invoices, payments, services, requests, documents, required_docs: required, missing_docs: missing, notifications: n, photo_tasks,
       summary: { open_balance: r2(open.reduce((a, i) => a + i.balance, 0)), overdue: r2(open.filter((i) => i.days_late > 0).reduce((a, i) => a + i.balance, 0)), next_due: open.slice().sort((a, b) => (a.due_date < b.due_date ? -1 : 1))[0] || null },
       company: { name: setting('company_name'), phone: setting('company_phone'), email: setting('company_email'), address: setting('company_address'), pickup: setting('pickup_address') || setting('company_address'), iban: setting('company_iban') },
       request_types: PORTAL_REQ,
@@ -989,6 +1065,34 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
     if (b === 'documents' && method === 'GET' && c) {
       const d = await db.get("SELECT * FROM documents WHERE id=? AND owner_type='rider' AND owner_id=?", [Number(c), r.id]) || err(404, 'Belge bulunamadı.');
       return ok(d);
+    }
+    if (b === 'photos' && method === 'POST' && !c) {
+      // purpose: 'request' (staff asked), 'pickup' (selfie + bike photos when the rental starts) or 'free' (rider sends one, e.g. damage)
+      const kind = PHOTO_KINDS.includes(body.kind) ? body.kind : 'bisiklet';
+      let p;
+      if (body.request_id) {
+        const q = await db.get("SELECT * FROM photo_requests WHERE id=? AND rider_id=? AND status='bekliyor'", [Number(body.request_id), r.id]) || err(404, 'Bu fotoğraf talebi artık açık değil.');
+        p = { bike_id: q.bike_id, rental_id: q.rental_id, request_id: q.id, stage: 'talep' };
+      } else {
+        const x = body.rental_id ? await db.get("SELECT * FROM rentals WHERE id=? AND rider_id=? AND status IN ('aktif','rezervasyon')", [Number(body.rental_id), r.id])
+          : await db.get("SELECT * FROM rentals WHERE rider_id=? AND status IN ('aktif','rezervasyon') ORDER BY status='aktif' DESC, id DESC LIMIT 1", [r.id]);
+        if (!x) err(400, 'Aktif kiralamanız yok.');
+        p = { bike_id: x.bike_id, rental_id: x.id, stage: body.purpose === 'pickup' ? 'teslim alma' : 'sürücü' };
+      }
+      // position: sent with the photo, or the phone location shared in the last 30 minutes
+      let lat = Number(body.lat), lng = Number(body.lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng) || !lat) {
+        const fresh = r.last_loc_at && r.last_loc_at > new Date(Date.now() - 30 * 60e3).toISOString().slice(0, 19).replace('T', ' ');
+        lat = fresh ? r.last_lat : null; lng = fresh ? r.last_lng : null;
+      }
+      const id = await addPhoto({ ...p, rider_id: r.id, kind, note: body.note, data: body.data, thumb: body.thumb, lat: lat != null ? r6(lat) : null, lng: lng != null ? r6(lng) : null }, null);
+      if (p.request_id) await settlePhotoRequest(p.request_id);
+      await audit(portalUser(r), 'fotoğraf', 'bikes', p.bike_id, `${r.name}: ${kind} · ${p.stage}`);
+      return ok({ id, ...(await portalData(r)) });
+    }
+    if (b === 'photos' && method === 'GET' && c) {
+      const ph = await db.get('SELECT id, kind, mime, data, created_at FROM bike_photos WHERE id=? AND rider_id=?', [Number(c), r.id]) || err(404, 'Fotoğraf bulunamadı.');
+      return ok(ph);
     }
     err(404, 'Bulunamadı.');
   }
@@ -1169,6 +1273,32 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
           const m = await getOne('cash_moves', Number(b));
           if (m.payment_id || m.deposit_id) err(409, 'Bu hareket bir ödeme veya depozitodan otomatik oluştu; ilgili ödemeyi silin.');
           await db.run('DELETE FROM cash_moves WHERE id=?', [m.id]); await audit(user, 'silme', 'cash_moves', m.id, `${m.type} ${m.amount}`);
+          return ok({ ok: true });
+        }
+      }
+      if (a === 'photos') {
+        if (method === 'GET' && !b) {
+          need(user, query.bike_id ? 'fleet' : query.rider_id ? 'customers' : 'rentals');
+          return ok(await photoHistory(query));
+        }
+        const ph = b ? await db.get('SELECT * FROM bike_photos WHERE id=?', [Number(b)]) || err(404, 'Fotoğraf bulunamadı.') : null;
+        if (method === 'GET') { if (!['fleet', 'rentals', 'customers'].some((x) => can(user, x))) err(403, 'Bu işlem için yetkiniz yok.'); return ok(ph); }
+        need(user, 'fleet', 'w');
+        if (method === 'POST' && !b) {
+          const bike = await getOne('bikes', Number(body.bike_id));
+          const cur = await db.get("SELECT id, rider_id FROM rentals WHERE bike_id=? AND status='aktif' ORDER BY id DESC LIMIT 1", [bike.id]);
+          const id = await addPhoto({ bike_id: bike.id, rental_id: body.rental_id || cur?.id || null, rider_id: null, kind: body.kind, stage: 'personel', note: body.note, data: body.data, thumb: body.thumb }, user);
+          await audit(user, 'fotoğraf', 'bikes', bike.id, `${bike.code} · ${body.note || ''}`);
+          return ok({ id });
+        }
+        if (method === 'DELETE' && b) { await db.run('DELETE FROM bike_photos WHERE id=?', [ph.id]); await audit(user, 'fotoğraf silme', 'bikes', ph.bike_id, `#${ph.id}`); return ok({ ok: true }); }
+      }
+      if (a === 'photo_requests') {
+        need(user, 'fleet', 'w');
+        if (method === 'POST' && !b) return ok(await requestPhoto(body, user));
+        if (method === 'POST' && c === 'cancel') {
+          const q = await db.get('SELECT * FROM photo_requests WHERE id=?', [Number(b)]) || err(404, 'Talep bulunamadı.');
+          if (q.status === 'bekliyor') await db.run("UPDATE photo_requests SET status='iptal', done_at=? WHERE id=?", [nowTs(), q.id]);
           return ok({ ok: true });
         }
       }
