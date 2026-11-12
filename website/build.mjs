@@ -89,6 +89,7 @@ function page(lang) {
   <title>${esc(t.meta_title)}</title>
   <meta name="description" content="${esc(t.meta_desc)}">
   <meta name="theme-color" content="#eb4056">
+  <meta name="color-scheme" content="light only">
   <link rel="canonical" href="${SITE.url}${base(lang)}">
   ${alt}
   <link rel="alternate" hreflang="x-default" href="${SITE.url}/">
@@ -253,6 +254,7 @@ function page(lang) {
 <script>window.PEDALLA=${JSON.stringify(runtime).replace(/</g, '\\u003c')};</script>
 <script src="${pre}vendor/leaflet/leaflet.js" defer></script>
 <script src="${pre}site.js?v=${V}" defer></script>
+<script src="${pre}pw-toggle.js?v=${V}" defer></script>
 </body>
 </html>`;
 }
