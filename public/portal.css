@@ -166,3 +166,35 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 .p-notes .grow { flex: 1; }
 .p-notes-in { padding: 0 10px 10px; display: grid; gap: 8px; }
 .p-notes-in .p-note { box-shadow: none; background: var(--p-bg); margin: 0; }
+
+/* 2026-11-12 dark theme: the redesign above used fixed light colours (page, bubbles, pills),
+   while the text colours switch with the phone's dark mode -> light text on light background.
+   Keep backgrounds and text in the same theme. */
+body.portal { --p-glass: rgba(238,242,243,.85); --p-pill: #fff; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) body.portal { --p-bg: #0f1518; --p-glass: rgba(15,21,24,.85); --p-pill: var(--surface); --night: #222d33; }
+}
+:root[data-theme="dark"] body.portal { --p-bg: #0f1518; --p-glass: rgba(15,21,24,.85); --p-pill: var(--surface); --night: #222d33; }
+body.portal, .portal .p-hello, .portal .p-title, .portal .p-h { color: var(--ink); }
+.p-top { background: var(--p-glass); }
+.p-top-tag { background: var(--p-pill); color: var(--ink); }
+.p-top .p-lang, .p-login-card .p-lang { background: var(--p-pill); }
+.p-lang button { color: var(--ink-2); } .p-lang button.on { color: #fff; }
+.st-bub { background: var(--surface); color: var(--ink); }
+.st-bub.dark { color: #fff; }
+.p-pick { background: var(--surface); }
+.p-type { background: var(--surface); color: var(--ink); }
+.p-notes-in .p-note { color: var(--ink); }
+.portal .field input, .portal .field select, .portal .field textarea { background: var(--surface); color: var(--ink); border-color: var(--line); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .portal .p-card, :root:not([data-theme="light"]) .portal .p-note, :root:not([data-theme="light"]) .portal .p-quick button,
+  :root:not([data-theme="light"]) .portal .p-login-card, :root:not([data-theme="light"]) .st-bub:not(.dark) { box-shadow: inset 0 0 0 1px var(--line); }
+  :root:not([data-theme="light"]) .p-nav { box-shadow: inset 0 0 0 1px #2f3c43, 0 16px 34px -14px rgba(0,0,0,.8); }
+  :root:not([data-theme="light"]) .st-bub.bad i { background: #4a1b20; color: #ff8a95; }
+  :root:not([data-theme="light"]) .st-bub.bad b { color: #ff8a95; }
+  :root:not([data-theme="light"]) .st-bub.warn b { color: #f5c04a; }
+  :root:not([data-theme="light"]) .p-pick-addr, :root:not([data-theme="light"]) .p-count { color: #ff8a95; }
+  :root:not([data-theme="light"]) .p-login { background: radial-gradient(circle at 85% 0%, rgba(235,64,86,.22), transparent 45%), var(--p-bg); }
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .p-lang button.on { background: var(--brand); } }
+:root[data-theme="dark"] .p-lang button.on { background: var(--brand); }

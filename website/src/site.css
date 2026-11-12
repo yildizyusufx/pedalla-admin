@@ -16,6 +16,7 @@
   --shadow: 0 1px 2px rgba(31,42,49,.06), 0 12px 32px -12px rgba(31,42,49,.18);
   --head: 'Sora', 'Jakarta', system-ui, sans-serif;
   --body: 'Jakarta', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color-scheme: light only;
 }
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; scroll-padding-top: 96px; -webkit-text-size-adjust: 100%; }
