@@ -100,6 +100,10 @@ POST /api/telemetry
 ```
 Toplu gönderim için `{"key":"…","points":[{…},{…}]}`. `tracker_id`, bisiklet kartındaki "GPS takip cihazı ID" ile eşleşir.
 
+Hazır takip cihazları için iki adaptör daha var (anahtar adreste `?key=` ile verilir):
+* **Traccar** sunucusu → *position forwarding*: `POST /api/telemetry/traccar?key=…`
+* **OsmAnd protokolü** (Traccar Client uygulaması, birçok GPS cihazı): `GET/POST /api/telemetry/osmand?key=…&id=TRK-4101&lat=…&lon=…&speed=…&batt=…`
+
 ## Dosya yapısı
 
 ```
@@ -109,9 +113,28 @@ shared/db-libsql.js, shared/dump.js, shared/node-crypto.js  Turso bağlantısı,
 shared/meta.js     Modül alanları, durumlar, roller, varsayılan ayarlar
 shared/schema.js   Veritabanı tabloları
 shared/api.js      Tüm iş kuralları ve REST API (sunucu ve demo ortak kullanır)
+shared/extras.js   E-imza, tavsiye, SEPA, sigorta paketleri, DSGVO, yedek, GPS adaptörleri
+shared/idcheck.js  Online kimlik doğrulama sağlayıcısı için bağlantı noktası
+scripts/backup.mjs, scripts/restore-backup.mjs  Veritabanı yedeği al / geri yükle
 shared/seed.js     Örnek veriler
 public/            Arayüz (index.html, app.js, core.js, style.css, brand.css, demo.html)
 ```
+
+## Dijital imza, tavsiye, SEPA, sigorta, DSGVO (Kasım 2026)
+
+* **Dijital imza:** Kiralama sayfasında *Sözleşme imzaları* kartı. Sürücü sözleşmeyi portalda okuyup parmakla imzalar; panelde kiraya veren/kiracı da imzalayabilir. Her imzada isim, zaman, IP, cihaz ve sözleşme içeriğinin SHA-256 özeti saklanır; kira, tarih, bisiklet gibi bir bilgi sonradan değişirse imza geçersiz sayılır ve yeniden istenir. Bireysel müşteride sürücünün imzası kiracı imzası sayılır. (Basit elektronik imza – eIDAS "fortgeschritten/qualifiziert" değildir.)
+* **Belge tarama:** Kiralama, müşteri ve sürücü belgelerinde *Belge tara*: telefon kamerasıyla çok sayfa çekilir, kontrast düzeltilir, tek PDF olarak yüklenir. Sürücü portalında da var.
+* **Tavsiye programı:** Her sürücünün kodu ve linki (`pedalla.bike/?ref=KOD`). Arkadaşın ilk kira faturası ödenince ikisine de Ayarlar'daki tutar kadar bakiye; bakiye sonraki kira faturalarından otomatik düşülür. Menü: *Tavsiyeler*.
+* **SEPA otomatik ödeme:** Sürücü portalda IBAN ile yetki (mandate) verir. *SEPA* sayfasında vadesi gelen faturalardan banka için `pain.008` XML dosyası üretilir, bankaya yüklenir, sonra "tahsil edildi" ile ödemeler işlenir. Ayarlar'da **Gläubiger-ID** ve firma IBAN'ı gerekli. Kart ödemesi için ödeme sağlayıcısı henüz bağlı değil.
+* **Sigorta paketleri:** Ayarlar → Sigorta paketleri (`Ad | aylık ücret | muafiyet`). Yeni kiralamada ve sürücü talebinde seçilir, ücret faturaya eklenir, sözleşmede görünür.
+* **Online kimlik doğrulama:** Şimdilik panelde selfie + belge ile elle doğrulama ("Kimliği doğruladım"). Dış sağlayıcı (IDnow, Veriff vb.) seçilince `shared/idcheck.js` üzerinden bağlanır.
+* **Google yorumları:** Ayarlar'a yorum linki girilince belirli bir kira süresinden sonra ve iadede sürücüye istek gider; sürücü sayfasında WhatsApp ile isteme düğmesi.
+* **DSGVO:** Kayıtta onay zamanı/sürümü saklanır; sürücü portalda verilerini indirir ve hesap silme talep eder; panelde sürücü *anonimleştir* (yasal saklama gereken faturalar kalır). Selfie'ler Ayarlar'daki süre sonunda otomatik silinir.
+
+### Yedekleme
+* Ayarlar → *Veri yedeği* → tüm veritabanı tek JSON dosyası olarak iner.
+* Otomatik günlük yedek: Vercel'de `BACKUP_TOKEN` ortam değişkeni oluşturun; GitHub depo ayarlarında **Secrets**: `PEDALLA_URL` (https://admin.pedalla.bike), `BACKUP_TOKEN` (aynı değer), `BACKUP_PASSPHRASE`. `.github/workflows/backup.yml` her gece şifreli yedeği 30 gün saklar (Actions → Backup → Artifacts).
+* Geri yükleme: `openssl enc -d -aes-256-cbc -pbkdf2 -in backup.json.gz.enc -out b.json.gz -pass pass:…` → `gunzip b.json.gz` → `node scripts/restore-backup.mjs b.json > restore.sql` → boş veritabanına uygulanır.
 
 ## Canlıya almadan önce
 

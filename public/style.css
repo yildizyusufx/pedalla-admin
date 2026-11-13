@@ -424,3 +424,38 @@ tr.off td { opacity: .45; }
 .ro-val { padding: 8px 0; } .sm-input { height: 32px; border-radius: 8px; border: 1px solid var(--line); padding: 0 8px; background: var(--surface); color: var(--ink); }
 .sum-print .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; } .sum-print .kpi { border: 1px solid #ddd; padding: 8px; border-radius: 6px; display: flex; flex-direction: column; }
 @media (max-width: 760px) { .od-h { flex-direction: column; } .sigpad canvas { height: 130px; } }
+
+/* ---------- document scanner (panel + rider screen) ---------- */
+.scan-bg { position: fixed; inset: 0; z-index: 3000; background: rgba(10, 16, 20, .55); display: grid; place-items: center; padding: 12px; opacity: 0; transition: opacity .2s; }
+.scan-bg.show { opacity: 1; }
+.scan { background: var(--surface); color: var(--ink); width: 100%; max-width: 720px; max-height: 92vh; border-radius: 18px; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,.3); }
+.scan-h { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+.scan-x { border: 0; background: var(--surface-2); color: var(--ink); width: 34px; height: 34px; border-radius: 50%; font-size: 15px; cursor: pointer; }
+.scan-b { padding: 14px 16px; overflow: auto; display: grid; gap: 12px; }
+.scan-hint { margin: 0; color: var(--muted); font-size: 13px; }
+.scan-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; } @media (max-width: 560px) { .scan-row { grid-template-columns: 1fr; } }
+.scan-modes { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; } .scan-modes label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+.scan-pages { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; min-height: 90px; align-items: start; }
+.scan-pg { margin: 0; position: relative; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #fff; }
+.scan-pg img { width: 100%; display: block; aspect-ratio: 3 / 4; object-fit: contain; background: #eef1f3; }
+.scan-pg figcaption { position: absolute; left: 6px; top: 6px; background: rgba(0,0,0,.6); color: #fff; font-size: 11px; font-weight: 700; border-radius: 6px; padding: 1px 6px; }
+.scan-pg-a { display: flex; justify-content: center; gap: 4px; padding: 4px; background: var(--surface-2); }
+.scan-pg-a button { border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 8px; min-width: 30px; height: 28px; cursor: pointer; }
+.scan-acts { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; position: sticky; bottom: -14px; background: var(--surface); padding: 10px 0 2px; }
+.scan-add, .scan-add2 { cursor: pointer; }
+
+/* ---------- contract e-signature ---------- */
+.sign div.signed b { height: auto; min-height: 46px; display: flex; align-items: flex-end; }
+.sign div.signed b img { max-height: 64px; max-width: 100%; object-fit: contain; }
+.esign-ev { margin-top: 18px; border-top: 1px dashed #bbb; padding-top: 8px; }
+.esign-ev table { width: 100%; border-collapse: collapse; margin: 6px 0; } .esign-ev td { padding: 3px 6px 3px 0; vertical-align: top; }
+.esign-ev tr.stale td { color: #b42318; } .mono { font-family: ui-monospace, Menlo, monospace; }
+.sign-state { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.sign-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 8px; }
+.sign-list li { display: flex; gap: 10px; align-items: center; border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px; }
+.sign-list li img { height: 38px; width: 110px; object-fit: contain; background: #fff; border-radius: 6px; border: 1px solid var(--line); }
+.sign-list li.stale { opacity: .6; } .sign-list li .grow small { display: block; }
+.idcheck { display: grid; grid-template-columns: 120px 1fr; gap: 14px; align-items: start; } .idcheck img { width: 120px; height: 120px; object-fit: cover; border-radius: 12px; border: 1px solid var(--line); }
+.ref-code { font: 800 22px/1.1 ui-monospace, Menlo, monospace; letter-spacing: .06em; }
+/* signature boxes with a drawn signature: space above the line, label below */
+.sign div:has(> b) { border-top: 0; padding-top: 0; } .sign div > b { border-bottom: 1px solid #111; margin-bottom: 6px; }

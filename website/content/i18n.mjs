@@ -2,7 +2,7 @@
 export const LANGS = { de: 'Deutsch', en: 'English', tr: 'Türkçe' };
 export const T = {
   de: {
-    meta_title: 'Pedalla – E-Bike & Lastenrad mieten in Hamburg | Monatsabo',
+    meta_title: 'E-Bike mieten Hamburg für Kuriere & Pendler | Pedalla Monatsabo',
     meta_desc: 'E-Bikes und E-Lastenräder im Monatsabo: Wartung, Reparatur und Versicherung inklusive. Für Kuriere, Pendler und Unternehmen in Hamburg. Jetzt online mieten.',
     nav_models: 'Modelle', nav_how: 'So geht\'s', nav_map: 'Karte', nav_business: 'Für Unternehmen', nav_faq: 'FAQ', nav_login: 'Fahrer-Login', cta_rent: 'Jetzt mieten', menu: 'Menü',
     hero_eyebrow: 'E-Bike-Abo aus Hamburg',
@@ -46,7 +46,7 @@ export const T = {
     r_title: 'Rad mieten', r_step1: 'Rad & Laufzeit', r_step2: 'Deine Daten', r_step3: 'Fertig',
     r_model: 'Modell', r_start: 'Startdatum', r_duration: 'Laufzeit', r_months: '{n} Monat|{n} Monate', r_weeks: '{n} Woche|{n} Wochen', r_days: '{n} Tag|{n} Tage',
     r_sum_rate: 'Monatlicher Preis', r_sum_total: 'Summe Laufzeit', r_sum_dep: 'Kaution (einmalig, erstattbar)', r_next: 'Weiter', r_back: 'Zurück',
-    r_new: 'Neu bei Pedalla', r_have: 'Ich habe ein Konto', r_name: 'Vor- und Nachname', r_email: 'E-Mail', r_phone: 'Handynummer', r_pw: 'Passwort (für dein Fahrerkonto)', r_pw_hint: 'Mindestens 6 Zeichen', r_addr: 'Adresse (optional)', r_note: 'Nachricht (optional)',
+    r_new: 'Neu bei Pedalla', r_have: 'Ich habe ein Konto', r_name: 'Vor- und Nachname', r_email: 'E-Mail', r_phone: 'Handynummer', r_pw: 'Passwort (für dein Fahrerkonto)', r_pw_hint: 'Mindestens 6 Zeichen', r_addr: 'Adresse (optional)', r_ref: 'Empfehlungscode (optional)', r_note: 'Nachricht (optional)',
     r_consent: 'Ich bin einverstanden, dass Pedalla meine Daten zur Bearbeitung der Mietanfrage und für den Vertrag verarbeitet (siehe {privacy}). Meinen Ausweis zeige ich bei der Übergabe im Original.',
     r_send: 'Anfrage senden', r_sending: 'Wird gesendet …',
     r_ok_h: 'Anfrage gesendet!', r_ok_p: 'Danke, {name}! Dein Wunschrad ist vorgemerkt. Wir prüfen die Verfügbarkeit und melden uns per Telefon oder WhatsApp für den Übergabetermin.',
@@ -62,7 +62,7 @@ export const T = {
     d_specs: 'Ausstattung', d_incl: 'Inklusive Wartung, Reparatur & Versicherung', close: 'Schließen',
   },
   en: {
-    meta_title: 'Pedalla – Rent e-bikes & cargo bikes in Hamburg | Monthly subscription',
+    meta_title: 'Rent an e-bike in Hamburg for couriers & commuters | Pedalla monthly',
     meta_desc: 'E-bikes and electric cargo bikes on a monthly plan: maintenance, repairs and insurance included. For couriers, commuters and businesses in Hamburg. Rent online now.',
     nav_models: 'Bikes', nav_how: 'How it works', nav_map: 'Map', nav_business: 'For business', nav_faq: 'FAQ', nav_login: 'Rider login', cta_rent: 'Rent now', menu: 'Menu',
     hero_eyebrow: 'E-bike subscription from Hamburg',
@@ -105,7 +105,7 @@ export const T = {
     r_title: 'Rent a bike', r_step1: 'Bike & term', r_step2: 'Your details', r_step3: 'Done',
     r_model: 'Model', r_start: 'Start date', r_duration: 'Duration', r_months: '{n} month|{n} months', r_weeks: '{n} week|{n} weeks', r_days: '{n} day|{n} days',
     r_sum_rate: 'Monthly price', r_sum_total: 'Total for term', r_sum_dep: 'Deposit (one-off, refundable)', r_next: 'Continue', r_back: 'Back',
-    r_new: 'New to Pedalla', r_have: 'I have an account', r_name: 'Full name', r_email: 'E-mail', r_phone: 'Mobile number', r_pw: 'Password (for your rider account)', r_pw_hint: 'At least 6 characters', r_addr: 'Address (optional)', r_note: 'Message (optional)',
+    r_new: 'New to Pedalla', r_have: 'I have an account', r_name: 'Full name', r_email: 'E-mail', r_phone: 'Mobile number', r_pw: 'Password (for your rider account)', r_pw_hint: 'At least 6 characters', r_addr: 'Address (optional)', r_ref: 'Referral code (optional)', r_note: 'Message (optional)',
     r_consent: 'I agree that Pedalla processes my data to handle the rental request and contract (see {privacy}). I will show my original ID at handover.',
     r_send: 'Send request', r_sending: 'Sending …',
     r_ok_h: 'Request sent!', r_ok_p: 'Thanks, {name}! Your bike is reserved for review. We\'ll check availability and contact you by phone or WhatsApp to arrange the handover.',
@@ -164,7 +164,7 @@ export const T = {
     r_title: 'Bisiklet kirala', r_step1: 'Bisiklet ve süre', r_step2: 'Bilgilerin', r_step3: 'Tamam',
     r_model: 'Model', r_start: 'Başlangıç tarihi', r_duration: 'Süre', r_months: '{n} ay|{n} ay', r_weeks: '{n} hafta|{n} hafta', r_days: '{n} gün|{n} gün',
     r_sum_rate: 'Aylık fiyat', r_sum_total: 'Süre toplamı', r_sum_dep: 'Depozito (tek sefer, iade edilir)', r_next: 'Devam', r_back: 'Geri',
-    r_new: 'Pedalla\'da yeniyim', r_have: 'Hesabım var', r_name: 'Ad soyad', r_email: 'E-posta', r_phone: 'Cep telefonu', r_pw: 'Şifre (sürücü hesabın için)', r_pw_hint: 'En az 6 karakter', r_addr: 'Adres (isteğe bağlı)', r_note: 'Mesaj (isteğe bağlı)',
+    r_new: 'Pedalla\'da yeniyim', r_have: 'Hesabım var', r_name: 'Ad soyad', r_email: 'E-posta', r_phone: 'Cep telefonu', r_pw: 'Şifre (sürücü hesabın için)', r_pw_hint: 'En az 6 karakter', r_addr: 'Adres (isteğe bağlı)', r_ref: 'Tavsiye kodu (isteğe bağlı)', r_note: 'Mesaj (isteğe bağlı)',
     r_consent: 'Bilgilerimin kiralama talebi ve sözleşme için Pedalla tarafından işlenmesini kabul ediyorum ({privacy}). Kimliğimin aslını teslimde göstereceğim.',
     r_send: 'Talebi gönder', r_sending: 'Gönderiliyor …',
     r_ok_h: 'Talebin gönderildi!', r_ok_p: 'Teşekkürler {name}! Bisikletin için talebin alındı. Uygunluğu kontrol edip teslim randevusu için telefon veya WhatsApp\'tan döneceğiz.',

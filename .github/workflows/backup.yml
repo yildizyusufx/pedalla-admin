@@ -1,0 +1,41 @@
+# Daily encrypted database backup, kept 30 days as a workflow artifact (Actions → Backup → run → Artifacts).
+# Needs repository secrets: PEDALLA_URL (e.g. https://admin.pedalla.bike), BACKUP_TOKEN (same as on Vercel),
+# BACKUP_PASSPHRASE (to decrypt: openssl enc -d -aes-256-cbc -pbkdf2 -in backup.json.gz.enc -out backup.json.gz -pass pass:…).
+name: Backup
+on:
+  schedule:
+    - cron: '30 2 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check secrets
+        id: chk
+        env: { T: '${{ secrets.BACKUP_TOKEN }}', P: '${{ secrets.BACKUP_PASSPHRASE }}', U: '${{ secrets.PEDALLA_URL }}' }
+        run: |
+          if [ -z "$T" ] || [ -z "$P" ] || [ -z "$U" ]; then echo "Backup secrets not set – skipping."; echo "go=0" >> "$GITHUB_OUTPUT"; else echo "go=1" >> "$GITHUB_OUTPUT"; fi
+      - uses: actions/checkout@v4
+        if: steps.chk.outputs.go == '1'
+      - uses: actions/setup-node@v4
+        if: steps.chk.outputs.go == '1'
+        with: { node-version: 22 }
+      - name: Fetch and encrypt
+        if: steps.chk.outputs.go == '1'
+        env:
+          PEDALLA_URL: ${{ secrets.PEDALLA_URL }}
+          BACKUP_TOKEN: ${{ secrets.BACKUP_TOKEN }}
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          node scripts/backup.mjs backup.json
+          gzip -9 backup.json
+          openssl enc -aes-256-cbc -pbkdf2 -salt -in backup.json.gz -out backup.json.gz.enc -pass env:BACKUP_PASSPHRASE
+          rm backup.json.gz
+      - uses: actions/upload-artifact@v4
+        if: steps.chk.outputs.go == '1'
+        with:
+          name: pedalla-backup-${{ github.run_number }}
+          path: backup.json.gz.enc
+          retention-days: 30

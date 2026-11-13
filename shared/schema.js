@@ -102,6 +102,30 @@ CREATE TABLE IF NOT EXISTS handovers (
   km REAL, battery INTEGER, checklist TEXT, damages TEXT, accessories TEXT, notes TEXT, rider_name TEXT, rider_sign TEXT, staff_sign TEXT,
   staff_id INTEGER, created_at TEXT DEFAULT (datetime('now')));
 CREATE INDEX IF NOT EXISTS ix_handover_rental ON handovers(rental_id, id);
+-- electronic contract signatures (rider screen or on the office tablet): signature image + evidence (time, IP, device, hash of the signed contract)
+CREATE TABLE IF NOT EXISTS contract_signs (
+  id INTEGER PRIMARY KEY, rental_id INTEGER NOT NULL REFERENCES rentals(id), role TEXT NOT NULL, name TEXT, sign TEXT, channel TEXT,
+  doc_hash TEXT, doc_lang TEXT, facts TEXT, ip TEXT, ua TEXT, rider_id INTEGER, user_id INTEGER, created_at TEXT DEFAULT (datetime('now')));
+CREATE INDEX IF NOT EXISTS ix_sign_rental ON contract_signs(rental_id, id);
+-- referral programme: who brought whom, and credits (discounts) that are taken off the next rent invoices
+CREATE TABLE IF NOT EXISTS referrals (
+  id INTEGER PRIMARY KEY, referrer_id INTEGER NOT NULL REFERENCES riders(id), referred_id INTEGER NOT NULL REFERENCES riders(id), status TEXT DEFAULT 'bekliyor',
+  reward REAL DEFAULT 0, friend_reward REAL DEFAULT 0, earned_at TEXT, note TEXT, created_at TEXT DEFAULT (datetime('now')));
+CREATE UNIQUE INDEX IF NOT EXISTS ix_ref_referred ON referrals(referred_id);
+CREATE TABLE IF NOT EXISTS credits (
+  id INTEGER PRIMARY KEY, customer_id INTEGER NOT NULL REFERENCES customers(id), rider_id INTEGER, amount REAL NOT NULL, left_amount REAL NOT NULL,
+  reason TEXT, referral_id INTEGER, user_id INTEGER, created_at TEXT DEFAULT (datetime('now')));
+CREATE INDEX IF NOT EXISTS ix_credit_cust ON credits(customer_id);
+CREATE TABLE IF NOT EXISTS credit_uses (
+  id INTEGER PRIMARY KEY, credit_id INTEGER NOT NULL REFERENCES credits(id), invoice_id INTEGER NOT NULL, amount REAL NOT NULL, created_at TEXT DEFAULT (datetime('now')));
+-- SEPA direct debit: mandates given in the rider screen and the collection files (pain.008) made for the bank
+CREATE TABLE IF NOT EXISTS sepa_mandates (
+  id INTEGER PRIMARY KEY, customer_id INTEGER NOT NULL REFERENCES customers(id), rider_id INTEGER, holder TEXT NOT NULL, iban TEXT NOT NULL, bic TEXT,
+  mandate_ref TEXT NOT NULL UNIQUE, signed_at TEXT NOT NULL, ip TEXT, ua TEXT, status TEXT DEFAULT 'aktif', first_used_at TEXT, revoked_at TEXT,
+  created_at TEXT DEFAULT (datetime('now')));
+CREATE TABLE IF NOT EXISTS sepa_batches (
+  id INTEGER PRIMARY KEY, msg_id TEXT NOT NULL, collection_date TEXT NOT NULL, count INTEGER, total REAL, items TEXT, status TEXT DEFAULT 'oluşturuldu',
+  user_id INTEGER, settled_at TEXT, created_at TEXT DEFAULT (datetime('now')));
 CREATE TABLE IF NOT EXISTS audit_log (
   id INTEGER PRIMARY KEY, ts TEXT DEFAULT (datetime('now')), user_id INTEGER, action TEXT, entity TEXT, entity_id INTEGER, details TEXT);
 `;
@@ -114,14 +138,14 @@ export const INTAKE_CHECKLIST = [
 
 // Columns added after the first release. createApi adds any that are missing (works on existing databases too).
 export const MIGRATIONS = {
-  riders: { self_registered: 'INTEGER DEFAULT 0', last_lat: 'REAL', last_lng: 'REAL', last_loc_at: 'TEXT', last_loc_acc: 'REAL', portal_email: 'TEXT', portal_password_hash: 'TEXT', portal_active: 'INTEGER DEFAULT 0', portal_last_login: 'TEXT', lang: 'TEXT', id_type: 'TEXT', id_expiry: 'TEXT', birth_date: 'TEXT', nationality: 'TEXT', address: 'TEXT', license_no: 'TEXT', id_checked: 'INTEGER DEFAULT 0' },
+  riders: { consent_at: 'TEXT', consent_version: 'TEXT', ref_code: 'TEXT', referred_by: 'INTEGER', anonymized_at: 'TEXT', self_registered: 'INTEGER DEFAULT 0', last_lat: 'REAL', last_lng: 'REAL', last_loc_at: 'TEXT', last_loc_acc: 'REAL', portal_email: 'TEXT', portal_password_hash: 'TEXT', portal_active: 'INTEGER DEFAULT 0', portal_last_login: 'TEXT', lang: 'TEXT', id_type: 'TEXT', id_expiry: 'TEXT', birth_date: 'TEXT', nationality: 'TEXT', address: 'TEXT', license_no: 'TEXT', id_checked: 'INTEGER DEFAULT 0' },
   service_orders: { brought_by_rider_id: 'INTEGER', report_id: 'INTEGER', urgent: 'INTEGER DEFAULT 0' },
   customers: { doc_lang: "TEXT DEFAULT 'de'" },
   deposits: { method: 'TEXT' },
   users: { lang: 'TEXT' },
-  portal_requests: { bike_type: 'TEXT', period: 'TEXT', duration: 'INTEGER', category: 'TEXT', rideable: 'INTEGER' },
-  bikes: { service_interval_days: 'INTEGER', uid: 'TEXT', lock_requested: 'INTEGER DEFAULT 0', stolen_at: 'TEXT' },
-  rentals: { pay_method: 'TEXT', return_notice_date: 'TEXT', return_notice_at: 'TEXT' },
+  portal_requests: { insurance_plan: 'TEXT', bike_type: 'TEXT', period: 'TEXT', duration: 'INTEGER', category: 'TEXT', rideable: 'INTEGER' },
+  bikes: { gps_provider: 'TEXT', gps_installed_at: 'TEXT', service_interval_days: 'INTEGER', uid: 'TEXT', lock_requested: 'INTEGER DEFAULT 0', stolen_at: 'TEXT' },
+  rentals: { insurance_plan: 'TEXT', insurance_fee: 'REAL DEFAULT 0', insurance_deductible: 'REAL', signed_at: 'TEXT', pay_method: 'TEXT', return_notice_date: 'TEXT', return_notice_at: 'TEXT' },
   invoices: { pay_link: 'TEXT', pay_provider: 'TEXT', pay_ref: 'TEXT' },
   payments: { import_hash: 'TEXT', provider: 'TEXT' },
   bike_photos: { handover_id: 'INTEGER', service_id: 'INTEGER' },
