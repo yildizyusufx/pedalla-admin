@@ -70,6 +70,31 @@ const T = {
     de: ['Miete verlängert', 'Deine Miete für {bike} wurde bis {date} verlängert.'],
     en: ['Rental extended', 'Your rental of {bike} was extended until {date}.'],
   },
+  contract_sign: {
+    tr: ['Sözleşmeni imzala', '{no} numaralı kira sözleşmen hazır. Uygulamada okuyup parmağınla imzalayabilirsin, ofise gelmene gerek yok.'],
+    de: ['Mietvertrag unterschreiben', 'Dein Mietvertrag {no} ist fertig. Du kannst ihn in der App lesen und mit dem Finger unterschreiben – ohne Termin im Büro.'],
+    en: ['Sign your rental agreement', 'Your rental agreement {no} is ready. Read it in the app and sign with your finger – no office visit needed.'],
+  },
+  referral_earned: {
+    tr: ['Tavsiye ödülü kazandın 🎉', '{name} ilk kirasını ödedi. {amount} indirim bir sonraki faturandan düşülecek. Teşekkürler!'],
+    de: ['Empfehlungsbonus verdient 🎉', '{name} hat die erste Miete bezahlt. {amount} Rabatt wird von deiner nächsten Rechnung abgezogen. Danke!'],
+    en: ['Referral bonus earned 🎉', '{name} paid the first rent. {amount} off will be taken from your next invoice. Thank you!'],
+  },
+  review_request: {
+    tr: ['Pedalla nasıl gidiyor?', 'Memnunsan Google\'da kısa bir yorum bırakır mısın? Diğer kuryelerin bizi bulmasına çok yardımcı olur. Bir sorun varsa bize yaz, hemen çözelim.'],
+    de: ['Wie läuft es mit Pedalla?', 'Wenn du zufrieden bist: Hinterlässt du uns eine kurze Google-Bewertung? Das hilft anderen Kurieren sehr. Gibt es ein Problem, schreib uns – wir kümmern uns sofort.'],
+    en: ['How is Pedalla going?', 'If you are happy, could you leave us a short Google review? It really helps other couriers find us. If something is wrong, write to us and we will fix it.'],
+  },
+  review_return: {
+    tr: ['Teşekkürler!', 'Pedalla ile sürdüğün için teşekkürler. Deneyimini Google\'da paylaşırsan çok seviniriz.'],
+    de: ['Danke!', 'Danke, dass du mit Pedalla unterwegs warst. Wir freuen uns sehr über eine Google-Bewertung.'],
+    en: ['Thank you!', 'Thanks for riding with Pedalla. We would love a Google review of your experience.'],
+  },
+  sepa_prenote: {
+    tr: ['SEPA otomatik ödeme', '{no} numaralı fatura için {amount} tutarı {date} tarihinde hesabından çekilecek (yetki no {ref}).'],
+    de: ['SEPA-Lastschrift angekündigt', 'Für Rechnung {no} ziehen wir {amount} am {date} per Lastschrift ein (Mandatsreferenz {ref}).'],
+    en: ['SEPA direct debit notice', 'For invoice {no} we will collect {amount} by direct debit on {date} (mandate reference {ref}).'],
+  },
   custom: { tr: ['{title}', '{text}'], de: ['{title}', '{text}'], en: ['{title}', '{text}'] },
 };
 const DEFAULT_TITLE = { tr: 'Pedalla', de: 'Pedalla', en: 'Pedalla' };

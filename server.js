@@ -29,7 +29,7 @@ const db = { // sync adapter; the API awaits each call
     try { const r = await fn(); sqlite.exec('COMMIT'); return r; } catch (e) { sqlite.exec('ROLLBACK'); throw e; } finally { depth--; }
   },
 };
-const api = await createApi(db, crypto);
+const api = await createApi(db, { ...crypto, backupToken: process.env.BACKUP_TOKEN || null });
 if (process.env.NO_SEED !== '1') { if (await seed(api, hashPassword)) console.log('Demo verileri yüklendi. Giriş: admin@pedalla.bike / pedalla123'); }
 else if ((await db.get('SELECT COUNT(*) AS n FROM users')).n === 0) {
   const email = process.env.ADMIN_EMAIL || 'admin@pedalla.bike'; const pw = process.env.ADMIN_PASSWORD || randomBytes(6).toString('hex');
@@ -49,7 +49,7 @@ const server = http.createServer(async (req, res) => {
       let raw = ''; for await (const ch of req) { raw += ch; if (raw.length > 6e6) throw new Error('too large'); }
       let body = {}; if (raw) { try { body = JSON.parse(raw); } catch { body = {}; } }
       const token = (req.headers.authorization || '').replace(/^Bearer /, '') || null;
-      const out = await api.handle({ method: req.method, path: url.pathname, query: Object.fromEntries(url.searchParams), body, token, headers: req.headers });
+      const out = await api.handle({ method: req.method, path: url.pathname, query: Object.fromEntries(url.searchParams), body, token, headers: { ...req.headers, 'x-client-ip': req.socket.remoteAddress } });
       res.writeHead(out.status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...cors });
       return res.end(JSON.stringify(out.body));
     }

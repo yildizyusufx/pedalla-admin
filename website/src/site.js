@@ -9,6 +9,9 @@
   const per = (p) => ({ 'gün': T.per_day, hafta: T.per_week }[p] || T.per_month);
   const durLabel = (p, n) => plural({ 'gün': T.r_days, hafta: T.r_weeks }[p] || T.r_months, n);
   const ICON = (d) => `<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+  // referral link (?ref=CODE) – kept for the signup in the rent dialog
+  try { const rq = new URLSearchParams(location.search).get('ref'); if (rq) localStorage.setItem('pedalla_ref', rq.trim().toUpperCase().slice(0, 16)); } catch { /* storage blocked */ }
+  const refStored = () => { try { return localStorage.getItem('pedalla_ref') || ''; } catch { return ''; } };
   const IC = { check: ICON('<path d="M5 12.5l4.5 4.5L19 7.5"/>'), shield: ICON('<path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/>'), wa: ICON('<path d="M4 20l1.3-4A8 8 0 1 1 8.4 19z"/>') };
 
   // ---------- models: marketing data + live catalog from the admin panel ----------
@@ -282,7 +285,8 @@
         <div class="row2"><label class="fld"><span>${T.r_email} *</span><input name="email" type="email" autocomplete="email" required value="${esc(v.email)}"></label>
         <label class="fld"><span>${T.r_phone} *</span><input name="phone" type="tel" autocomplete="tel" required placeholder="+49 …" value="${esc(v.phone)}"></label></div>
         <label class="fld"><span>${T.r_pw} *</span><input name="password" type="password" autocomplete="new-password" minlength="6" required><small>${T.r_pw_hint}</small></label>
-        <label class="fld"><span>${T.r_addr}</span><input name="address" autocomplete="street-address" value="${esc(v.address)}"></label>`
+        <div class="row2"><label class="fld"><span>${T.r_addr}</span><input name="address" autocomplete="street-address" value="${esc(v.address)}"></label>
+        <label class="fld"><span>${T.r_ref}</span><input name="ref" autocomplete="off" maxlength="16" value="${esc(v.ref ?? refStored())}"></label></div>`
       : `<label class="fld"><span>${T.r_email}</span><input name="email" type="email" autocomplete="email" required value="${esc(v.email)}"></label>
         <label class="fld"><span>${T.r_pw.replace(/\s*\(.*\)/, '')}</span><input name="password" type="password" autocomplete="current-password" required></label>`}
       <label class="fld"><span>${T.r_note}</span><textarea name="notes" rows="2">${esc(v.notes)}</textarea></label>
@@ -310,7 +314,7 @@
       let token;
       try {
         const auth = isNew
-          ? await api('signup', { method: 'POST', body: JSON.stringify({ name: d.name.trim(), email: d.email.trim(), phone: d.phone.trim(), password: d.password, address: d.address, consent: true, lang: P.lang, website: d.website }) })
+          ? await api('signup', { method: 'POST', body: JSON.stringify({ name: d.name.trim(), email: d.email.trim(), phone: d.phone.trim(), password: d.password, address: d.address, ref: (d.ref || '').trim().toUpperCase(), consent: true, lang: P.lang, website: d.website }) })
           : await api('login', { method: 'POST', body: JSON.stringify({ email: d.email.trim(), password: d.password }) });
         token = auth.token;
         const m = cur();

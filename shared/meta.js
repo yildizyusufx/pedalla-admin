@@ -13,7 +13,16 @@ export const ID_TYPES = ['Kimlik kartı (Personalausweis)', 'Pasaport', 'Oturum 
 export const DOC_LANGS = [{ v: 'de', l: 'Almanca (Deutsch)' }, { v: 'en', l: 'İngilizce (English)' }];
 export const DOC_TYPES = ['Kimlik ön yüz', 'Kimlik arka yüz', 'Pasaport', 'Oturum izni', 'Ehliyet', 'Adres belgesi (Meldebescheinigung)', 'Ticaret sicili / Gewerbeanmeldung', 'İmzalı sözleşme', 'Teslim fotoğrafı', 'Hasar fotoğrafı', 'Diğer'];
 export const UI_LANGS = [{ v: 'tr', l: 'Türkçe' }, { v: 'de', l: 'Deutsch' }, { v: 'en', l: 'English' }];
-export const REQUEST_TYPES = ['servis randevusu', 'arıza bildirimi', 'iade randevusu', 'kiralama uzatma', 'yeni kiralama'];
+export const REQUEST_TYPES = ['servis randevusu', 'arıza bildirimi', 'iade randevusu', 'kiralama uzatma', 'yeni kiralama', 'hesap silme'];
+// GPS trackers: how a tracker sends its position (see Ayarlar → GPS takip cihazı entegrasyonu)
+export const GPS_PROVIDERS = ['Pedalla JSON (/api/telemetry)', 'Traccar (yönlendirme)', 'OsmAnd protokolü', 'Diğer'];
+// insurance packages, one per line in Settings: "Name | price per period (net) | deductible per claim"
+export function insurancePlans(settings) {
+  return String(settings?.insurance_plans || '').split(/\r?\n/).map((l) => l.split('|').map((x) => x.trim())).filter((x) => x[0])
+    .map(([name, fee, ded]) => ({ name, fee: Number(String(fee || '0').replace(',', '.')) || 0, deductible: ded === '' || ded == null ? null : Number(String(ded).replace(',', '.')) || 0 }));
+}
+// version of the privacy notice riders agree to at sign-up (raise it when the Datenschutz text changes)
+export const CONSENT_VERSION = '2026-11';
 export const REQUEST_STATUS = ['yeni', 'onaylandı', 'tamamlandı', 'reddedildi', 'iptal'];
 // documents a rider is expected to upload in the rider portal (passport replaces both ID sides)
 export const RIDER_REQUIRED_DOCS = ['Kimlik ön yüz', 'Kimlik arka yüz', 'Adres belgesi (Meldebescheinigung)'];
@@ -67,6 +76,7 @@ export function applyBikeTypes(settings) {
   const per = enabledPeriods(settings);
   RESOURCES.pricing_plans.fields.find((f) => f.k === 'period').o = opt(per);
   RESOURCES.rentals.fields.find((f) => f.k === 'period').o = opt(per);
+  RESOURCES.rentals.fields.find((f) => f.k === 'insurance_plan').o = opt(insurancePlans(settings).map((p) => p.name));
   const list = String(settings?.bike_types || '').split(/\r?\n|,/).map((x) => x.trim()).filter(Boolean);
   if (!list.length) return;
   RESOURCES.bikes.fields.find((f) => f.k === 'type').o = opt(list);
@@ -87,6 +97,8 @@ export const RESOURCES = {
       { k: 'frame_no', l: 'Şasi no' },
       { k: 'battery_no', l: 'Batarya seri no' },
       { k: 'gps_tracker_id', l: 'GPS takip cihazı ID' },
+      { k: 'gps_provider', l: 'Takip cihazı / bağlantı türü', t: 'select', o: opt(GPS_PROVIDERS) },
+      { k: 'gps_installed_at', l: 'Takip cihazı takılma tarihi', t: 'date' },
       { k: 'color', l: 'Renk' },
       { k: 'year', l: 'Model yılı', t: 'number' },
       { k: 'purchase_date', l: 'Alış tarihi', t: 'date' },
@@ -196,6 +208,9 @@ export const RESOURCES = {
       { k: 'period', l: 'Faturalama periyodu', t: 'select', o: opt(PERIODS), def: 'ay' },
       { k: 'rate', l: 'Periyot ücreti (net)', t: 'money', req: 1, list: 1 },
       { k: 'deposit_amount', l: 'Depozito', t: 'money', list: 1 },
+      { k: 'insurance_plan', l: 'Sigorta paketi', t: 'select', o: [] },
+      { k: 'insurance_fee', l: 'Sigorta ücreti / periyot (net, kiraya eklenir)', t: 'money' },
+      { k: 'insurance_deductible', l: 'Sigorta muafiyeti (hasar başına kiracı payı)', t: 'money' },
       { k: 'pay_method', l: 'Kira ödeme şekli', t: 'select', o: opt(['banka havalesi', 'SEPA otomatik ödeme', 'kredi kartı', 'nakit', 'PayPal']) },
       { k: 'deposit_status', l: 'Depozito durumu', t: 'select', o: opt(['bekliyor', 'alındı', 'iade edildi', 'kısmi iade', 'mahsup edildi']), ro: 1 },
       { k: 'status', l: 'Durum', t: 'select', o: opt(RENTAL_STATUS), list: 1, badge: 1, ro: 1 },
@@ -346,6 +361,7 @@ export const RESOURCES = {
       { k: 'preferred_date', l: 'İstenen tarih', t: 'date', list: 1 },
       { k: 'preferred_time', l: 'İstenen saat' },
       { k: 'bike_type', l: 'İstenen bisiklet tipi', ro: 1 },
+      { k: 'insurance_plan', l: 'İstenen sigorta paketi', ro: 1 },
       { k: 'notes', l: 'Sürücünün notu', t: 'textarea', ro: 1 },
       { k: 'status', l: 'Durum', t: 'select', o: opt(REQUEST_STATUS), list: 1, badge: 1 },
       { k: 'admin_note', l: 'Sürücüye cevap (sürücü ekranında görünür)', t: 'textarea' },
@@ -435,6 +451,27 @@ export const DEFAULT_SETTINGS = {
   auto_service_from_report: '1',// a fault report from the rider screen opens a service order right away
   // online payment provider: empty until one is connected (see shared/payments.js)
   pay_provider: '',
+  // online identity check provider: empty until one is connected (see shared/idcheck.js); until then staff checks the ID photos
+  id_provider: '',
+  // electronic contract signature in the rider screen
+  esign: '1',
+  // SEPA direct debit: mandates in the rider screen + collection file (pain.008) for the bank. Needs the creditor ID (Gläubiger-ID)
+  sepa_on: '0',
+  sepa_creditor_id: '',
+  sepa_lead_days: '5',
+  // referral programme: credit (net €) for the rider who brings a friend, and for the friend; earned when the friend's first rent invoice is paid
+  referral_on: '1',
+  referral_reward: '25',
+  referral_friend_reward: '25',
+  // review request (Google) in the rider screen / phone app: after this many days of renting and once more at return
+  review_url: '',
+  review_after_days: '14',
+  // insurance packages offered with a rental: "Name | price per period net | deductible per claim" – one per line
+  insurance_plans: 'Basis (inklusive) | 0 | 500\nPlus | 9.90 | 150\nPremium | 19.90 | 0',
+  // privacy / GDPR
+  site_url: 'https://pedalla.bike',
+  privacy_url: 'https://pedalla.bike/datenschutz',
+  retention_selfie_months: '6',  // pick-up selfies of finished rentals are deleted after this many months
   bike_types: BIKE_TYPES.join('\n'),
   company_name: 'Pedalla GmbH',
   company_address: 'Missundestraße 50, 22769 Hamburg',

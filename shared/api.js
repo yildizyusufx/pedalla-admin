@@ -4,6 +4,7 @@ import { RESOURCES, DEFAULT_ROLE_PERMS, DEFAULT_SETTINGS, PERMS, ROLES, REQUEST_
 import { renderMessage } from './messages.js';
 import { provider, amountsIn, parseDate, lineHash } from './payments.js';
 import { SCHEMA, INTAKE_CHECKLIST, MIGRATIONS } from './schema.js';
+import { createExtras } from './extras.js';
 
 export class ApiError extends Error { constructor(status, msg) { super(msg); this.status = status; } }
 const err = (s, m) => { throw new ApiError(s, m); };
@@ -19,7 +20,7 @@ export function addPeriod(d, period, n = 1) {
 }
 const daysBetween = (a, b) => Math.round((new Date(b + 'T00:00:00Z') - new Date(a + 'T00:00:00Z')) / 86400000);
 
-export async function createApi(db, { hashPassword, verifyPassword, randomToken, cronSecret = null }) {
+export async function createApi(db, { hashPassword, verifyPassword, randomToken, cronSecret = null, backupToken = null }) {
   await db.exec(SCHEMA);
   for (const [table, cols] of Object.entries(MIGRATIONS)) {
     const have = new Set((await db.all(`PRAGMA table_info(${table})`)).map((c) => c.name));
@@ -373,6 +374,7 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken,
         const fee = lateFeeFor(i); if (fee > (i.late_fee || 0) + 0.004) { await db.run('UPDATE invoices SET late_fee=? WHERE id=?', [fee, i.id]); await recalcInvoice(i.id); out.late_fees++; }
       }
     }
+    try { Object.assign(out, await ext.daily()); } catch (e) { console.error('daily extras', e); }
     if (out.invoices || out.messages || out.late_fees) await audit(sys, 'günlük iş', 'system', null, `${out.invoices} fatura, ${out.messages} hatırlatma, ${out.late_fees} gecikme bedeli`);
     return out;
   }
@@ -670,7 +672,9 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken,
     while (start <= until && start <= r.end_date && n < 60) {
       let end = addDays(addPeriod(start, r.period), -1);
       if (end > r.end_date) end = r.end_date;
-      const invId = await createInvoice({ customer_id: r.customer_id, rental_id: r.id, description: `Kiralama ${r.contract_no} · ${bike?.code} · ${start} – ${end}`, net: r.rate, period_start: start, period_end: end, issue_date: start }, user);
+      const ins = Number(r.insurance_fee) > 0 ? ` · inkl. Versicherung ${r.insurance_plan || ''} ${r2(r.insurance_fee).toFixed(2)} €`.replace(/\s+/g, ' ') : '';
+      const invId = await createInvoice({ customer_id: r.customer_id, rental_id: r.id, description: `Kiralama ${r.contract_no} · ${bike?.code} · ${start} – ${end}${ins}`, net: r2(r.rate + (Number(r.insurance_fee) || 0)), period_start: start, period_end: end, issue_date: start }, user);
+      await ext.applyCredits(invId); // referral / goodwill credits come off the rent
       if (r.rider_id && start >= addDays(today(), -3)) {
         const inv = await db.get('SELECT * FROM invoices WHERE id=?', [invId]);
         if (await invoiceRider(inv)) await notifyRider(r.rider_id, 'invoice_new', { no: inv.invoice_no, amount: r2(inv.total), date: inv.due_date }, { link: 'pay', level: 'info', dedupe: `inv_new:${invId}` });
@@ -692,6 +696,7 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken,
     }
     await audit(user, 'ödeme', 'invoices', inv.id, `${inv.invoice_no}: ${r2(body.amount)} €`);
     if (body.method !== 'depozitodan mahsup') { const rid = await invoiceRider(inv); if (rid) await notifyRider(rid, 'payment_received', { no: inv.invoice_no, amount: r2(body.amount) }, { link: 'pay', level: 'ok', user }); }
+    await ext.checkReferrals().catch((e) => console.error('referrals', e));
     return await getOne('payments', r.lastId);
   }
   function lateFeeFor(inv) {
@@ -736,6 +741,9 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken,
     let plan = b.plan_id ? await db.get('SELECT * FROM pricing_plans WHERE id=?', [b.plan_id]) : null;
     const rate = b.rate !== undefined && b.rate !== '' ? Number(b.rate) : plan?.price || 0;
     const deposit = b.deposit_amount !== undefined && b.deposit_amount !== '' ? Number(b.deposit_amount) : plan?.deposit || 0;
+    const ins = b.insurance_plan ? ext.planFor(b.insurance_plan) : null;
+    const insFee = b.insurance_fee !== undefined && b.insurance_fee !== '' && b.insurance_fee != null ? Number(b.insurance_fee) || 0 : ins?.fee || 0;
+    const insDed = b.insurance_deductible !== undefined && b.insurance_deductible !== '' && b.insurance_deductible != null ? Number(b.insurance_deductible) : ins?.deductible ?? null;
     let id;
     await db.tx(async () => {
       const no = await nextNo('K');
@@ -744,11 +752,13 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken,
         b.period || plan?.period || 'ay', r2(rate), r2(deposit), deposit > 0 ? (b.deposit_paid ? 'alındı' : 'bekliyor') : 'bekliyor',
         reserve ? 'rezervasyon' : 'aktif', b.start_km ?? bike.odometer_km, b.start_battery ?? bike.battery_level, b.accessories || null, b.notes || null, user?.id]);
       id = r.lastId;
+      if (b.insurance_plan || insFee) await db.run('UPDATE rentals SET insurance_plan=?, insurance_fee=?, insurance_deductible=? WHERE id=?', [b.insurance_plan || null, r2(insFee), insDed, id]);
       if (deposit > 0 && b.deposit_paid) await depositMove({ rental_id: id, customer_id: b.customer_id, date: b.start_date > today() ? today() : b.start_date, type: 'tahsil', amount: deposit, notes: 'Teslimde alındı', method: b.deposit_method }, user);
       await db.run('UPDATE bikes SET status=? WHERE id=?', [reserve ? 'rezerve' : 'kirada', b.bike_id]);
       await audit(user, 'kiralama', 'rentals', id, `${no} · ${bike.code} → ${cust.company_name || cust.name}`);
       if (!reserve) await billRental(id, user);
     });
+    await ext.askToSign(id).catch((e) => console.error('ask sign', e));
     return await getOne('rentals', id);
   }
   async function activateRental(id, user) {
@@ -812,6 +822,7 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken,
       }
       await audit(user, 'iade', 'rentals', id, `${r.contract_no} gecikme ${lateDays} gün, hasar ${damage} €`);
     });
+    await ext.reviewOnReturn(id).catch((e) => console.error('review', e));
     return { ...(await getOne('rentals', id)), ...out };
   }
   async function extendRental(id, b, user) {
@@ -1144,6 +1155,8 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken,
     r.late_return_fee_per_day = Number(setting('late_return_fee_per_day'));
     r.handovers = await handoverList(id);
     r.plan_rows = await paymentPlan(id);
+    const cv = await ext.contractView(id); r.signs = cv.signs; r.sign_state = cv.sign_state;
+    r.insurance_plans = ext.plans();
     if (user && !can(user, 'finance')) { r.invoices = []; r.deposits = []; r.plan_rows = []; }
     return r;
   }
@@ -1190,7 +1203,7 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken,
   // ---------- rider portal (sürücü ekranı) ----------
   // Riders sign in with the e-mail/password set by staff. They only ever see their own rentals, bikes,
   // documents and requests; invoices/payments only when they are the paying (individual) customer.
-  const PORTAL_REQ = REQUEST_TYPES;
+  const PORTAL_REQ = REQUEST_TYPES.filter((x) => x !== 'hesap silme'); // account deletion has its own button (privacy section)
   const riderFromToken = async (token) => {
     if (!token) return null;
     const s = await db.get('SELECT * FROM rider_sessions WHERE token=? AND expires > ?', [token, nowTs()]);
@@ -1271,7 +1284,10 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken,
     const rank = { danger: 0, warn: 1, info: 2, ok: 3 };
     n.sort((a, b) => rank[a.level] - rank[b.level]);
     const open = invoices.filter((i) => ['açık', 'kısmi'].includes(i.status));
+    const extra = await ext.portalExtras(r, rentals, cust);
+    if (extra.sign_tasks.length) n.unshift(...extra.sign_tasks.map((s) => ({ level: 'warn', code: s.changed ? 'sign_again' : 'sign_needed', no: s.contract_no, bike: s.bike, rental_id: s.rental_id })));
     return {
+      ...extra,
       rider: { id: r.id, name: r.name, phone: r.phone, email: r.email, portal_email: r.portal_email, lang: r.lang || cust?.doc_lang || setting('doc_lang') || 'de', id_type: r.id_type, id_no: r.id_no, id_expiry: r.id_expiry, address: r.address, birth_date: r.birth_date, nationality: r.nationality },
       customer: cust ? { name: cust.company_name || cust.name, type: cust.type } : null, payer,
       rentals, invoices, payments, services, requests, documents, required_docs: required, missing_docs: missing, notifications: n, photo_tasks,
@@ -1287,9 +1303,9 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken,
       online_pay: !!provider(setting('pay_provider')),
     };
   }
-  async function portalHandle(seg, method, body, token) {
+  async function portalHandle(seg, method, body, token, headers = {}) {
     const [, b, c] = seg;
-    if (b === 'config' && method === 'GET') return ok({ signup: setting('portal_signup') !== '0', company: setting('company_name'), pickup: setting('pickup_address') || setting('company_address'), id_types: ID_TYPES });
+    if (b === 'config' && method === 'GET') return ok({ signup: setting('portal_signup') !== '0', company: setting('company_name'), pickup: setting('pickup_address') || setting('company_address'), id_types: ID_TYPES, privacy_url: setting('privacy_url') || '', esign: setting('esign') !== '0', referral: setting('referral_on') !== '0' });
     if (b === 'bike-types' && method === 'GET') return ok(await bikeTypeList());
     if (b === 'catalog' && method === 'GET') {
       // public data for the marketing website: bike types, cheapest active plan per type, free bikes and
@@ -1354,7 +1370,9 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken,
       const cid = await directCustomer(p, sys);
       const x = await db.run(`INSERT INTO riders(customer_id,name,phone,email,address,birth_date,nationality,id_type,id_no,active,trained,id_checked,portal_email,portal_password_hash,portal_active,lang,self_registered)
         VALUES(?,?,?,?,?,?,?,?,?,1,0,0,?,?,1,?,1)`, [cid, p.name, p.phone, email, p.address, s('birth_date', 10) || null, s('nationality', 60) || null, ID_TYPES.includes(body.id_type) ? body.id_type : null, p.id_no, email, hashPassword(String(body.password)), lang]);
+      await db.run('UPDATE riders SET consent_at=?, consent_version=? WHERE id=?', [nowTs(), ext.CONSENT_VERSION, x.lastId]);
       await audit({ id: null }, 'sürücü kaydı', 'riders', x.lastId, `${p.name} sürücü ekranından kayıt oldu`);
+      if (body.ref) await ext.applyReferral({ id: x.lastId, name: p.name, customer_id: cid }, body.ref).catch((e) => console.error('referral', e));
       const tok = randomToken(); const exp = new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 19).replace('T', ' ');
       await db.run('INSERT INTO rider_sessions(token,rider_id,expires) VALUES(?,?,?)', [tok, x.lastId, exp]);
       await db.run('UPDATE riders SET portal_last_login=? WHERE id=?', [nowTs(), x.lastId]);
@@ -1401,11 +1419,11 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken,
       let rent = {};
       if (body.type === 'yeni kiralama') {
         const types = String(setting('bike_types') || '').split(/\r?\n|,/).map((x) => x.trim()).filter(Boolean);
-        rent = { bike_type: types.includes(body.bike_type) ? body.bike_type : null, period: enabledPeriods(SETTINGS).includes(body.period) ? body.period : enabledPeriods(SETTINGS)[0], duration: Math.min(52, Math.max(1, Math.round(Number(body.duration) || 1))) };
+        rent = { insurance_plan: ext.planFor(body.insurance_plan)?.name || null, bike_type: types.includes(body.bike_type) ? body.bike_type : null, period: enabledPeriods(SETTINGS).includes(body.period) ? body.period : enabledPeriods(SETTINGS)[0], duration: Math.min(52, Math.max(1, Math.round(Number(body.duration) || 1))) };
         if (await db.get("SELECT 1 FROM portal_requests WHERE rider_id=? AND type='yeni kiralama' AND status='yeni'", [r.id])) err(409, 'Bekleyen bir kiralama talebiniz zaten var.');
       }
-      const x = await db.run('INSERT INTO portal_requests(rider_id,customer_id,rental_id,bike_id,type,preferred_date,preferred_time,notes,bike_type,period,duration) VALUES(?,?,?,?,?,?,?,?,?,?,?)',
-        [r.id, rental?.customer_id || r.customer_id, rental?.id || null, rental?.bike_id || null, body.type, body.preferred_date || null, String(body.preferred_time || '').slice(0, 20) || null, String(body.notes || '').slice(0, 1000) || null, rent.bike_type ?? null, rent.period ?? null, rent.duration ?? null]);
+      const x = await db.run('INSERT INTO portal_requests(rider_id,customer_id,rental_id,bike_id,type,preferred_date,preferred_time,notes,bike_type,period,duration,insurance_plan) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)',
+        [r.id, rental?.customer_id || r.customer_id, rental?.id || null, rental?.bike_id || null, body.type, body.preferred_date || null, String(body.preferred_time || '').slice(0, 20) || null, String(body.notes || '').slice(0, 1000) || null, rent.bike_type ?? null, rent.period ?? null, rent.duration ?? null, rent.insurance_plan ?? null]);
       await audit(portalUser(r), 'sürücü talebi', 'portal_requests', x.lastId, `${r.name}: ${body.type}`);
       return ok(await portalData(r));
     }
@@ -1470,8 +1488,13 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken,
       const ph = await db.get('SELECT id, kind, mime, data, created_at FROM bike_photos WHERE id=? AND rider_id=?', [Number(c), r.id]) || err(404, 'Fotoğraf bulunamadı.');
       return ok(ph);
     }
+    const ex = await ext.portalRoute(seg, method, body, r, headers, () => portalData(r));
+    if (ex !== undefined) return ok(ex);
     err(404, 'Bulunamadı.');
   }
+
+  // features added Nov 2026 (e-signature, referrals, SEPA, insurance, privacy, backup) – see shared/extras.js
+  const ext = createExtras({ db, err, setting, settings: () => SETTINGS, getOne, audit, notifyRider, nowTs, today, addDays, daysBetween, r2, can, need, listDocuments, recalcInvoice, addPayment, backupToken });
 
   // ---------- router ----------
   const permOf = (res) => RESOURCES[res]?.perm;
@@ -1491,6 +1514,23 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken,
         await audit(u, 'giriş', 'users', u.id);
         return ok({ token: tok });
       }
+      if (a === 'telemetry' && (b === 'traccar' || b === 'osmand')) {
+        // other tracker formats: Traccar position forwarding (JSON) and the OsmAnd protocol (query string); key as ?key=
+        const key = setting('telemetry_key');
+        if (key && query.key !== key && body?.key !== key) err(401, 'Geçersiz cihaz anahtarı.');
+        const pt = ext.trackerPoint(b, query, body || {});
+        if (!pt.tracker_id || !Number.isFinite(pt.lat) || !Number.isFinite(pt.lng)) err(400, 'Cihaz ID ve konum gerekli.');
+        return ok(await telemetry(pt));
+      }
+      if (a === 'backup') {
+        // full database backup as JSON, table by table in chunks: admin login or the BACKUP_TOKEN (GitHub Actions)
+        if (!await ext.backupAuth(await userFromToken(token), token)) err(401, 'Yetkisiz.');
+        if (!b) {
+          if (query.mark === '1') await db.run("INSERT INTO settings(key,value) VALUES('backup_last_at',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", [nowTs()]);
+          return ok({ app: 'pedalla-admin', created_at: nowTs(), tables: await ext.backupTables() });
+        }
+        if (b === 'table') return ok(await ext.backupChunk(String(query.name || ''), Number(query.after) || 0));
+      }
       if (a === 'telemetry' && method === 'POST') {
         // GPS trackers authenticate with the shared device key from settings
         const key = setting('telemetry_key');
@@ -1498,7 +1538,7 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken,
         if (Array.isArray(body.points)) { const out = []; for (const pt of body.points) out.push(await telemetry(pt)); return ok(out); }
         return ok(await telemetry(body));
       }
-      if (a === 'portal') return await portalHandle(seg, method, method === 'GET' ? query : body, token);
+      if (a === 'portal') return await portalHandle(seg, method, method === 'GET' ? query : body, token, headers);
       if (a === 'cron' && b === 'daily') {
         // Vercel cron (vercel.json). With CRON_SECRET set, Vercel sends it as a bearer token; without it the job only runs once a day anyway
         if (cronSecret && token !== cronSecret && !await userFromToken(token)) err(401, 'Yetkisiz.');
@@ -1612,6 +1652,7 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken,
         need(user, permOf(b));
         return ok(await fn(Number(c), user));
       }
+      { const ex = await ext.adminRoute(seg, method, query, body, user, headers); if (ex !== undefined) return ok(ex); }
       // custom actions
       if (a === 'rentals' && method === 'POST' && !b) { need(user, 'rentals', 'w'); return ok(await createRental(body, user)); }
       if (a === 'rentals' && method === 'POST' && c) {

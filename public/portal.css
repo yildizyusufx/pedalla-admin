@@ -263,3 +263,22 @@ body.portal, .portal .p-hello, .portal .p-title, .portal .p-h { color: var(--ink
 .p-copy { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0; border-bottom: 1px dashed var(--line); }
 .p-copy:last-child { border-bottom: 0; } .p-copy b { display: block; word-break: break-all; }
 .p-qr { margin: 14px auto 6px; max-width: 230px; } .p-qr svg { width: 100%; height: auto; background: #fff; border-radius: 12px; padding: 6px; }
+/* signup details, e-sign, referral, SEPA, privacy */
+.p-more { margin: 4px 0; border: 1px dashed var(--line); border-radius: 12px; padding: 8px 12px; }
+.p-more summary { cursor: pointer; font-weight: 600; color: var(--slate-d); }
+.p-more[open] summary { margin-bottom: 8px; }
+.p-contract { flex: 1 1 100%; justify-content: center; }
+.p-ref-teaser { width: 100%; display: flex; align-items: center; gap: 10px; text-align: left; font: inherit; color: var(--ink); cursor: pointer; background: linear-gradient(135deg, var(--brand-l), var(--surface)); }
+.p-ref-teaser span { flex: 1; font-weight: 600; } .p-ref-teaser .ic:last-child { transform: rotate(-90deg); opacity: .5; }
+.p-credit { display: flex; align-items: center; gap: 8px; font-weight: 600; background: var(--brand-l); }
+.p-sepa.on { border-color: var(--ok); }
+.p-ref { text-align: center; }
+.p-ref-code { font-size: 26px; font-weight: 800; letter-spacing: .12em; margin: 4px 0 10px; color: var(--brand-d); font-family: ui-monospace, monospace; }
+.p-col { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; } .p-col .btn { justify-content: center; }
+.p-scanbtn { margin-top: 8px; }
+.p-clang { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+.p-seg.sm label { min-width: 52px; flex: 0 0 auto; } .p-seg.sm span { padding: 6px 12px; font-size: 13px; }
+.p-doc { border: 1px solid var(--line); border-radius: 12px; padding: 12px; background: #fff; overflow-x: auto; max-height: 52vh; overflow-y: auto; }
+.p-doc .doc { font-size: 12px; } .p-doc .doc-2 { grid-template-columns: 1fr; }
+.p-signed { display: flex; align-items: center; gap: 6px; font-weight: 600; margin-top: 10px; }
+.portal .sigpad canvas { height: 150px; }

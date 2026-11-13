@@ -2,6 +2,9 @@
 import { tval } from './i18n-values.js';
 import { DOC_TYPES } from './shared/meta.js';
 import { epcPayload } from './shared/payments.js';
+import { contractHtml } from './contract-doc.js';
+import { signPad, padHtml } from './signpad.js';
+import { openScanner } from './scan.js';
 
 const L = {
   tr: {
@@ -137,12 +140,69 @@ Object.assign(L.de, { ph_pick_h: 'Übergabe-Check', ph_pick_p: 'Mach bei der Abh
 Object.assign(L.en, { ph_pick_h: 'Pick-up check', ph_pick_p: 'When you collect the bike, take a selfie and at least {n} photos of the bike (right and left side; scratches or damage close up). The photos are saved with the date in the bike\'s history.',
   ph_req_h: 'Pedalla asks for a photo', ph_req_p: 'Please take it now and send it. The photo is saved in the bike\'s history.', ph_selfie: 'Take a selfie', ph_bike: 'Photo of the bike', ph_more: 'One more', ph_done: 'Thanks, the photos were received.', ph_sending: 'Sending photo…', ph_sent: 'Photo sent', ph_send: 'Send a photo', ph_bad: 'The photo could not be read. Please take it again with the camera.', ph_note: 'Note' });
 const LANGS = [['tr', 'TR'], ['de', 'DE'], ['en', 'EN']];
+// ---- texts added Nov 2026: contract e-signature, referral, SEPA, privacy, scanner, insurance ----
+Object.assign(L.tr, {
+  consent: 'Bilgilerimin kiralama ve sözleşme için Pedalla tarafından işlenmesini kabul ediyorum ({privacy}).', privacy_l: 'gizlilik metni',
+  more_details: 'Diğer bilgiler (isteğe bağlı, sonra da girilebilir)', ref_code: 'Davet kodu (varsa)', signup_short: 'Sadece 4 bilgi: ad, e-posta, telefon, şifre. Gerisini sonra tamamlarsın.',
+  n_sign_needed: '{no} numaralı sözleşmen hazır. Okuyup telefondan imzala, ofise gelmene gerek yok.', n_sign_again: '{no} numaralı sözleşme güncellendi. Lütfen yeni hâlini tekrar imzala.',
+  sign_btn: 'Sözleşmeyi oku ve imzala', contract_btn: 'Sözleşme', signed: 'imzalandı', c_h: 'Kira sözleşmesi', c_lang_note: 'Sözleşmenin resmi metni Almancadır; İngilizce de görüntüleyebilirsin.',
+  c_name: 'Ad soyad (imzalayan)', c_sign: 'İmzan (parmağınla çiz)', c_clear: 'Temizle', c_accept: 'Sözleşmeyi okudum, koşulları kabul ediyorum. Elektronik imzamın el yazısı imza yerine geçtiğini biliyorum.',
+  c_submit: 'İmzala ve gönder', c_done: 'Sözleşme imzalandı. Teşekkürler!', c_need_sign: 'Lütfen imza alanına imzanı çiz.', c_signed_at: 'İmzaladın: {date}', c_ev: 'Tarih, saat, IP ve sözleşme içeriğinin sağlama değeri kanıt olarak saklanır.',
+  ins: 'Sigorta paketi', ins_none: 'Sigorta yok', ins_incl: 'dahil', ins_ded: 'muafiyet {amount}', ins_hint: 'Hırsızlık ve hasarda ödeyeceğin payı düşürür.',
+  ref_h: 'Arkadaşını getir', ref_p: 'Arkadaşın kodunla kayıt olsun: o {friend} indirim alır, ilk kirasını ödeyince sen de {reward} indirim kazanırsın.', ref_your: 'Davet kodun', ref_copy: 'Linki kopyala', ref_share: 'WhatsApp ile paylaş',
+  ref_stats: '{n} davet · {e} kazanıldı', ref_credit: 'İndirim bakiyen: {amount} (sonraki faturandan düşülür)', ref_msg: 'Pedalla ile aylık e-bike kiralıyorum, bakım ve sigorta dahil. Kodumla kaydol, {friend} indirim kazan: {link}',
+  ref_teaser: 'Arkadaşını getir, {reward} indirim kazan', st_bekliyor: 'bekliyor', st_kazanıldı: 'kazanıldı', st_iptal: 'iptal',
+  sepa_h: 'Otomatik ödeme (SEPA)', sepa_p: 'Kira her ay hesabından otomatik çekilsin, hatırlamana gerek kalmasın. İstediğin zaman iptal edebilirsin.', sepa_holder: 'Hesap sahibi', sepa_iban: 'IBAN',
+  sepa_accept: 'SEPA yetki metnini okudum ve kabul ediyorum.', sepa_btn: 'Otomatik ödemeyi aç', sepa_on: 'Otomatik ödeme açık', sepa_ref: 'Yetki no', sepa_off: 'Otomatik ödemeyi kapat', sepa_off_q: 'Otomatik ödeme kapatılsın mı? Faturaları havale ile ödersin.', sepa_text: 'Yetki metni (Almanca, resmi)',
+  priv_h: 'Gizlilik ve verilerim', priv_p: 'Kimlik belgeni, selfie\'ni ve sözleşme verilerini sadece kiralama için kullanırız. Verilerinin bir kopyasını indirebilir veya silinmesini isteyebilirsin.',
+  priv_read: 'Gizlilik metnini oku', priv_export: 'Verilerimi indir', priv_delete: 'Hesabımın silinmesini iste', priv_delete_q: 'Hesabının ve verilerinin silinmesini istiyor musun? Yasal saklama süresi olan faturalar hariç tüm verilerin silinir.', priv_requested: 'Silme talebin alındı, en geç 30 gün içinde işlenir.',
+  scan_btn: 'Çok sayfalı belge tara (PDF)', scan_done: '{n} sayfalık PDF yüklendi', idc_h: 'Online kimlik doğrulama', idc_btn: 'Kimliğimi online doğrula',
+  sign_ok_badge: 'Sözleşme imzalı',
+});
+Object.assign(L.de, {
+  consent: 'Ich bin einverstanden, dass Pedalla meine Daten für Miete und Vertrag verarbeitet ({privacy}).', privacy_l: 'Datenschutzerklärung',
+  more_details: 'Weitere Angaben (optional, auch später möglich)', ref_code: 'Empfehlungscode (falls vorhanden)', signup_short: 'Nur 4 Angaben: Name, E-Mail, Telefon, Passwort. Den Rest ergänzt du später.',
+  n_sign_needed: 'Dein Mietvertrag {no} ist fertig. Lies ihn und unterschreibe direkt am Handy – ohne Termin im Büro.', n_sign_again: 'Dein Mietvertrag {no} wurde geändert. Bitte unterschreibe die neue Fassung.',
+  sign_btn: 'Vertrag lesen & unterschreiben', contract_btn: 'Vertrag', signed: 'unterschrieben', c_h: 'Mietvertrag', c_lang_note: 'Der Vertrag liegt auf Deutsch vor; du kannst ihn auch auf Englisch ansehen.',
+  c_name: 'Name (Unterzeichner/in)', c_sign: 'Deine Unterschrift (mit dem Finger)', c_clear: 'Löschen', c_accept: 'Ich habe den Vertrag gelesen und akzeptiere die Bedingungen. Mir ist bewusst, dass meine elektronische Unterschrift die handschriftliche ersetzt.',
+  c_submit: 'Unterschreiben & senden', c_done: 'Vertrag unterschrieben. Danke!', c_need_sign: 'Bitte unterschreibe im Feld.', c_signed_at: 'Unterschrieben am {date}', c_ev: 'Datum, Uhrzeit, IP und eine Prüfsumme des Vertragsinhalts werden als Nachweis gespeichert.',
+  ins: 'Versicherungspaket', ins_none: 'Keine Versicherung', ins_incl: 'inklusive', ins_ded: 'Selbstbeteiligung {amount}', ins_hint: 'Senkt deinen Anteil bei Diebstahl und Schäden.',
+  ref_h: 'Freunde einladen', ref_p: 'Dein Freund registriert sich mit deinem Code und bekommt {friend} Rabatt – sobald er die erste Miete zahlt, bekommst du {reward} Rabatt.', ref_your: 'Dein Code', ref_copy: 'Link kopieren', ref_share: 'Per WhatsApp teilen',
+  ref_stats: '{n} eingeladen · {e} verdient', ref_credit: 'Dein Rabattguthaben: {amount} (wird von der nächsten Rechnung abgezogen)', ref_msg: 'Ich miete mein E-Bike monatlich bei Pedalla – Wartung und Versicherung inklusive. Mit meinem Code bekommst du {friend} Rabatt: {link}',
+  ref_teaser: 'Freunde einladen, {reward} Rabatt bekommen', st_bekliyor: 'offen', st_kazanıldı: 'verdient', st_iptal: 'storniert',
+  sepa_h: 'Automatisch zahlen (SEPA)', sepa_p: 'Die Miete wird jeden Monat automatisch abgebucht – nie wieder dran denken. Jederzeit kündbar.', sepa_holder: 'Kontoinhaber/in', sepa_iban: 'IBAN',
+  sepa_accept: 'Ich habe das SEPA-Lastschriftmandat gelesen und erteile es.', sepa_btn: 'Lastschrift aktivieren', sepa_on: 'Lastschrift aktiv', sepa_ref: 'Mandatsreferenz', sepa_off: 'Lastschrift beenden', sepa_off_q: 'Lastschrift wirklich beenden? Rechnungen zahlst du dann per Überweisung.', sepa_text: 'Mandatstext',
+  priv_h: 'Datenschutz & meine Daten', priv_p: 'Ausweis, Selfie und Vertragsdaten nutzen wir nur für die Miete. Du kannst eine Kopie deiner Daten herunterladen oder die Löschung beantragen.',
+  priv_read: 'Datenschutzerklärung lesen', priv_export: 'Meine Daten herunterladen', priv_delete: 'Löschung meines Kontos beantragen', priv_delete_q: 'Möchtest du die Löschung deines Kontos und deiner Daten beantragen? Gelöscht wird alles außer Rechnungen mit gesetzlicher Aufbewahrungspflicht.', priv_requested: 'Löschantrag erhalten – wir bearbeiten ihn innerhalb von 30 Tagen.',
+  scan_btn: 'Mehrseitiges Dokument scannen (PDF)', scan_done: 'PDF mit {n} Seiten hochgeladen', idc_h: 'Online-Ausweisprüfung', idc_btn: 'Ausweis online prüfen',
+  sign_ok_badge: 'Vertrag unterschrieben',
+});
+Object.assign(L.en, {
+  consent: 'I agree that Pedalla processes my data for the rental and contract ({privacy}).', privacy_l: 'privacy policy',
+  more_details: 'More details (optional, can be added later)', ref_code: 'Referral code (if you have one)', signup_short: 'Just 4 fields: name, e-mail, phone, password. Add the rest later.',
+  n_sign_needed: 'Your rental agreement {no} is ready. Read it and sign on your phone – no office visit needed.', n_sign_again: 'Your rental agreement {no} was updated. Please sign the new version.',
+  sign_btn: 'Read & sign the agreement', contract_btn: 'Agreement', signed: 'signed', c_h: 'Rental agreement', c_lang_note: 'The agreement is in German; you can also view it in English.',
+  c_name: 'Name (signer)', c_sign: 'Your signature (draw with your finger)', c_clear: 'Clear', c_accept: 'I have read the agreement and accept its terms. I understand that my electronic signature replaces a handwritten one.',
+  c_submit: 'Sign & send', c_done: 'Agreement signed. Thank you!', c_need_sign: 'Please sign in the box.', c_signed_at: 'Signed on {date}', c_ev: 'Date, time, IP and a checksum of the agreement are stored as evidence.',
+  ins: 'Insurance package', ins_none: 'No insurance', ins_incl: 'included', ins_ded: 'deductible {amount}', ins_hint: 'Lowers your share in case of theft or damage.',
+  ref_h: 'Invite friends', ref_p: 'Your friend signs up with your code and gets {friend} off – once they pay their first rent, you get {reward} off.', ref_your: 'Your code', ref_copy: 'Copy link', ref_share: 'Share on WhatsApp',
+  ref_stats: '{n} invited · {e} earned', ref_credit: 'Your discount balance: {amount} (taken off your next invoice)', ref_msg: 'I rent my e-bike monthly from Pedalla – maintenance and insurance included. Use my code and get {friend} off: {link}',
+  ref_teaser: 'Invite friends, get {reward} off', st_bekliyor: 'pending', st_kazanıldı: 'earned', st_iptal: 'cancelled',
+  sepa_h: 'Pay automatically (SEPA)', sepa_p: 'Your rent is debited automatically every month – nothing to remember. Cancel any time.', sepa_holder: 'Account holder', sepa_iban: 'IBAN',
+  sepa_accept: 'I have read the SEPA direct debit mandate and grant it.', sepa_btn: 'Turn on direct debit', sepa_on: 'Direct debit active', sepa_ref: 'Mandate reference', sepa_off: 'Stop direct debit', sepa_off_q: 'Stop direct debit? You will then pay invoices by bank transfer.', sepa_text: 'Mandate text',
+  priv_h: 'Privacy & my data', priv_p: 'We use your ID, selfie and contract data only for the rental. You can download a copy of your data or ask us to delete it.',
+  priv_read: 'Read the privacy policy', priv_export: 'Download my data', priv_delete: 'Request account deletion', priv_delete_q: 'Do you want to request deletion of your account and data? Everything is deleted except invoices we must keep by law.', priv_requested: 'Deletion request received – we process it within 30 days.',
+  scan_btn: 'Scan multi-page document (PDF)', scan_done: 'PDF with {n} pages uploaded', idc_h: 'Online ID check', idc_btn: 'Verify my ID online',
+  sign_ok_badge: 'Agreement signed',
+});
 const store = { get: (k) => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} } };
 const guessLang = () => { const n = (navigator.language || 'de').slice(0, 2); return L[n] ? n : 'de'; };
 // hand-off from the public website: portal.html?lang=de#t=<token>&go=requests logs the rider straight in
 const handoff = new URLSearchParams(location.hash.startsWith('#t=') ? location.hash.slice(1) : '');
 const qlang = new URLSearchParams(location.search).get('lang');
 if (qlang && L[qlang]) store.set('pedalla_rider_lang', qlang);
+const qref = new URLSearchParams(location.search).get('ref');
+if (qref && /^[A-Za-z0-9]{3,20}$/.test(qref)) store.set('pedalla_ref', qref.toUpperCase());
 if (handoff.get('t')) { store.set('pedalla_rider_token', handoff.get('t')); history.replaceState(null, '', location.pathname + location.search + '#' + (handoff.get('go') || 'home')); }
 let lang = store.get('pedalla_rider_lang') || guessLang();
 let token = store.get('pedalla_rider_token');
@@ -183,6 +243,8 @@ const langSw = () => `<div class="p-lang">${LANGS.map(([k, l]) => `<button type=
 const bindLang = (el) => el.querySelectorAll('[data-lang]').forEach((b) => (b.onclick = () => setLang(b.dataset.lang)));
 
 const IC = {
+  pen: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13 7 4 4"/>', gift: '<rect x="3" y="8" width="18" height="13" rx="1.5"/><path d="M3 12h18M12 8v13M12 8c-2-4-6-4-6-1.5S9 8 12 8c3 0 6-1 6-1.5S14 4 12 8"/>',
+  doc: '<path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6M9 13h8M9 17h5"/>', shield: '<path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/>', share: '<circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="m8.2 10.8 7.6-3.6M8.2 13.2l7.6 3.6"/>',
   home: '<path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/>', req: '<rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4M16 3v4M4 10h16"/>',
   pay: '<rect x="2" y="6" width="20" height="13" rx="2"/><path d="M2 10h20M6 15h4"/>', docs: '<path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6M9 13h8M9 17h5"/>',
   me: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>', bike: '<circle cx="6" cy="16" r="4"/><circle cx="18" cy="16" r="4"/><path d="M6 16 10 8h5l3 8M10 8 8 5H6M12 16l3-8"/>',
@@ -214,24 +276,30 @@ function signupView() {
   const types = cfg?.id_types || [];
   root().innerHTML = `<div class="p-login"><div class="p-login-card">${langSw()}<img class="p-logo" src="img/logo.png" alt="pedalla">
     <h1>${t('signup_h')}</h1><p class="muted">${t('signup_sub')}</p>
-    ${cfg && !cfg.signup ? `<div class="p-card p-empty">${t('signup_closed')}</div>` : `<form id="sgf" autocomplete="on">
+    ${cfg && !cfg.signup ? `<div class="p-card p-empty">${t('signup_closed')}</div>` : `<form id="sgf" autocomplete="on"><p class="muted">${t('signup_short')}</p>
     <label class="field"><span>${t('full_name')} *</span><input name="name" required minlength="3" autocomplete="name"></label>
     <label class="field"><span>${t('email')} *</span><input name="email" type="email" required autocomplete="email" inputmode="email"></label>
     <label class="field"><span>${t('phone')} *</span><input name="phone" type="tel" required autocomplete="tel"></label>
     <label class="field"><span>${t('password')} *</span><input name="password" type="password" required minlength="6" autocomplete="new-password" placeholder="${esc(t('pw_hint'))}"></label>
+    <details class="p-more"><summary>${t('more_details')}</summary>
+    <label class="field"><span>${t('ref_code')}</span><input name="ref" value="${esc(store.get('pedalla_ref') || '')}" autocapitalize="characters" autocomplete="off"></label>
     <div class="p-row"><label class="field"><span>${t('birth')}</span><input name="birth_date" type="date" max="${todayISO()}" autocomplete="bday"></label>
     <label class="field"><span>${t('nationality')}</span><input name="nationality" autocomplete="country-name"></label></div>
     <label class="field"><span>${t('address')}</span><input name="address" autocomplete="street-address"></label>
     <div class="p-row"><label class="field"><span>${t('id_type')}</span><select name="id_type"><option value="">—</option>${types.map((x) => `<option value="${esc(x)}">${esc(v(x))}</option>`).join('')}</select></label>
-    <label class="field"><span>${t('id_no')}</span><input name="id_no"></label></div>
+    <label class="field"><span>${t('id_no')}</span><input name="id_no"></label></div></details>
     <input name="website" class="p-hp" tabindex="-1" autocomplete="off" aria-hidden="true">
-    <label class="p-check"><input type="checkbox" name="consent" required><span>${t('consent')}</span></label>
+    <label class="p-check"><input type="checkbox" name="consent" required><span>${t('consent', { privacy: `<a href="${esc(cfg?.privacy_url || 'https://pedalla.bike/datenschutz')}" target="_blank" rel="noopener">${t('privacy_l')}</a>` })}</span></label>
     <button class="btn primary p-big">${t('create_acc')}</button></form>`}
     <p class="p-alt">${t('have_account')} <a href="#login">${t('login')}</a></p></div></div>`;
   bindLang(root());
   root().querySelector('#sgf')?.addEventListener('submit', guard(async (e) => {
     e.preventDefault(); const f = Object.fromEntries(new FormData(e.target)); f.consent = !!f.consent; f.lang = lang;
-    try { const r = await api('POST', 'signup', f); setToken(r.token); fresh = true; history.replaceState(null, '', '#home'); tab = 'home'; await load(); }
+    try {
+      const r = await api('POST', 'signup', f); setToken(r.token); fresh = true; store.set('pedalla_ref', null);
+      // straight on to the bike request: fewer steps between sign-up and a booked bike
+      history.replaceState(null, '', '#req'); tab = 'req'; await load(); shell('yeni kiralama');
+    }
     catch (x) { throw new Error(/zaten bir hesap/.test(x.message) ? t('email_taken') : x.message); }
   }));
 }
@@ -242,6 +310,7 @@ function notice(n) {
   if (n.code.startsWith('request_')) { p.date = n.date ? ` (${date(n.date)})` : ''; p.note = n.note ? ` ${t('reply')}: “${esc(n.note)}”` : ''; }
   const act = { service_due: 'servis randevusu', service_overdue: 'servis randevusu', return_soon: 'kiralama uzatma', return_late: 'iade randevusu' }[n.code];
   const go = n.code === 'docs_missing' || n.code.startsWith('id_') ? 'docs' : n.code.startsWith('invoice') ? 'pay' : null;
+  if (n.code.startsWith('sign_')) return `<div class="p-note l-${n.level}"><div class="p-note-ic">${ic('pen')}</div><div><p>${t('n_' + n.code, p)}</p><button class="btn sm primary" data-sign="${n.rental_id}">${ic('pen')} ${t('sign_btn')}</button></div></div>`;
   return `<div class="p-note l-${n.level}"><div class="p-note-ic">${ic(n.level === 'ok' ? 'check' : n.level === 'info' ? 'bell' : 'alert')}</div><div><p>${t('n_' + n.code, p)}</p>
     ${act ? `<button class="btn sm" data-new="${act}">${esc(cv(act))}</button>` : ''}${go ? `<button class="btn sm" data-tab="${go}">${t(go === 'docs' ? 'upload' : 'payments')}</button>` : ''}</div></div>`;
 }
@@ -288,7 +357,8 @@ function bikeCard(x) {
     <dl class="p-dl"><div><dt>${t('contract')}</dt><dd>${esc(x.contract_no)}</dd></div><div><dt>${t('until')}</dt><dd class="${x.late_days ? 't-danger' : ''}">${date(x.end_date)}</dd></div>
     ${x.battery_level != null ? `<div><dt>${t('battery')}</dt><dd>${x.battery_level} %</dd></div>` : ''}<div><dt>${t('km')}</dt><dd>${num(x.odometer_km)} km</dd></div>
     <div><dt>${t('next_service')}</dt><dd class="${x.next_service_date && x.next_service_date <= addDays(todayISO(), 14) ? 't-warn' : ''}">${date(x.next_service_date)}</dd></div>
-    ${x.deposit_amount ? `<div><dt>${t('deposit')}</dt><dd>${money(x.deposit_held || 0)} / ${money(x.deposit_amount)}</dd></div>` : ''}${x.plan_name ? `<div><dt>${t('plan')}</dt><dd>${esc(x.plan_name)}</dd></div>` : ''}${x.pay_method ? `<div><dt>${t('pay_method')}</dt><dd>${esc(v(x.pay_method))}</dd></div>` : ''}</dl>
+    ${x.deposit_amount ? `<div><dt>${t('deposit')}</dt><dd>${money(x.deposit_held || 0)} / ${money(x.deposit_amount)}</dd></div>` : ''}${x.plan_name ? `<div><dt>${t('plan')}</dt><dd>${esc(x.plan_name)}</dd></div>` : ''}${x.pay_method ? `<div><dt>${t('pay_method')}</dt><dd>${esc(v(x.pay_method))}</dd></div>` : ''}${x.insurance_plan ? `<div><dt>${t('ins')}</dt><dd>${esc(x.insurance_plan)}${x.insurance_deductible != null ? ` · ${t('ins_ded', { amount: money(x.insurance_deductible) })}` : ''}</dd></div>` : ''}</dl>
+    ${data.esign ? `<button class="btn sm ${x.signed ? 'ghost' : 'primary'} p-contract" data-${x.signed ? 'contract' : 'sign'}="${x.id}">${ic('pen')} ${x.signed ? `${t('contract_btn')} · <span class="t-ok">${t('signed')} ✓</span>` : t('sign_btn')}</button>` : ''}
     ${x.return_notice_date ? `<div class="p-rn">${ic('back')} ${t('rn_set')}: <b>${date(x.return_notice_date)}</b></div>` : ''}
     ${x.status === 'aktif' ? `<div class="p-bike-act"><button class="btn sm" data-x="${x.id}">${ic('plus')} ${t('b_extend')}</button><button class="btn sm" data-rn="${x.id}">${ic('back')} ${t('b_return')}</button><button class="btn sm" data-fault="${x.id}">${ic('alert')} ${t('b_fault')}</button></div>` : ''}
     <button class="btn sm p-shot-free" data-shot="bisiklet" data-purpose="free" data-rental="${x.id}">${ic('cam')} ${t('ph_send')}</button></div>`;
@@ -328,10 +398,10 @@ function pickupView() {
     <a class="btn sm" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(addr)}">${ic('pin')} ${t('pickup_route')}</a></div></section>`;
 }
 // home stays clean: only notices that need action now stay open, everything else sits in a collapsed list
-const MUST = ['return_late', 'invoice_overdue', 'id_expired', 'docs_missing'];
+const MUST = ['sign_needed', 'sign_again', 'return_late', 'invoice_overdue', 'id_expired', 'docs_missing'];
 function noticesBlock(list) {
   if (!list.length) return '';
-  const must = list.filter((n) => MUST.includes(n.code)).slice(0, 2);
+  const must = list.filter((n) => MUST.includes(n.code)).slice(0, 3);
   const rest = list.filter((n) => !must.includes(n));
   return `${must.length ? `<section class="p-must">${must.map(notice).join('')}</section>` : ''}
   ${rest.length ? `<details class="p-card p-notes"><summary>${ic('bell')}<span>${t('notices')}</span><i class="p-count">${rest.length}</i><span class="grow"></span>${ic('down')}</summary><div class="p-notes-in">${rest.map(notice).join('')}</div></details>` : ''}`;
@@ -345,6 +415,7 @@ function homeView() {
   ${act.length ? `<section><h2 class="p-h">${t('quick')}</h2><div class="p-quick">
     <button data-new="servis randevusu">${ic('wrench')}<span>${t('q_service')}</span></button>${(() => { const a = act.find((x) => x.status === 'aktif'); return a ? `<button data-fault="${a.id}">${ic('alert')}<span>${t('q_fault')}</span></button>
     <button data-rn="${a.id}">${ic('back')}<span>${t('q_return')}</span></button><button data-x="${a.id}">${ic('plus')}<span>${t('q_extend')}</span></button>` : `<button data-new="iade randevusu">${ic('back')}<span>${t('q_return')}</span></button>`; })()}</div></section>` : ''}
+  ${d.referral && act.length ? `<button class="p-card p-ref-teaser" data-tab="me">${ic('gift')}<span>${t('ref_teaser', { reward: money(d.referral.reward) })}</span>${ic('down')}</button>` : ''}
   ${d.payer ? `<section><h2 class="p-h">${t('next_payment')}</h2><div class="p-card" data-tab="pay">${nd ? `<div class="p-pay-big ${nd.days_late ? 't-danger' : ''}">${money(nd.balance)}</div><div class="muted">${esc(nd.invoice_no)} · ${t('due')} ${date(nd.due_date)}</div>` : `<div class="muted">${t('nothing_due')}</div>`}
     ${nc ? `<div class="p-sub">${t('next_charge')}: <b>${money(nc.amount)}</b> · ${t('from')} ${date(nc.date)}</div>` : ''}</div></section>` : ''}`;
 }
@@ -359,6 +430,7 @@ function requestsView(pre) {
       <div class="field"><span>${t('bike_type')}</span><div class="p-types">${(btypes || (d.bike_types || []).map((name) => ({ name }))).map((x, i) => `<label class="p-type"><input type="radio" name="bike_type" value="${esc(x.name)}" ${i === 0 ? 'checked' : ''}><div class="p-type-img">${x.image ? `<img src="${x.image}" alt="" loading="lazy">` : ic('bike')}</div><span>${esc(v(x.name))}</span></label>`).join('')}<label class="p-type"><input type="radio" name="bike_type" value=""><div class="p-type-img p-type-any">?</div><span>${t('any_type')}</span></label></div></div>
       <div class="p-row"><label class="field"><span>${t('period')}</span><select name="period">${(d.periods || ['ay']).map((p) => `<option value="${p}" ${p === 'ay' ? 'selected' : ''}>${t({ 'gün': 'p_day', hafta: 'p_week', ay: 'p_month' }[p])}</option>`).join('')}</select></label>
       <label class="field"><span>${t('duration')}</span><input name="duration" type="number" min="1" max="52" value="1"></label></div>
+      ${(d.insurance_plans || []).length ? `<label class="field"><span>${t('ins')} <small class="muted">${t('ins_hint')}</small></span><select name="insurance_plan">${d.insurance_plans.map((p, i) => `<option value="${esc(p.name)}" ${i === 0 ? 'selected' : ''}>${esc(p.name)} · ${p.fee ? money(p.fee) + ' / ' + t('p_month') : t('ins_incl')}${p.deductible != null ? ' · ' + t('ins_ded', { amount: money(p.deductible) }) : ''}</option>`).join('')}</select></label>` : ''}
       <div class="p-price muted" id="pprice"></div></div>
     <label class="field"><span>${t('note')}</span><textarea name="notes" rows="3" placeholder="${esc(t('note_ph'))}"></textarea></label>
     <button class="btn primary p-big">${t('send')}</button></form></section>
@@ -378,6 +450,8 @@ function paymentsView() {
     ${['açık', 'kısmi'].includes(i.status) ? `<button class="btn primary sm p-paybtn" data-pay="${i.id}">${ic('pay')} ${t('pay_btn')}</button>` : ''}</div>`;
   const plans = d.rentals.filter((x) => x.plan?.length);
   return `<div class="p-kpis"><div class="p-card"><small>${t('open_balance')}</small><b>${money(d.summary.open_balance)}</b></div><div class="p-card ${d.summary.overdue ? 'l-danger' : ''}"><small>${t('overdue')}</small><b>${money(d.summary.overdue)}</b></div></div>
+  ${d.credit > 0 ? `<div class="p-card p-credit">${ic('gift')} ${t('ref_credit', { amount: money(d.credit) })}</div>` : ''}
+  ${sepaView()}
   ${open.length ? `<section><h2 class="p-h">${t('invoices')}</h2>${open.map(inv).join('')}<div class="p-card p-howto"><b>${t('pay_how')}</b><p>${t('pay_text')}</p>
     <dl class="p-dl">${d.company.name ? `<div><dt>${t('receiver')}</dt><dd>${esc(d.company.name)}</dd></div>` : ''}${d.company.iban ? `<div><dt>${t('iban')}</dt><dd class="mono">${esc(d.company.iban)}</dd></div>` : ''}</dl></div></section>` : `<div class="p-card p-empty">${ic('check')} ${t('nothing_due')}</div>`}
   ${plans.map((x) => `<section><h2 class="p-h">${t('plan_h')} · ${esc(x.bike_code)}</h2><div class="p-card p-list p-plan">${x.pay_method ? `<small class="muted">${t('pay_method')}: ${esc(v(x.pay_method))}</small>` : ''}
@@ -393,7 +467,7 @@ function docsView() {
   <section><h2 class="p-h">${t('upload')}</h2><form class="p-card p-form" id="df">
     <label class="field"><span>${t('doc_type')}</span><select name="doc_type">${types.map((x) => `<option value="${esc(x)}">${esc(v(x))}</option>`).join('')}</select></label>
     <label class="p-file"><input type="file" name="file" accept="image/*,application/pdf" required>${ic('cam')}<span id="fname">${t('take_photo')}</span></label>
-    <button class="btn primary p-big">${t('upload')}</button></form></section>
+    <button class="btn primary p-big">${t('upload')}</button><button type="button" class="btn p-big p-scanbtn" id="scanb">${ic('doc')} ${t('scan_btn')}</button></form></section>
   <section><h2 class="p-h">${t('my_docs')}</h2>${d.documents.length ? `<div class="p-card p-list">${d.documents.map((x) => `<div class="p-item-row"><span>${esc(v(x.doc_type))}<small class="muted"> · ${date(x.created_at)}</small></span><button class="btn sm ghost" data-doc="${x.id}">${t('open')}</button></div>`).join('')}</div>` : `<div class="p-card p-empty">${t('no_docs')}</div>`}</section>`;
 }
 function profileView() {
@@ -403,6 +477,7 @@ function profileView() {
     ${r.id_type ? `<div><dt>${t('id_doc')}</dt><dd>${esc(v(r.id_type))} ${esc(r.id_no || '')}${r.id_expiry ? ` · ${t('valid')} ${date(r.id_expiry)}` : ''}</dd></div>` : ''}</dl>
     <label class="field"><span>${t('phone')}</span><input name="phone" type="tel" value="${esc(r.phone || '')}"></label>
     <button class="btn p-big">${t('save')}</button></form></section>
+  ${refView()}
   <section><h2 class="p-h">${t('lang')}</h2><div class="p-card">${langSw()}</div></section>
   ${navigator.geolocation ? `<section><h2 class="p-h">📍 ${t('loc_h')}</h2><div class="p-card"><p>${locOn() ? `<b class="t-ok">${t('loc_on')}</b>${locSent ? ` <small class="muted">· ${t('loc_last')} ${locSent}</small>` : ''}` : `<b>${t('loc_off')}</b>`}</p><p class="muted">${t('loc_text')}</p>${locOn() ? `<button class="btn" data-loc="off">${t('loc_stop')}</button>` : `<button class="btn primary" data-loc="on">${t('loc_allow')}</button>`}</div></section>` : ''}
   <section><h2 class="p-h">${t('change_pw')}</h2><form class="p-card p-form" id="pw">
@@ -411,6 +486,7 @@ function profileView() {
     <button class="btn p-big">${t('change_pw')}</button></form></section>
   <section><h2 class="p-h">${t('contact')}</h2><div class="p-card p-contact"><b>${esc(c.name)}</b><small class="muted">${esc(c.address || '')}</small>
     <div class="p-row">${c.phone ? `<a class="btn" href="tel:${esc(c.phone)}">${ic('phone')} ${t('call')}</a><a class="btn wa" href="https://wa.me/${wa}" target="_blank" rel="noopener">${t('write')}</a>` : ''}${c.email ? `<a class="btn" href="mailto:${esc(c.email)}">${ic('mail')}</a>` : ''}</div></div></section>
+  ${privacyView()}
   <button class="btn ghost p-big" id="lo">${t('logout')}</button>`;
 }
 
@@ -469,6 +545,7 @@ function bind() {
   el.querySelector('#pw')?.addEventListener('submit', guard(async (e) => { e.preventDefault(); data = await api('PUT', 'me', Object.fromEntries(new FormData(e.target))); toast(t('saved')); shell(); }));
   el.querySelectorAll('[data-loc]').forEach((b) => (b.onclick = () => { store.set(LOC_KEY, b.dataset.loc); if (b.dataset.loc === 'on') { locDenied = false; startLoc(true); } else stopLoc(); shell(); }));
   el.querySelector('#lo')?.addEventListener('click', guard(async () => { await api('POST', 'logout').catch(() => {}); stopLoc(); setToken(null); render(); }));
+  bindExtras(el);
 }
 // ---- bottom sheets: inbox, fault report, extension, return date, pay one invoice ----
 function sheet(title, html) {
@@ -491,7 +568,7 @@ const addPeriods = (d, p, n) => {
 async function inboxSheet() {
   const box = await api('GET', 'inbox');
   const s = sheet(t('inbox'), box.messages.length ? `<div class="p-inbox">${box.messages.map((m) => `<button type="button" class="p-msg l-${esc(m.level || 'info')} ${m.read ? '' : 'new'}" data-go="${esc(m.link || '')}"><b>${esc(m.title)}</b><span>${esc(m.body)}</span><small class="muted">${date(m.created_at)}</small></button>`).join('')}</div>` : `<div class="p-empty">${t('inbox_empty')}</div>`);
-  s.el.querySelectorAll('[data-go]').forEach((b) => (b.onclick = () => { const g = b.dataset.go; s.close(); if (TABS.some(([k]) => k === g) && g !== tab) location.hash = g; }));
+  s.el.querySelectorAll('[data-go]').forEach((b) => (b.onclick = () => { const g = b.dataset.go; s.close(); if (/^https?:\/\//.test(g)) { window.open(g, '_blank', 'noopener'); return; } if (TABS.some(([k]) => k === g) && g !== tab) location.hash = g; }));
   if (box.unread) { await api('POST', 'inbox/read', {}).catch(() => {}); data.unread = 0; const dot = document.querySelector('#inb .p-dot'); if (dot) dot.remove(); }
 }
 function faultSheet(rid) {
@@ -593,6 +670,83 @@ function startLoc(ask) {
   if (locTimer == null) locTimer = setInterval(() => { if (document.visibilityState === 'visible') sendLoc(false); }, 5 * 60000);
 }
 function stopLoc() { clearInterval(locTimer); locTimer = null; }
+
+// ---- contract e-signature, referral, SEPA mandate, privacy (added Nov 2026) ----
+const docLang = () => (lang === 'en' ? 'en' : 'de');
+async function contractSheet(rid, signNow) {
+  let c = await api('GET', `contract/${rid}`); let dl = docLang();
+  const mine = () => (c.rental.signs || []).filter((x) => x.role === 'sürücü' && x.valid).pop();
+  const s = sheet(t('c_h'), '<div id="cbox"></div>');
+  const draw = () => {
+    const signedBy = mine(); const canSign = !signedBy && ['aktif', 'rezervasyon'].includes(c.rental.status);
+    s.el.querySelector('#cbox').innerHTML = `${lang === 'tr' || lang === 'de' ? '' : ''}<div class="p-row p-clang"><small class="muted">${t('c_lang_note')}</small><div class="p-seg sm">${['de', 'en'].map((l) => `<label><input type="radio" name="cl" value="${l}" ${l === dl ? 'checked' : ''}><span>${l.toUpperCase()}</span></label>`).join('')}</div></div>
+      <div class="p-doc">${contractHtml(c.rental, c.settings, dl)}</div>
+      ${signedBy ? `<p class="t-ok p-signed">${ic('check')} ${t('c_signed_at', { date: date(signedBy.created_at) + ' ' + String(signedBy.created_at).slice(11, 16) })}</p>` : ''}
+      ${canSign ? `<form class="p-form" id="csf"><label class="field"><span>${t('c_name')}</span><input name="name" required minlength="3" value="${esc(data.rider.name)}"></label>
+        ${padHtml('c', t('c_sign'), t('c_clear'))}
+        <label class="p-check"><input type="checkbox" name="accept" required><span>${t('c_accept')}</span></label><p class="muted small">${t('c_ev')}</p>
+        <button class="btn primary p-big">${ic('pen')} ${t('c_submit')}</button></form>` : ''}`;
+    s.el.querySelectorAll('input[name=cl]').forEach((x) => (x.onchange = () => { dl = x.value; draw(); }));
+    const f = s.el.querySelector('#csf'); if (!f) return;
+    const pad = signPad(f.querySelector('[data-pad=c]'));
+    if (signNow) setTimeout(() => f.scrollIntoView({ behavior: 'smooth', block: 'start' }), 250);
+    f.onsubmit = guard(async (e) => {
+      e.preventDefault(); const sign = pad.value(); if (!sign) throw new Error(t('c_need_sign'));
+      const btn = f.querySelector('.p-big'); btn.disabled = true;
+      try { const r = await api('POST', `contract/${rid}/sign`, { name: f.name.value, sign, accept: true, lang: dl }); c = { ...c, rental: r.rental }; delete r.rental; data = r; toast(t('c_done')); shell(); draw(); }
+      finally { btn.disabled = false; }
+    });
+  };
+  draw();
+}
+function sepaView() {
+  const sp = data.sepa; if (!sp) return '';
+  if (sp.mandate) return `<section class="p-card p-sepa on"><div class="p-item-h"><b>${ic('check')} ${t('sepa_on')}</b></div><dl class="p-dl"><div><dt>${t('sepa_holder')}</dt><dd>${esc(sp.mandate.holder)}</dd></div><div><dt>${t('sepa_iban')}</dt><dd class="mono">${esc(sp.mandate.iban)}</dd></div><div><dt>${t('sepa_ref')}</dt><dd class="mono">${esc(sp.mandate.mandate_ref)}</dd></div></dl><button class="btn sm ghost" id="sepaoff">${t('sepa_off')}</button></section>`;
+  return `<section class="p-card p-sepa"><b>${ic('pay')} ${t('sepa_h')}</b><p class="muted">${t('sepa_p')}</p><form class="p-form" id="sepaf">
+    <label class="field"><span>${t('sepa_holder')}</span><input name="holder" required value="${esc(data.rider.name)}" autocomplete="name"></label>
+    <label class="field"><span>${t('sepa_iban')}</span><input name="iban" required class="mono" placeholder="DE00 0000 0000 0000 0000 00" autocomplete="off" inputmode="text" autocapitalize="characters"></label>
+    <details><summary class="muted">${t('sepa_text')}</summary><p class="small muted">${esc(lang === 'en' ? sp.text_en : sp.text_de)}</p></details>
+    <label class="p-check"><input type="checkbox" name="accept" required><span>${t('sepa_accept')}</span></label>
+    <button class="btn primary p-big">${t('sepa_btn')}</button></form></section>`;
+}
+function refView() {
+  const r = data.referral; if (!r) return '';
+  return `<section><h2 class="p-h">${ic('gift')} ${t('ref_h')}</h2><div class="p-card p-ref"><p>${t('ref_p', { friend: `<b>${money(r.friend_reward)}</b>`, reward: `<b>${money(r.reward)}</b>` })}</p>
+    <small class="muted">${t('ref_your')}</small><div class="p-ref-code">${esc(r.code)}</div>
+    <div class="p-row"><button class="btn" id="refcopy">${t('ref_copy')}</button><a class="btn wa" id="refwa" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(t('ref_msg', { friend: money(r.friend_reward), link: r.link || r.code }))}">${t('ref_share')}</a></div>
+    <p class="muted">${t('ref_stats', { n: r.invited, e: r.earned })}${r.credit ? ` · ${t('ref_credit', { amount: money(r.credit) })}` : ''}</p>
+    ${r.friends.length ? `<div class="p-list">${r.friends.map((f) => `<div class="p-item-row"><span>${esc(f.name)}</span><span class="${f.status === 'kazanıldı' ? 't-ok' : 'muted'}">${t('st_' + f.status)}</span></div>`).join('')}</div>` : ''}</div></section>`;
+}
+function privacyView() {
+  const d = data;
+  return `<section><h2 class="p-h">${ic('shield')} ${t('priv_h')}</h2><div class="p-card"><p class="muted">${t('priv_p')}</p>
+    ${d.id_check?.provider && !d.id_check.verified ? `<button class="btn primary p-big" id="idc">${t('idc_btn')}</button>` : ''}
+    <div class="p-col">${d.privacy_url ? `<a class="btn" href="${esc(d.privacy_url)}" target="_blank" rel="noopener">${t('priv_read')}</a>` : ''}<button class="btn" id="pexp">${t('priv_export')}</button>
+    ${d.deletion_requested ? `<p class="t-warn">${t('priv_requested')}</p>` : `<button class="btn ghost" id="pdel">${t('priv_delete')}</button>`}</div></div></section>`;
+}
+function bindExtras(el) {
+  el.querySelectorAll('[data-sign]').forEach((b) => (b.onclick = guard(async (e) => { e.stopPropagation(); await contractSheet(Number(b.dataset.sign), true); })));
+  el.querySelectorAll('[data-contract]').forEach((b) => (b.onclick = guard(async (e) => { e.stopPropagation(); await contractSheet(Number(b.dataset.contract), false); })));
+  el.querySelector('#sepaf')?.addEventListener('submit', guard(async (e) => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target)); data = await api('POST', 'sepa', { holder: f.holder, iban: f.iban, accept: !!f.accept }); toast(t('saved')); shell(); }));
+  el.querySelector('#sepaoff')?.addEventListener('click', guard(async () => { if (!confirm(t('sepa_off_q'))) return; data = await api('DELETE', 'sepa'); toast(t('saved')); shell(); }));
+  el.querySelector('#refcopy')?.addEventListener('click', async (e) => {
+    const txt = data.referral.link || data.referral.code;
+    if (navigator.share) { try { await navigator.share({ text: t('ref_msg', { friend: money(data.referral.friend_reward), link: txt }) }); return; } catch {} }
+    try { await navigator.clipboard.writeText(txt); } catch { const ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); } catch {} ta.remove(); }
+    e.target.textContent = t('copied'); setTimeout(() => (e.target.textContent = t('ref_copy')), 1500);
+  });
+  el.querySelector('#pexp')?.addEventListener('click', guard(async () => {
+    const x = await api('GET', 'privacy/export');
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(x, null, 2)], { type: 'application/json' })); a.download = 'pedalla-meine-daten.json'; a.click();
+  }));
+  el.querySelector('#pdel')?.addEventListener('click', guard(async () => { if (!confirm(t('priv_delete_q'))) return; data = await api('POST', 'privacy/delete', {}); toast(t('priv_requested')); shell(); }));
+  el.querySelector('#idc')?.addEventListener('click', guard(async () => { const x = await api('POST', 'id-check', {}); if (x.url) location.href = x.url; }));
+  el.querySelector('#scanb')?.addEventListener('click', () => {
+    const sel = el.querySelector('#df [name=doc_type]');
+    openScanner({ lang, toast, types: [...sel.options].map((o) => [o.value, o.textContent]), type: sel.value, name: `${data.rider.name.split(' ')[0]}-${todayISO()}`,
+      onSave: async (d) => { data = await api('POST', 'documents', { doc_type: d.doc_type, name: d.name, mime: d.mime, data: d.data }); toast(t('scan_done', { n: d.pages })); shell(); } });
+  });
+}
 async function load() {
   root().innerHTML = '<div class="loading"><div class="pdl-loader" role="status" aria-label="Loading"></div></div>';
   data = await api('GET', 'me');

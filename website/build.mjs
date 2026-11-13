@@ -69,7 +69,10 @@ function page(lang) {
     '@context': 'https://schema.org', '@type': 'LocalBusiness', name: 'Pedalla', url: SITE.url, telephone: SITE.phone, image: `${SITE.url}/img/og.jpg`,
     address: { '@type': 'PostalAddress', streetAddress: SITE.address.street, postalCode: SITE.address.zip, addressLocality: SITE.address.city, addressCountry: SITE.address.country },
     geo: { '@type': 'GeoCoordinates', latitude: SITE.stations[0].lat, longitude: SITE.stations[0].lng }, areaServed: 'Hamburg',
+    priceRange: '€€',
+    makesOffer: MODELS.map((m) => ({ '@type': 'Offer', name: m.name, priceCurrency: 'EUR', price: price(m.fallbackPrice), priceSpecification: { '@type': 'UnitPriceSpecification', price: price(m.fallbackPrice), priceCurrency: 'EUR', unitCode: 'MON' } })),
   };
+  const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: [7, 1, 2, 3, 4, 5, 6].filter((n) => t['q' + n]).map((n) => ({ '@type': 'Question', name: t['q' + n], acceptedAnswer: { '@type': 'Answer', text: String(t['a' + n]).replace(/<[^>]+>/g, '') } })) };
   const runtime = {
     lang, api: SITE.api, portal: SITE.portal, whatsapp: SITE.whatsapp, priceMode: SITE.priceMode, vat: SITE.vat, durations: SITE.durations, periods: SITE.periods, pickup: `${SITE.stations[0].street}, ${SITE.stations[0].zip}`,
     stations: SITE.stations, area: SITE.area, privacy: `${pre}datenschutz${EXT}`, pre,
@@ -100,6 +103,7 @@ function page(lang) {
   <link rel="stylesheet" href="${pre}site.css?v=${V}">
   <link rel="stylesheet" href="${pre}vendor/leaflet/leaflet.css">
   <script type="application/ld+json">${JSON.stringify(ld)}</script>
+  <script type="application/ld+json">${JSON.stringify(faqLd)}</script>
 </head>
 <body>
 <div class="pdl-intro" aria-hidden="true"><div class="pdl-loader"></div></div>
