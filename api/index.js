@@ -46,7 +46,7 @@ async function getApi() {
   const db = libsqlDb(dbUrl(), dbToken());
   const step = async (name, fn) => { try { return await fn(); } catch (e) { throw new Error(`[${name}] ${e.message}${e.cause?.message ? ' / ' + e.cause.message : ''}`); } };
   await step('bağlantı', () => db.get('SELECT 1 AS ok'));
-  const api = await step('tablolar', () => createApi(db, crypto));
+  const api = await step('tablolar', () => createApi(db, { ...crypto, cronSecret: process.env.CRON_SECRET || null }));
   if ((await step('kullanıcı sayısı', () => db.get('SELECT COUNT(*) AS n FROM users'))).n === 0) {
     if (process.env.NO_SEED === '1') {
       const email = process.env.ADMIN_EMAIL || 'admin@pedalla.bike';
@@ -88,7 +88,7 @@ export default async function handler(req, res) {
     if (req.method === 'OPTIONS') { res.statusCode = 204; return res.end(); }
     const body = req.method === 'GET' ? {} : await readBody(req);
     const token = (req.headers.authorization || '').replace(/^Bearer /, '') || null;
-    const out = await api.handle({ method: req.method, path, query: Object.fromEntries(url.searchParams), body, token });
+    const out = await api.handle({ method: req.method, path, query: Object.fromEntries(url.searchParams), body, token, headers: req.headers });
     res.statusCode = out.status;
     res.setHeader('content-type', 'application/json; charset=utf-8');
     res.setHeader('cache-control', 'no-store');

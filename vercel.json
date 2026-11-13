@@ -4,5 +4,6 @@
   "buildCommand": "node scripts/build-static.mjs",
   "outputDirectory": "dist",
   "rewrites": [{ "source": "/api/(.*)", "destination": "/api?__path=$1" }],
-  "functions": { "api/index.js": { "maxDuration": 60 } }
+  "functions": { "api/index.js": { "maxDuration": 60 } },
+  "crons": [{ "path": "/api/cron/daily", "schedule": "0 5 * * *" }]
 }

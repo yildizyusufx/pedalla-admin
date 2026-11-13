@@ -392,3 +392,35 @@ tr.off td { opacity: .45; }
 .ptl-more { margin-top: 4px; }
 .ph-full { margin: 0; } .ph-full img { display: block; max-width: 100%; max-height: 70vh; margin: 0 auto; border-radius: 10px; } .ph-full figcaption { text-align: center; margin-top: 8px; font-size: 12.5px; }
 @media (max-width: 600px) { .ptl-img { width: 84px; height: 84px; } .ptl-img.selfie { width: 72px; height: 72px; margin: 6px; } }
+
+/* ---- hand-over / return protocol ---- */
+.dmg-wrap { display: grid; gap: 10px; }
+.dmg-side { justify-self: start; }
+.dmg-svg { width: 100%; max-width: 760px; height: auto; display: block; border-radius: 12px; cursor: crosshair; touch-action: manipulation; }
+.dmg-svg.sm { max-width: 330px; cursor: default; border: 1px solid #ddd; }
+.dmg-bg { fill: var(--surface-2); }
+.dmg-svg .bk { stroke: var(--ink-2); stroke-width: 5; } .dmg-svg .bk-box { fill: color-mix(in srgb, var(--slate, #7a929e) 14%, transparent); } .dmg-svg .bk-thick { stroke-width: 9; }
+.dmg-svg .bk-bat { fill: color-mix(in srgb, var(--brand) 25%, transparent); } .dmg-svg .bk-fender { stroke-width: 3; opacity: .6; }
+.dmg-lbl { font: 700 14px system-ui, sans-serif; fill: var(--muted); letter-spacing: .04em; }
+.dmg-m circle { fill: var(--brand); stroke: #fff; stroke-width: 3; } .dmg-m.old circle { fill: #8a9aa3; }
+.dmg-m text { font: 800 14px system-ui, sans-serif; fill: #fff; pointer-events: none; }
+.dmg-t td { vertical-align: middle; } .dmg-t input, .dmg-t select { width: 100%; min-width: 110px; }
+.dmg-n { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--brand); color: #fff; font-weight: 800; font-size: 12px; } .dmg-n.old { background: #8a9aa3; }
+.sigs { display: grid; gap: 14px; }
+.sigpad { position: relative; display: grid; gap: 6px; }
+.sigpad canvas { width: 100%; height: 150px; border: 1.5px dashed var(--line); border-radius: 12px; background: #fff; touch-action: none; cursor: crosshair; }
+.sigpad [data-clear] { position: absolute; right: 8px; bottom: 8px; }
+.dmg-print { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; } .dmg-print .dmg-bg { fill: #fafafa; } .dmg-print .bk { stroke: #333; }
+.ho-photos { display: flex; flex-wrap: wrap; gap: 6px; } .ho-photos img { width: 92px; height: 92px; object-fit: cover; border-radius: 6px; border: 1px solid #ddd; }
+.ho-sign div { min-height: 70px; } .ho-sign img { height: 64px; max-width: 100%; object-fit: contain; align-self: flex-start; margin-bottom: 4px; }
+/* ---- overdue list ---- */
+.od-card { border-left: 5px solid var(--warn); } .od-card.lv2, .od-card.lv3 { border-left-color: var(--danger); }
+.od-h { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; margin-bottom: 8px; } .od-h small { display: block; margin-top: 4px; }
+.od-sum b { font-size: 22px; white-space: nowrap; } .od-act { display: inline-flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+/* ---- messages to riders ---- */
+.msg-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; max-height: 420px; overflow: auto; }
+.msg-list li { padding: 10px 12px; border-radius: 10px; background: var(--surface-2); border-left: 4px solid var(--info); } .msg-list li.l-warn { border-left-color: var(--warn); } .msg-list li.l-danger { border-left-color: var(--danger); } .msg-list li.l-ok { border-left-color: var(--ok); }
+.msg-list p { margin: 2px 0 4px; }
+.ro-val { padding: 8px 0; } .sm-input { height: 32px; border-radius: 8px; border: 1px solid var(--line); padding: 0 8px; background: var(--surface); color: var(--ink); }
+.sum-print .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; } .sum-print .kpi { border: 1px solid #ddd; padding: 8px; border-radius: 6px; display: flex; flex-direction: column; }
+@media (max-width: 760px) { .od-h { flex-direction: column; } .sigpad canvas { height: 130px; } }

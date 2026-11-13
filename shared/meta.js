@@ -19,6 +19,15 @@ export const REQUEST_STATUS = ['yeni', 'onaylandı', 'tamamlandı', 'reddedildi'
 export const RIDER_REQUIRED_DOCS = ['Kimlik ön yüz', 'Kimlik arka yüz', 'Adres belgesi (Meldebescheinigung)'];
 export const CASH_IN = ['Fatura tahsilatı', 'Depozito tahsilatı', 'Servis / parça satışı', 'Kasaya para konuldu', 'Diğer gelir'];
 export const CASH_OUT = ['Depozito iadesi', 'Masraf / malzeme', 'Yakıt / ulaşım', 'Personel avansı', 'Bankaya yatırıldı', 'Diğer gider'];
+// fault / damage report from the rider screen → service order type
+export const FAULT_CATEGORIES = [
+  ['fren', 'arıza'], ['lastik / patlak', 'arıza'], ['batarya / şarj', 'arıza'], ['motor / elektrik', 'arıza'], ['ışık', 'arıza'], ['zincir / vites', 'arıza'],
+  ['kilit / anahtar', 'arıza'], ['kargo kutusu', 'hasar'], ['kaza', 'kaza'], ['hasar / kırık', 'hasar'], ['diğer', 'arıza'],
+];
+// damage marks on the hand-over drawing
+export const DAMAGE_TYPES = ['çizik', 'ezik', 'kırık', 'eksik', 'kir / leke', 'diğer'];
+// how a rental is paid (shown on the payment plan and in the rider screen)
+export const RENT_PAY_METHODS = ['banka havalesi', 'SEPA otomatik ödeme', 'kredi kartı', 'nakit', 'PayPal'];
 export const BIKE_COST_TYPES = ['kaza / hasar', 'dış servis / onarım', 'yedek parça (stok dışı)', 'sigorta', 'aksesuar / ekipman', 'nakliye', 'diğer'];
 export const PART_CATEGORIES = ['fren', 'lastik/jant', 'zincir/aktarma', 'batarya', 'motor/elektrik', 'ışık', 'kargo kutusu', 'gidon/sele', 'aksesuar', 'diğer'];
 
@@ -187,6 +196,7 @@ export const RESOURCES = {
       { k: 'period', l: 'Faturalama periyodu', t: 'select', o: opt(PERIODS), def: 'ay' },
       { k: 'rate', l: 'Periyot ücreti (net)', t: 'money', req: 1, list: 1 },
       { k: 'deposit_amount', l: 'Depozito', t: 'money', list: 1 },
+      { k: 'pay_method', l: 'Kira ödeme şekli', t: 'select', o: opt(['banka havalesi', 'SEPA otomatik ödeme', 'kredi kartı', 'nakit', 'PayPal']) },
       { k: 'deposit_status', l: 'Depozito durumu', t: 'select', o: opt(['bekliyor', 'alındı', 'iade edildi', 'kısmi iade', 'mahsup edildi']), ro: 1 },
       { k: 'status', l: 'Durum', t: 'select', o: opt(RENTAL_STATUS), list: 1, badge: 1, ro: 1 },
       { k: 'start_km', l: 'Teslim km', t: 'number' },
@@ -413,6 +423,18 @@ export const DEFAULT_SETTINGS = {
   portal_signup: '1',
   // rider screen asks for a selfie + bike photos when a rental starts (pick-up check)
   photo_pickup: '1',
+  // automatic collection & reminders (daily job: Vercel cron + first request of the day)
+  auto_billing: '1',            // create the next period invoices of active rentals every day
+  auto_reminders: '1',          // remind riders in the rider screen / phone app before and after the due date
+  reminder_days_before: '3',    // first reminder this many days before the due date
+  dunning_days: '1,7,14',       // reminder levels: days after the due date
+  auto_late_fee: '0',           // add the late fee (late_fee_per_day) to overdue invoices automatically
+  // rider screen self-service
+  self_extend: '1',             // riders can extend their rental themselves (no overdue invoice, bike not booked after)
+  self_extend_max: '3',         // at most this many periods at once
+  auto_service_from_report: '1',// a fault report from the rider screen opens a service order right away
+  // online payment provider: empty until one is connected (see shared/payments.js)
+  pay_provider: '',
   bike_types: BIKE_TYPES.join('\n'),
   company_name: 'Pedalla GmbH',
   company_address: 'Missundestraße 50, 22769 Hamburg',

@@ -1,9 +1,15 @@
 // Pedalla rider portal (sürücü ekranı) – mobile first, TR / DE / EN
 import { tval } from './i18n-values.js';
 import { DOC_TYPES } from './shared/meta.js';
+import { epcPayload } from './shared/payments.js';
 
 const L = {
   tr: {
+    inbox: 'Mesajlar', inbox_empty: 'Henüz mesaj yok.', read_all: 'Tümünü okundu say', close: 'Kapat', b_extend: 'Uzat', b_return: 'İade tarihi', b_fault: 'Arıza bildir', rn_set: 'Bildirilen iade tarihi', pay_method: 'Ödeme şekli',
+    f_h: 'Arıza / hasar bildir', f_cat: 'Ne oldu?', f_ride: 'Bisikleti kullanabiliyor musunuz?', f_yes: 'Evet, sürebiliyorum', f_no: 'Hayır, kullanılamıyor', f_notes: 'Kısaca anlatın', f_notes_ph: 'Örn. ön fren ses yapıyor, sağ ayna kırıldı…', f_photos: 'Fotoğraf ekle (en fazla 4)', f_send: 'Bildirimi gönder', f_sent: 'Bildiriminiz alındı. Servis kaydı: {no}', f_sent0: 'Bildiriminiz alındı. Size dönüş yapacağız.', f_need: 'Kısaca yazın veya fotoğraf ekleyin.',
+    x_h: 'Kiralamayı uzat', x_now: 'Şu anki bitiş', x_how: 'Ne kadar uzatmak istiyorsunuz?', x_new: 'Yeni bitiş', x_cost: 'Ek kira (KDV dahil, tahmini)', x_btn: 'Şimdi uzat', x_req_btn: 'Uzatma talebi gönder', x_auto: 'Bisiklet müsaitse uzatma hemen onaylanır.', x_done: 'Kiralamanız {date} tarihine kadar uzatıldı.', x_wait_overdue: 'Gecikmiş ödemeniz olduğu için talebiniz Pedalla onayına gönderildi.', x_wait_booked: 'Bisiklet sonrasında rezerve. Talebiniz Pedalla’ya iletildi, size alternatif sunacağız.', x_wait: 'Uzatma talebiniz Pedalla onayına gönderildi.',
+    rn_h: 'İade tarihi bildir', rn_p: 'Bisikleti hangi gün getireceksiniz? Sözleşme bitişi: {date}.', rn_btn: 'İade tarihini bildir', rn_done: 'İade tarihiniz kaydedildi. Görüşmek üzere!', rn_early: 'Sözleşme bitişinden önce. Erken iadede kalan süre otomatik iade edilmez, Pedalla sizinle konuşacak.',
+    plan_h: 'Ödeme planı', pay_btn: 'Öde', pay_h: 'Fatura öde', pay_amount: 'Tutar', pay_ref: 'Açıklama (mutlaka yazın)', copy: 'Kopyala', copied: 'Kopyalandı', pay_qr: 'Banka uygulamanızda “QR ile öde / GiroCode” ile tarayın, bilgiler otomatik dolar.', pay_online: 'Online öde', pay_note: 'Havale 1–2 iş günü içinde hesabımıza geçer. Ödeme kaydedilince size mesaj gelir.', period_n: '{n} × {p}',
     note_ph_rent: 'Örn. kurye işi için kullanacağım, haftada 5 gün; teslim almak için uygun saatim…', note_ph_return: 'Örn. bisikleti hangi saatte getirebileceğiniz, iade adresi…', note_ph_extend: 'Örn. ne kadar uzatmak istediğiniz…',
     no_account: 'Hesabınız yok mu?', signup: 'Kayıt ol', signup_h: 'Sürücü kaydı', signup_sub: 'Bilgilerinizi girin, hesabınızı oluşturun ve hemen kiralama talebi gönderin.', have_account: 'Zaten hesabınız var mı?', full_name: 'Ad soyad', birth: 'Doğum tarihi', nationality: 'Uyruk', address: 'Adres', id_type: 'Kimlik türü', id_no: 'Kimlik / pasaport no', pw_hint: 'En az 6 karakter', consent: 'Bilgilerimin kiralama ve sözleşme için Pedalla tarafından işlenmesini kabul ediyorum. Kimliğimin aslını teslimde göstereceğim.', create_acc: 'Hesabı oluştur', email_taken: 'Bu e-posta ile zaten bir hesap var. Giriş yapın.', welcome_new: 'Hesabınız oluşturuldu. Şimdi kiralama talebi gönderebilir ve kimlik belgelerinizi yükleyebilirsiniz.', rent_cta: 'Bisiklet kiralamak ister misiniz?', rent_btn: 'Kiralama talebi gönder', bike_type: 'Bisiklet tipi', any_type: 'Fark etmez', period: 'Kiralama süresi birimi', duration: 'Süre', p_day: 'Gün', p_week: 'Hafta', p_month: 'Ay', start: 'Başlangıç tarihi', price_from: 'Tarife', deposit_l: 'depozito', vat_note: '+ KDV', optional: '(isteğe bağlı)', signup_closed: 'Yeni kayıt şu an kapalı. Lütfen bizimle iletişime geçin.',
     loc_h: 'Konum paylaşımı', loc_text: 'Bisikletin güvenliği ve hızlı yardım için, bu ekran açıkken telefonunuzun konumu Pedalla ile paylaşılır. İstediğiniz zaman Profil\'den kapatabilirsiniz.', loc_allow: 'Konumu paylaş', loc_later: 'Şimdi değil', loc_on: 'Konum paylaşılıyor', loc_off: 'Konum paylaşılmıyor', loc_stop: 'Paylaşımı durdur', loc_denied: 'Konum izni verilmedi. Telefon ayarlarından tarayıcıya konum izni verin.', loc_last: 'son gönderim',
@@ -39,6 +45,11 @@ const L = {
     n_service_ready: '{bike} bisikletiniz servisten hazır ({no}). Teslim alabilirsiniz.',
   },
   de: {
+    inbox: 'Nachrichten', inbox_empty: 'Noch keine Nachrichten.', read_all: 'Alle als gelesen markieren', close: 'Schließen', b_extend: 'Verlängern', b_return: 'Rückgabe', b_fault: 'Störung melden', rn_set: 'Gemeldete Rückgabe', pay_method: 'Zahlungsart',
+    f_h: 'Störung / Schaden melden', f_cat: 'Was ist passiert?', f_ride: 'Kannst du das Rad noch fahren?', f_yes: 'Ja, fahrbereit', f_no: 'Nein, nicht nutzbar', f_notes: 'Kurz beschreiben', f_notes_ph: 'z. B. Vorderbremse quietscht, rechter Spiegel gebrochen…', f_photos: 'Fotos hinzufügen (max. 4)', f_send: 'Meldung senden', f_sent: 'Meldung erhalten. Serviceauftrag: {no}', f_sent0: 'Meldung erhalten. Wir melden uns.', f_need: 'Bitte kurz beschreiben oder ein Foto anhängen.',
+    x_h: 'Miete verlängern', x_now: 'Aktuelles Ende', x_how: 'Um wie lange verlängern?', x_new: 'Neues Ende', x_cost: 'Zusätzliche Miete (inkl. MwSt., ca.)', x_btn: 'Jetzt verlängern', x_req_btn: 'Verlängerung anfragen', x_auto: 'Ist das Rad frei, wird die Verlängerung sofort bestätigt.', x_done: 'Deine Miete wurde bis {date} verlängert.', x_wait_overdue: 'Wegen einer überfälligen Zahlung geht deine Anfrage zur Freigabe an Pedalla.', x_wait_booked: 'Das Rad ist danach schon reserviert. Pedalla meldet sich mit einer Alternative.', x_wait: 'Deine Verlängerung wurde zur Freigabe an Pedalla geschickt.',
+    rn_h: 'Rückgabetermin melden', rn_p: 'An welchem Tag bringst du das Rad zurück? Vertragsende: {date}.', rn_btn: 'Rückgabe melden', rn_done: 'Dein Rückgabetermin ist gespeichert. Bis bald!', rn_early: 'Vor dem Vertragsende. Bei früher Rückgabe wird die Restzeit nicht automatisch erstattet, Pedalla spricht mit dir.',
+    plan_h: 'Zahlungsplan', pay_btn: 'Bezahlen', pay_h: 'Rechnung bezahlen', pay_amount: 'Betrag', pay_ref: 'Verwendungszweck (bitte angeben)', copy: 'Kopieren', copied: 'Kopiert', pay_qr: 'In deiner Banking-App mit „Scan2Pay / GiroCode“ scannen, die Daten werden automatisch ausgefüllt.', pay_online: 'Online bezahlen', pay_note: 'Eine Überweisung ist in 1–2 Werktagen bei uns. Sobald sie verbucht ist, bekommst du eine Nachricht.', period_n: '{n} × {p}',
     note_ph_rent: 'z. B. für Kurierfahrten, 5 Tage pro Woche; wann ich das Rad abholen kann…', note_ph_return: 'z. B. wann Sie das Rad zurückbringen können…', note_ph_extend: 'z. B. um wie lange Sie verlängern möchten…',
     no_account: 'Noch kein Konto?', signup: 'Registrieren', signup_h: 'Fahrer-Registrierung', signup_sub: 'Daten eingeben, Konto anlegen und direkt eine Mietanfrage senden.', have_account: 'Schon ein Konto?', full_name: 'Vor- und Nachname', birth: 'Geburtsdatum', nationality: 'Staatsangehörigkeit', address: 'Adresse', id_type: 'Ausweisart', id_no: 'Ausweis- / Passnummer', pw_hint: 'Mindestens 6 Zeichen', consent: 'Ich bin einverstanden, dass Pedalla meine Daten für Miete und Vertrag verarbeitet. Meinen Ausweis zeige ich bei der Übergabe im Original.', create_acc: 'Konto anlegen', email_taken: 'Mit dieser E-Mail gibt es bereits ein Konto. Bitte anmelden.', welcome_new: 'Ihr Konto wurde angelegt. Sie können jetzt eine Mietanfrage senden und Ihre Ausweisdokumente hochladen.', rent_cta: 'Möchten Sie ein Fahrrad mieten?', rent_btn: 'Mietanfrage senden', bike_type: 'Fahrradtyp', any_type: 'Egal', period: 'Mieteinheit', duration: 'Dauer', p_day: 'Tag', p_week: 'Woche', p_month: 'Monat', start: 'Startdatum', price_from: 'Tarif', deposit_l: 'Kaution', vat_note: '+ MwSt.', optional: '(optional)', signup_closed: 'Neue Registrierungen sind derzeit geschlossen. Bitte kontaktieren Sie uns.',
     loc_h: 'Standortfreigabe', loc_text: 'Zur Sicherheit des Fahrrads und für schnelle Hilfe wird der Standort Ihres Handys mit Pedalla geteilt, solange diese Seite geöffnet ist. Sie können es jederzeit im Profil ausschalten.', loc_allow: 'Standort teilen', loc_later: 'Nicht jetzt', loc_on: 'Standort wird geteilt', loc_off: 'Standort wird nicht geteilt', loc_stop: 'Freigabe beenden', loc_denied: 'Keine Standortberechtigung. Bitte in den Handy-Einstellungen dem Browser den Standort erlauben.', loc_last: 'zuletzt gesendet',
@@ -74,6 +85,11 @@ const L = {
     n_service_ready: 'Dein Rad {bike} ist fertig ({no}) und kann abgeholt werden.',
   },
   en: {
+    inbox: 'Messages', inbox_empty: 'No messages yet.', read_all: 'Mark all as read', close: 'Close', b_extend: 'Extend', b_return: 'Return date', b_fault: 'Report a problem', rn_set: 'Announced return', pay_method: 'Payment method',
+    f_h: 'Report a fault / damage', f_cat: 'What happened?', f_ride: 'Can you still ride the bike?', f_yes: 'Yes, rideable', f_no: 'No, not usable', f_notes: 'Short description', f_notes_ph: 'e.g. front brake squeaks, right mirror broken…', f_photos: 'Add photos (max. 4)', f_send: 'Send report', f_sent: 'Report received. Service order: {no}', f_sent0: 'Report received. We will get back to you.', f_need: 'Please describe it briefly or add a photo.',
+    x_h: 'Extend rental', x_now: 'Current end', x_how: 'Extend by how much?', x_new: 'New end', x_cost: 'Extra rent (incl. VAT, approx.)', x_btn: 'Extend now', x_req_btn: 'Request extension', x_auto: 'If the bike is free, the extension is confirmed right away.', x_done: 'Your rental was extended until {date}.', x_wait_overdue: 'Because of an overdue payment your request was sent to Pedalla for approval.', x_wait_booked: 'The bike is booked afterwards. Pedalla will get back to you with an alternative.', x_wait: 'Your extension request was sent to Pedalla for approval.',
+    rn_h: 'Announce return date', rn_p: 'On which day will you bring the bike back? Contract end: {date}.', rn_btn: 'Announce return', rn_done: 'Your return date was saved. See you!', rn_early: 'Before the contract end. Remaining time is not refunded automatically on early return, Pedalla will talk to you.',
+    plan_h: 'Payment plan', pay_btn: 'Pay', pay_h: 'Pay invoice', pay_amount: 'Amount', pay_ref: 'Reference (please include)', copy: 'Copy', copied: 'Copied', pay_qr: 'Scan with “scan to pay / GiroCode” in your banking app and the details are filled in.', pay_online: 'Pay online', pay_note: 'A bank transfer reaches us in 1–2 business days. You get a message once it is booked.', period_n: '{n} × {p}',
     note_ph_rent: 'e.g. for courier work, 5 days a week; when I can pick up the bike…', note_ph_return: 'e.g. when you can bring the bike back…', note_ph_extend: 'e.g. how long you would like to extend…',
     no_account: 'No account yet?', signup: 'Sign up', signup_h: 'Rider sign-up', signup_sub: 'Enter your details, create your account and send a rental request right away.', have_account: 'Already have an account?', full_name: 'Full name', birth: 'Date of birth', nationality: 'Nationality', address: 'Address', id_type: 'ID type', id_no: 'ID / passport no.', pw_hint: 'At least 6 characters', consent: 'I agree that Pedalla processes my data for the rental and contract. I will show my original ID at handover.', create_acc: 'Create account', email_taken: 'An account with this e-mail already exists. Please log in.', welcome_new: 'Your account has been created. You can now send a rental request and upload your ID documents.', rent_cta: 'Would you like to rent a bike?', rent_btn: 'Send rental request', bike_type: 'Bike type', any_type: 'Any', period: 'Rental unit', duration: 'Duration', p_day: 'Day', p_week: 'Week', p_month: 'Month', start: 'Start date', price_from: 'Rate', deposit_l: 'deposit', vat_note: '+ VAT', optional: '(optional)', signup_closed: 'New sign-ups are closed right now. Please contact us.',
     loc_h: 'Location sharing', loc_text: 'For the bike\'s safety and quick help, your phone\'s location is shared with Pedalla while this screen is open. You can turn it off any time in Profile.', loc_allow: 'Share location', loc_later: 'Not now', loc_on: 'Location is being shared', loc_off: 'Location is not shared', loc_stop: 'Stop sharing', loc_denied: 'Location permission denied. Allow location for your browser in the phone settings.', loc_last: 'last sent',
@@ -152,7 +168,7 @@ async function api(method, path, body) {
   if (r.status >= 400) throw new Error(j.error || t('err'));
   return j;
 }
-const setToken = (x) => { token = x; store.set('pedalla_rider_token', x); if (!x) data = null; };
+const setToken = (x) => { token = x; store.set('pedalla_rider_token', x); if (!x) { data = null; try { window.PedallaAndroid?.clearPush?.(); } catch {} } };
 function toast(msg, kind = 'ok') {
   const el = document.createElement('div'); el.className = `toast t-${kind}`; el.textContent = msg; document.body.appendChild(el);
   setTimeout(() => el.classList.add('show'), 10); setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 300); }, 3500);
@@ -272,7 +288,9 @@ function bikeCard(x) {
     <dl class="p-dl"><div><dt>${t('contract')}</dt><dd>${esc(x.contract_no)}</dd></div><div><dt>${t('until')}</dt><dd class="${x.late_days ? 't-danger' : ''}">${date(x.end_date)}</dd></div>
     ${x.battery_level != null ? `<div><dt>${t('battery')}</dt><dd>${x.battery_level} %</dd></div>` : ''}<div><dt>${t('km')}</dt><dd>${num(x.odometer_km)} km</dd></div>
     <div><dt>${t('next_service')}</dt><dd class="${x.next_service_date && x.next_service_date <= addDays(todayISO(), 14) ? 't-warn' : ''}">${date(x.next_service_date)}</dd></div>
-    ${x.deposit_amount ? `<div><dt>${t('deposit')}</dt><dd>${money(x.deposit_held || 0)} / ${money(x.deposit_amount)}</dd></div>` : ''}${x.plan_name ? `<div><dt>${t('plan')}</dt><dd>${esc(x.plan_name)}</dd></div>` : ''}</dl>
+    ${x.deposit_amount ? `<div><dt>${t('deposit')}</dt><dd>${money(x.deposit_held || 0)} / ${money(x.deposit_amount)}</dd></div>` : ''}${x.plan_name ? `<div><dt>${t('plan')}</dt><dd>${esc(x.plan_name)}</dd></div>` : ''}${x.pay_method ? `<div><dt>${t('pay_method')}</dt><dd>${esc(v(x.pay_method))}</dd></div>` : ''}</dl>
+    ${x.return_notice_date ? `<div class="p-rn">${ic('back')} ${t('rn_set')}: <b>${date(x.return_notice_date)}</b></div>` : ''}
+    ${x.status === 'aktif' ? `<div class="p-bike-act"><button class="btn sm" data-x="${x.id}">${ic('plus')} ${t('b_extend')}</button><button class="btn sm" data-rn="${x.id}">${ic('back')} ${t('b_return')}</button><button class="btn sm" data-fault="${x.id}">${ic('alert')} ${t('b_fault')}</button></div>` : ''}
     <button class="btn sm p-shot-free" data-shot="bisiklet" data-purpose="free" data-rental="${x.id}">${ic('cam')} ${t('ph_send')}</button></div>`;
 }
 const dDiff = (a, b) => Math.round((new Date(b + 'T00:00:00Z') - new Date(a + 'T00:00:00Z')) / 864e5);
@@ -325,8 +343,8 @@ function homeView() {
   ${fresh || (d.self_registered && !d.rentals.length && !d.requests.length) ? `<div class="p-card p-welcome">${ic('check')} ${t('welcome_new')}</div>` : ''}
   <section><h2 class="p-h">${t('my_bike')}</h2>${act.length ? act.map(bikeCard).join('') : `<div class="p-card p-empty">${t('no_rental')}${d.requests.some((q) => q.type === 'yeni kiralama' && q.status === 'yeni') ? '' : `<p><b>${t('rent_cta')}</b></p><button class="btn primary p-big" data-new="yeni kiralama">${ic('bike')} ${t('rent_btn')}</button>`}</div>`}</section>
   ${act.length ? `<section><h2 class="p-h">${t('quick')}</h2><div class="p-quick">
-    <button data-new="servis randevusu">${ic('wrench')}<span>${t('q_service')}</span></button><button data-new="arıza bildirimi">${ic('alert')}<span>${t('q_fault')}</span></button>
-    <button data-new="iade randevusu">${ic('back')}<span>${t('q_return')}</span></button><button data-new="kiralama uzatma">${ic('plus')}<span>${t('q_extend')}</span></button></div></section>` : ''}
+    <button data-new="servis randevusu">${ic('wrench')}<span>${t('q_service')}</span></button>${(() => { const a = act.find((x) => x.status === 'aktif'); return a ? `<button data-fault="${a.id}">${ic('alert')}<span>${t('q_fault')}</span></button>
+    <button data-rn="${a.id}">${ic('back')}<span>${t('q_return')}</span></button><button data-x="${a.id}">${ic('plus')}<span>${t('q_extend')}</span></button>` : `<button data-new="iade randevusu">${ic('back')}<span>${t('q_return')}</span></button>`; })()}</div></section>` : ''}
   ${d.payer ? `<section><h2 class="p-h">${t('next_payment')}</h2><div class="p-card" data-tab="pay">${nd ? `<div class="p-pay-big ${nd.days_late ? 't-danger' : ''}">${money(nd.balance)}</div><div class="muted">${esc(nd.invoice_no)} · ${t('due')} ${date(nd.due_date)}</div>` : `<div class="muted">${t('nothing_due')}</div>`}
     ${nc ? `<div class="p-sub">${t('next_charge')}: <b>${money(nc.amount)}</b> · ${t('from')} ${date(nc.date)}</div>` : ''}</div></section>` : ''}`;
 }
@@ -356,10 +374,14 @@ function paymentsView() {
   if (!d.payer) return `<div class="p-card p-empty">${t('company_pays', { c: esc(d.customer?.name || '') })}</div>`;
   const open = d.invoices.filter((i) => ['açık', 'kısmi'].includes(i.status)); const done = d.invoices.filter((i) => !['açık', 'kısmi'].includes(i.status));
   const inv = (i) => `<div class="p-card p-item"><div class="p-item-h"><b>${esc(i.invoice_no)}</b>${i.days_late ? `<span class="badge b-danger">${t('overdue')} · ${t('days', { n: i.days_late })}</span>` : badge(i.status)}</div>
-    <div class="p-item-row"><span class="muted">${date(i.issue_date)} · ${t('due')} ${date(i.due_date)}</span><b>${money(['açık', 'kısmi'].includes(i.status) ? i.balance : i.total)}</b></div></div>`;
+    <div class="p-item-row"><span class="muted">${date(i.issue_date)} · ${t('due')} ${date(i.due_date)}</span><b>${money(['açık', 'kısmi'].includes(i.status) ? i.balance : i.total)}</b></div>
+    ${['açık', 'kısmi'].includes(i.status) ? `<button class="btn primary sm p-paybtn" data-pay="${i.id}">${ic('pay')} ${t('pay_btn')}</button>` : ''}</div>`;
+  const plans = d.rentals.filter((x) => x.plan?.length);
   return `<div class="p-kpis"><div class="p-card"><small>${t('open_balance')}</small><b>${money(d.summary.open_balance)}</b></div><div class="p-card ${d.summary.overdue ? 'l-danger' : ''}"><small>${t('overdue')}</small><b>${money(d.summary.overdue)}</b></div></div>
   ${open.length ? `<section><h2 class="p-h">${t('invoices')}</h2>${open.map(inv).join('')}<div class="p-card p-howto"><b>${t('pay_how')}</b><p>${t('pay_text')}</p>
     <dl class="p-dl">${d.company.name ? `<div><dt>${t('receiver')}</dt><dd>${esc(d.company.name)}</dd></div>` : ''}${d.company.iban ? `<div><dt>${t('iban')}</dt><dd class="mono">${esc(d.company.iban)}</dd></div>` : ''}</dl></div></section>` : `<div class="p-card p-empty">${ic('check')} ${t('nothing_due')}</div>`}
+  ${plans.map((x) => `<section><h2 class="p-h">${t('plan_h')} · ${esc(x.bike_code)}</h2><div class="p-card p-list p-plan">${x.pay_method ? `<small class="muted">${t('pay_method')}: ${esc(v(x.pay_method))}</small>` : ''}
+    ${x.plan.slice(0, 14).map((r) => `<div class="p-item-row pl-${{ 'ödendi': 'ok', 'gecikmiş': 'bad', 'kısmi': 'part', bekliyor: 'open', 'planlandı': 'fut' }[r.state]}"><span>${date(r.start)} – ${date(r.end)}<small class="muted"> · ${t('due')} ${date(r.due)}${r.invoice_no ? ' · ' + esc(r.invoice_no) : ''}</small></span><span class="p-plan-r"><b>${money(r.state === 'ödendi' ? r.amount : r.balance)}</b><i>${esc(v(r.state))}</i></span></div>`).join('')}</div></section>`).join('')}
   <section><h2 class="p-h">${t('paid_list')}</h2>${d.payments.length ? `<div class="p-card p-list">${d.payments.map((p) => `<div class="p-item-row"><span>${date(p.date)} · ${esc(p.invoice_no || '')}<small class="muted"> ${esc(v(p.method) || '')}</small></span><b>${money(p.amount)}</b></div>`).join('')}</div>` : `<div class="p-card p-empty">${t('no_payments')}</div>`}</section>
   ${done.length ? `<section><h2 class="p-h">${t('invoices')} · ${esc(v('ödendi'))}</h2>${done.slice(0, 12).map(inv).join('')}</section>` : ''}`;
 }
@@ -397,7 +419,7 @@ function shell(pre) {
   const d = data; if (!TABS.some(([k]) => k === tab)) tab = 'home';
   const body = { home: homeView, req: () => requestsView(pre), pay: paymentsView, docs: docsView, me: profileView }[tab]();
   const dots = { home: d.notifications.filter((n) => n.level === 'danger' || n.level === 'warn').length + (d.photo_tasks || []).filter((k) => !k.done).length, docs: d.missing_docs.length, pay: d.invoices.filter((i) => i.days_late).length };
-  root().innerHTML = `<header class="p-top"><span class="p-logo-pill"><i><img src="img/mark.png" alt=""></i><img src="img/wordmark-light.png" alt="pedalla" class="p-top-logo"></span><span class="p-top-tag">${t('title')}</span><span class="grow"></span>${tab === 'me' ? '' : langSw()}</header>
+  root().innerHTML = `<header class="p-top"><span class="p-logo-pill"><i><img src="img/mark.png" alt=""></i><img src="img/wordmark-light.png" alt="pedalla" class="p-top-logo"></span><span class="p-top-tag">${t('title')}</span><span class="grow"></span><button type="button" class="p-bell" id="inb" aria-label="${t('inbox')}">${ic('bell')}${d.unread ? `<i class="p-dot">${d.unread > 9 ? '9+' : d.unread}</i>` : ''}</button>${tab === 'me' ? '' : langSw()}</header>
   <main class="p-main">${tab === 'home' ? `<div class="p-hello">${t('hello')}, <b>${esc(d.rider.name.split(' ')[0])}</b> 👋</div>` : `<h1 class="p-title">${t(TABS.find(([k]) => k === tab)[1])}</h1>`}${body}</main>
   <nav class="p-nav">${TABS.map(([k, l, i]) => `<a href="#${k}" class="${k === tab ? 'on' : ''}">${ic(i)}<span>${t(l)}</span>${dots[k] ? `<i class="p-dot">${dots[k]}</i>` : ''}</a>`).join('')}</nav>`;
   bind();
@@ -421,6 +443,11 @@ function bind() {
     const tog = () => { const rent = rf.type.value === 'yeni kiralama'; el.querySelector('.rent-only').hidden = !rent; rf.notes.placeholder = t(rent ? 'note_ph_rent' : rf.type.value === 'iade randevusu' ? 'note_ph_return' : rf.type.value === 'kiralama uzatma' ? 'note_ph_extend' : 'note_ph'); price(); };
     rf.type.addEventListener('change', tog); rf.addEventListener('change', (e) => { if (e.target.name === 'bike_type' || e.target.name === 'period') price(); }); tog();
   }
+  el.querySelector('#inb')?.addEventListener('click', guard(inboxSheet));
+  el.querySelectorAll('[data-fault]').forEach((b) => (b.onclick = (e) => { e.stopPropagation(); faultSheet(Number(b.dataset.fault)); }));
+  el.querySelectorAll('[data-x]').forEach((b) => (b.onclick = (e) => { e.stopPropagation(); extendSheet(Number(b.dataset.x)); }));
+  el.querySelectorAll('[data-rn]').forEach((b) => (b.onclick = (e) => { e.stopPropagation(); returnSheet(Number(b.dataset.rn)); }));
+  el.querySelectorAll('[data-pay]').forEach((b) => (b.onclick = guard(async (e) => { e.stopPropagation(); await paySheet(Number(b.dataset.pay)); })));
   el.querySelectorAll('[data-cancel]').forEach((b) => (b.onclick = guard(async () => { data = await api('POST', `requests/${b.dataset.cancel}/cancel`); toast(t('cancelled')); shell(); })));
   const fi = el.querySelector('#df input[type=file]');
   if (fi) fi.onchange = () => { el.querySelector('#fname').textContent = fi.files[0]?.name || t('take_photo'); };
@@ -442,6 +469,97 @@ function bind() {
   el.querySelector('#pw')?.addEventListener('submit', guard(async (e) => { e.preventDefault(); data = await api('PUT', 'me', Object.fromEntries(new FormData(e.target))); toast(t('saved')); shell(); }));
   el.querySelectorAll('[data-loc]').forEach((b) => (b.onclick = () => { store.set(LOC_KEY, b.dataset.loc); if (b.dataset.loc === 'on') { locDenied = false; startLoc(true); } else stopLoc(); shell(); }));
   el.querySelector('#lo')?.addEventListener('click', guard(async () => { await api('POST', 'logout').catch(() => {}); stopLoc(); setToken(null); render(); }));
+}
+// ---- bottom sheets: inbox, fault report, extension, return date, pay one invoice ----
+function sheet(title, html) {
+  document.querySelector('.p-sheet-bg')?.remove();
+  const bg = document.createElement('div'); bg.className = 'p-sheet-bg';
+  bg.innerHTML = `<div class="p-sheet" role="dialog" aria-modal="true"><div class="p-sheet-h"><b>${title}</b><button type="button" class="p-x" aria-label="${t('close')}">${ic('x')}</button></div><div class="p-sheet-b">${html}</div></div>`;
+  const close = () => { bg.classList.remove('show'); setTimeout(() => bg.remove(), 200); };
+  bg.onclick = (e) => { if (e.target === bg) close(); }; bg.querySelector('.p-x').onclick = close;
+  document.body.appendChild(bg); setTimeout(() => bg.classList.add('show'), 10); bindLang(bg);
+  return { el: bg.querySelector('.p-sheet-b'), close };
+}
+const rentalById = (id) => data.rentals.find((x) => x.id === id);
+const periodName = (p, n = 1) => `${n} × ${t({ 'gün': 'p_day', hafta: 'p_week', ay: 'p_month' }[p] || 'p_month')}`;
+const addPeriods = (d, p, n) => {
+  const x = new Date(d + 'T00:00:00Z');
+  if (p === 'gün') x.setUTCDate(x.getUTCDate() + n); else if (p === 'hafta') x.setUTCDate(x.getUTCDate() + 7 * n);
+  else { const day = x.getUTCDate(); x.setUTCDate(1); x.setUTCMonth(x.getUTCMonth() + n); x.setUTCDate(Math.min(day, new Date(Date.UTC(x.getUTCFullYear(), x.getUTCMonth() + 1, 0)).getUTCDate())); }
+  return x.toISOString().slice(0, 10);
+};
+async function inboxSheet() {
+  const box = await api('GET', 'inbox');
+  const s = sheet(t('inbox'), box.messages.length ? `<div class="p-inbox">${box.messages.map((m) => `<button type="button" class="p-msg l-${esc(m.level || 'info')} ${m.read ? '' : 'new'}" data-go="${esc(m.link || '')}"><b>${esc(m.title)}</b><span>${esc(m.body)}</span><small class="muted">${date(m.created_at)}</small></button>`).join('')}</div>` : `<div class="p-empty">${t('inbox_empty')}</div>`);
+  s.el.querySelectorAll('[data-go]').forEach((b) => (b.onclick = () => { const g = b.dataset.go; s.close(); if (TABS.some(([k]) => k === g) && g !== tab) location.hash = g; }));
+  if (box.unread) { await api('POST', 'inbox/read', {}).catch(() => {}); data.unread = 0; const dot = document.querySelector('#inb .p-dot'); if (dot) dot.remove(); }
+}
+function faultSheet(rid) {
+  const x = rentalById(rid); if (!x) return; const photos = [];
+  const s = sheet(t('f_h'), `<form class="p-form" id="ff"><div class="muted">${esc(x.bike_code)} · ${esc(x.contract_no)}</div>
+    <div class="field"><span>${t('f_cat')}</span><div class="p-chips">${(data.fault_categories || []).map((c, i) => `<label class="p-chip"><input type="radio" name="category" value="${esc(c)}" ${i === 0 ? 'checked' : ''}><span>${esc(cv(c))}</span></label>`).join('')}</div></div>
+    <div class="field"><span>${t('f_ride')}</span><div class="p-seg"><label><input type="radio" name="rideable" value="1" checked><span>${t('f_yes')}</span></label><label class="bad"><input type="radio" name="rideable" value="0"><span>${t('f_no')}</span></label></div></div>
+    <label class="field"><span>${t('f_notes')}</span><textarea name="notes" rows="3" placeholder="${esc(t('f_notes_ph'))}"></textarea></label>
+    <div class="field"><span>${t('f_photos')}</span><div class="p-thumbs" id="fth"><button type="button" class="p-addph" id="fadd">${ic('cam')}</button></div></div>
+    <button class="btn primary p-big">${t('f_send')}</button></form>`);
+  const th = s.el.querySelector('#fth'); const add = s.el.querySelector('#fadd');
+  const draw = () => { th.querySelectorAll('img').forEach((i) => i.remove()); photos.forEach((p) => add.insertAdjacentHTML('beforebegin', `<img src="${p.thumb}" alt="">`)); add.hidden = photos.length >= 4; };
+  add.onclick = () => {
+    const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*'; inp.setAttribute('capture', 'environment'); inp.style.display = 'none'; document.body.appendChild(inp);
+    inp.onchange = guard(async () => { const f = inp.files[0]; inp.remove(); if (!f) return; photos.push(await photoData(f)); draw(); }); inp.click();
+  };
+  s.el.querySelector('#ff').addEventListener('submit', guard(async (e) => {
+    e.preventDefault(); const f = Object.fromEntries(new FormData(e.target));
+    if (!f.notes.trim() && !photos.length) throw new Error(t('f_need'));
+    const btn = e.target.querySelector('.p-big'); btn.disabled = true; btn.textContent = t('loading');
+    try {
+      const r = await api('POST', 'reports', { rental_id: rid, category: f.category, rideable: f.rideable, notes: f.notes, photos });
+      const no = r.service_no; delete r.request_id; delete r.service_no; data = r; s.close(); toast(no ? t('f_sent', { no }) : t('f_sent0')); shell();
+    } finally { btn.disabled = false; btn.textContent = t('f_send'); }
+  }));
+}
+function extendSheet(rid) {
+  const x = rentalById(rid); if (!x) return; const max = data.self_extend_max || 3;
+  const s = sheet(t('x_h'), `<form class="p-form" id="xf"><dl class="p-dl"><div><dt>${t('x_now')}</dt><dd>${date(x.end_date)}</dd></div><div><dt>${t('x_new')}</dt><dd id="xnew"></dd></div><div><dt>${t('x_cost')}</dt><dd id="xcost"></dd></div></dl>
+    <div class="field"><span>${t('x_how')}</span><div class="p-seg">${Array.from({ length: max }, (_, i) => `<label><input type="radio" name="periods" value="${i + 1}" ${i === 0 ? 'checked' : ''}><span>${periodName(x.period, i + 1)}</span></label>`).join('')}</div></div>
+    <label class="field"><span>${t('note')} ${t('optional')}</span><textarea name="notes" rows="2"></textarea></label>
+    ${data.self_extend ? `<p class="muted">${t('x_auto')}</p>` : ''}<button class="btn primary p-big">${t(data.self_extend ? 'x_btn' : 'x_req_btn')}</button></form>`);
+  const f = s.el.querySelector('#xf');
+  const upd = () => { const n = Number(f.periods.value); s.el.querySelector('#xnew').textContent = date(addDays(addPeriods(addDays(x.end_date, 1), x.period, n), -1)); s.el.querySelector('#xcost').textContent = x.rate ? money(x.rate * n * (1 + (Number(data.vat_rate) || 0) / 100)) : '—'; };
+  f.addEventListener('change', upd); upd();
+  f.addEventListener('submit', guard(async (e) => {
+    e.preventDefault(); const r = await api('POST', `rentals/${rid}/extend`, { periods: Number(f.periods.value), notes: f.notes.value });
+    const res = r.result; delete r.result; data = r; s.close();
+    toast(res.done ? t('x_done', { date: date(res.end_date) }) : t({ overdue: 'x_wait_overdue', booked: 'x_wait_booked' }[res.reason] || 'x_wait'), res.done ? 'ok' : 'info'); shell();
+  }));
+}
+function returnSheet(rid) {
+  const x = rentalById(rid); if (!x) return; const min = todayISO(); const pre = x.return_notice_date || (x.end_date >= min ? x.end_date : min);
+  const s = sheet(t('rn_h'), `<form class="p-form" id="nf"><p>${t('rn_p', { date: date(x.end_date) })}</p>
+    <div class="p-row"><label class="field"><span>${t('date')}</span><input name="date" type="date" min="${min}" value="${pre}" required></label>
+    <label class="field"><span>${t('time')}</span><select name="time"><option value="">${t('any_time')}</option>${['09:00–12:00', '12:00–15:00', '15:00–18:00'].map((y) => `<option>${y}</option>`).join('')}</select></label></div>
+    <p class="muted" id="nearly" hidden>${t('rn_early')}</p>
+    <label class="field"><span>${t('note')} ${t('optional')}</span><textarea name="notes" rows="2" placeholder="${esc(t('note_ph_return'))}"></textarea></label>
+    <button class="btn primary p-big">${t('rn_btn')}</button></form>`);
+  const f = s.el.querySelector('#nf'); const chk = () => { s.el.querySelector('#nearly').hidden = !(f.date.value && f.date.value < x.end_date); };
+  f.date.addEventListener('change', chk); chk();
+  f.addEventListener('submit', guard(async (e) => { e.preventDefault(); data = await api('POST', `rentals/${rid}/return-notice`, Object.fromEntries(new FormData(f))); s.close(); toast(t('rn_done')); shell(); }));
+}
+async function paySheet(id) {
+  const p = await api('GET', `pay/${id}`);
+  const epc = p.iban ? epcPayload({ name: p.name, iban: p.iban, amount: p.amount, reference: p.reference }) : null;
+  let qr = '';
+  if (epc && window.qrcode) { try { const q = window.qrcode(0, 'M'); q.addData(epc); q.make(); qr = q.createSvgTag({ cellSize: 4, margin: 2, scalable: true }); } catch {} }
+  const row = (label, val, cls = '') => `<div class="p-copy"><div><small class="muted">${label}</small><b class="${cls}">${esc(val)}</b></div><button type="button" class="btn sm ghost" data-copy="${esc(val)}">${t('copy')}</button></div>`;
+  const s = sheet(t('pay_h'), `<div class="p-pay"><div class="p-pay-big">${money(p.amount)}</div><div class="muted">${esc(p.invoice_no)} · ${t('due')} ${date(p.due_date)}</div>
+    ${p.link ? `<a class="btn primary p-big" href="${esc(p.link)}" target="_blank" rel="noopener">${ic('pay')} ${t('pay_online')}</a>` : ''}
+    ${p.iban ? `<div class="p-card p-howto"><b>${t('pay_how')}</b>${row(t('receiver'), p.name)}${row(t('iban'), p.iban.replace(/\s+/g, '').replace(/(.{4})/g, '$1 ').trim(), 'mono')}${row(t('pay_amount'), (Math.round(p.amount * 100) / 100).toFixed(2))}${row(t('pay_ref'), p.reference, 'mono')}</div>` : `<div class="p-card p-howto"><b>${t('pay_how')}</b><p>${t('pay_text')}</p>${row(t('pay_ref'), p.reference, 'mono')}</div>`}
+    ${qr ? `<div class="p-qr">${qr}<p class="muted">${t('pay_qr')}</p></div>` : ''}<p class="muted">${t('pay_note')}</p></div>`);
+  s.el.querySelectorAll('[data-copy]').forEach((b) => (b.onclick = async () => {
+    const txt = b.dataset.copy.replace(/^([A-Z]{2}\d{2})[\d ]+$/, (m) => m.replace(/\s+/g, ''));
+    try { await navigator.clipboard.writeText(txt); } catch { const ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); } catch {} ta.remove(); }
+    b.textContent = t('copied'); setTimeout(() => (b.textContent = t('copy')), 1500);
+  }));
 }
 // photos are resized in the browser so uploads stay small on mobile data
 async function fileToData(file) {
@@ -480,6 +598,8 @@ async function load() {
   data = await api('GET', 'me');
   if (!btypes) api('GET', 'bike-types').then((x) => { btypes = x; if (tab === 'req') shell(); }).catch(() => {});
   if (store.get(LOC_KEY) !== 'off') startLoc(false);
+  // Android app: hand the session to the app so it can check for new messages in the background and show phone notifications
+  try { window.PedallaAndroid?.setPush?.(location.origin + location.pathname.replace(/[^/]*$/, ''), token, lang); } catch {}
   if (!store.get('pedalla_rider_lang') && data.rider.lang && L[data.rider.lang]) { lang = data.rider.lang; document.documentElement.lang = lang; }
   if (data.rider.lang && data.rider.lang !== lang && store.get('pedalla_rider_lang')) api('PUT', 'me', { lang }).catch(() => {});
   render();
