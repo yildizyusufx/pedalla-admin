@@ -25,9 +25,9 @@ const loading = () => setMain('<div class="loading"><div class="pdl-loader" role
 const NAV = [
   ['Genel', [['', 'Özet', 'dashboard', 'grid'], ['map', 'Canlı harita', 'fleet', 'map'], ['notifications', 'Bildirimler', 'dashboard', 'bell']]],
   ['Kiralama', [['rentals', 'Kiralamalar', 'rentals', 'key'], ['bikes', 'Bisikletler', 'fleet', 'bike'], ['customers', 'Müşteriler', 'customers', 'users'], ['riders', 'Sürücüler', 'customers', 'user'], ['portal_requests', 'Sürücü talepleri', 'rentals', 'inbox'], ['pricing_plans', 'Tarifeler', 'rentals', 'tag']]],
-  ['Finans', [['invoices', 'Faturalar', 'finance', 'doc'], ['payments', 'Ödemeler', 'finance', 'cash'], ['deposits', 'Depozitolar', 'finance', 'lock'], ['cash', 'Kasa', 'finance', 'safe']]],
+  ['Finans', [['invoices', 'Faturalar', 'finance', 'doc'], ['overdue', 'Geciken ödemeler', 'finance', 'alert'], ['payments', 'Ödemeler', 'finance', 'cash'], ['deposits', 'Depozitolar', 'finance', 'lock'], ['cash', 'Kasa', 'finance', 'safe']]],
   ['Servis & Stok', [['service', 'Servis kayıtları', 'service', 'wrench'], ['parts', 'Yedek parçalar', 'stock', 'box'], ['stock_moves', 'Stok hareketleri', 'stock', 'swap'], ['suppliers', 'Tedarikçiler', 'stock', 'truck']]],
-  ['Analiz', [['reports', 'Raporlar', 'reports', 'chart']]],
+  ['Analiz', [['summary', 'Yönetici özeti', 'reports', 'pie'], ['reports', 'Raporlar', 'reports', 'chart']]],
   ['Yönetim', [['users', 'Kullanıcılar', 'admin', 'users'], ['roles', 'Roller & yetkiler', 'admin', 'shield'], ['settings', 'Ayarlar', 'admin', 'cog'], ['audit_log', 'İşlem geçmişi', 'admin', 'list']]],
 ];
 const ICONS = {
@@ -44,6 +44,7 @@ const ICONS = {
   safe: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="12" cy="12" r="3.5"/><path d="M12 8.5v1M12 14.5v1M15.5 12h-1M9.5 12h-1M6 20v1.5M18 20v1.5"/>',
   list: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
   inbox: '<path d="M3 13h5l2 3h4l2-3h5"/><path d="M5 5h14l2 8v6H3v-6z"/>',
+  alert: '<path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17h.01"/>', pie: '<path d="M12 3a9 9 0 1 0 9 9h-9z"/><path d="M15 3.5A9 9 0 0 1 20.5 9H15z"/>',
 };
 const icon = (n) => `<svg viewBox="0 0 24 24" class="ic" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS[n] || ''}</svg>`;
 export const LOGO = `<span class="logo"><img src="img/logo.png" alt="pedalla.bike"></span>`;
@@ -109,7 +110,7 @@ async function dashboardPage() {
   const d = await GET('dashboard'); const k = d.kpi; const fin = can('finance');
   const fleet = BIKE_STATUS.map((s) => ({ l: s, v: d.fleet.find((x) => x.status === s)?.n || 0, c: statusHex[s] })).filter((x) => x.v);
   const months = d.monthly.map((m) => ({ ...m, label: MONTHS[uiLang][Number(m.m.slice(5)) - 1] }));
-  setMain(`${head(`Merhaba, ${esc(session.user.name.split(' ')[0])}`, `${date(todayISO())} · ${esc(session.settings.company_name || 'Pedalla')} filo özeti`)}
+  setMain(`${head(`Merhaba, ${esc(session.user.name.split(' ')[0])}`, `${date(todayISO())} · ${esc(session.settings.company_name || 'Pedalla')} filo özeti`, `${can('reports') ? '<a class="btn sm" href="#/summary">Yönetici özeti</a>' : ''}${fin && k.overdue_count ? `<a class="btn sm danger ghost" href="#/overdue">Geciken ödemeler (${k.overdue_count})</a>` : ''}`)}
   <div class="kpis">
     ${kpi('Kiradaki bisiklet', `${k.bikes_rented}<small>/${k.bikes_total}</small>`, meter(k.utilization) + `Doluluk %${k.utilization}`, 'hero', '#/bikes?status=kirada')}
     ${kpi('Müsait', k.bikes_available, `${k.reservations} rezervasyon`, '', '#/bikes?status=müsait')}
@@ -247,7 +248,7 @@ async function bikePage(id) {
   const b = await GET(`detail/bikes/${id}`); const w = can('fleet', 'w');
   const cur = b.current;
   setMain(`${head(`${esc(b.code)} <span class="h-badge">${badge(b.status)}</span>`, `${esc(b.type || '')} · ${esc(b.brand || '')} ${esc(b.model || '')} · ${esc(b.color || '')}`,
-    `${w ? '<button class="btn sm" id="edit">Düzenle</button><button class="btn sm" id="stat">Durum değiştir</button>' : ''}<a class="btn sm" href="#/bikes/${b.id}/qr">QR etiketi</a>${quickBtns(b, false)}${can('service', 'w') ? `<a class="btn sm" href="#/service/new?bike_id=${b.id}">Servise al</a>` : ''}${can('rentals', 'w') && b.status === 'müsait' ? `<a class="btn primary sm" href="#/rentals/new?bike_id=${b.id}">Kirala</a>` : ''}`)}
+    `${w ? '<button class="btn sm" id="edit">Düzenle</button><button class="btn sm" id="stat">Durum değiştir</button>' : ''}<a class="btn sm" href="#/bikes/${b.id}/qr">QR etiketi</a>${w && cur?.rider_name ? '<button class="btn sm" id="askphoto">📷 Fotoğraf iste</button>' : ''}${quickBtns(b, false)}${can('service', 'w') ? `<a class="btn sm" href="#/service/new?bike_id=${b.id}">Servise al</a>` : ''}${can('rentals', 'w') && b.status === 'müsait' ? `<a class="btn primary sm" href="#/rentals/new?bike_id=${b.id}">Kirala</a>` : ''}`)}
   ${b.status === 'kayıp/çalıntı' ? `<div class="alert danger"><b>Çalıntı / kayıp bildirildi</b>${b.stolen_at ? ` · ${dt(b.stolen_at)}` : ''}${b.lat != null ? ` · Son konum: <a href="https://www.google.com/maps?q=${b.lat},${b.lng}" target="_blank" rel="noopener">${b.lat}, ${b.lng}</a> · ${ago(b.last_seen)}` : ''}</div>` : b.lock_requested ? '<div class="alert warn">🔒 Bisiklet durduruldu: GPS cihazına kilit komutu gönderildi. Tekrar kullanıma açmak için "Tekrar aktif et"e basın.</div>' : ''}
   ${b.economics ? econCard(b) : ''}
   <div class="grid g-1-2">
@@ -257,6 +258,7 @@ async function bikePage(id) {
     </div>
     ${card(`Konum · ${esc(b.location_name || '')} <small class="muted">son sinyal ${ago(b.last_seen)}</small>`, '<div id="bmap" class="map sm"></div>')}
   </div>
+  ${photoCard('bike_id', b.id, w, `Fotoğraf geçmişi <span class="cnt">${b.photo_count}</span>`, w ? '<button class="btn sm" id="addphoto">+ Fotoğraf ekle</button>' : '')}
   ${card('Kiralama geçmişi', table(b.rentals, [{ k: 'contract_no', l: 'Sözleşme' }, { k: 'customer_label', l: 'Kiracı' }, { k: 'rider_name', l: 'Sürücü', f: (r) => esc(r.rider_name || '—') }, { l: 'Başlangıç', f: (r) => date(r.start_date) }, { l: 'Dönüş', f: (r) => date(r.returned_at || r.end_date) }, { l: 'Ücret', f: (r) => `${money(r.rate)}/${r.period}`, cls: 'num' }, { l: 'Durum', f: (r) => badge(r.status) }], { link: (r) => `#/rentals/${r.id}` }))}
   ${card(`Giderler <small class="muted">kaza, dış onarım, sigorta… (kazançtan düşülür)</small>${w ? '<button class="btn sm right" id="addcost">+ Gider ekle</button>' : ''}`, table(b.costs, [{ l: 'Tarih', f: (r) => date(r.date) }, { l: 'Gider türü', f: (r) => esc(r.category) }, { k: 'description', l: 'Açıklama' }, { l: 'Tutar', f: (r) => money(r.amount), cls: 'num' }, { l: 'Kullanıcı', f: (r) => esc(r.user_name || '—') }, w ? { l: '', f: (r) => `<button class="btn ghost sm" data-delcost="${r.id}" title="Sil">✕</button>` } : null].filter(Boolean), { empty: 'Kayıtlı gider yok' }))}
   ${card('Servis geçmişi', table(b.services, [{ k: 'order_no', l: 'No' }, { l: 'Kabul', f: (r) => dt(r.received_at) }, { l: 'Tip', f: (r) => esc(r.type) }, { k: 'complaint', l: 'Şikayet', f: (r) => esc((r.complaint || '').slice(0, 70)) }, { l: 'Teknisyen', f: (r) => esc(r.technician_name || '—') }, { l: 'Parça', f: (r) => money(r.parts_total), cls: 'num' }, { l: 'Durum', f: (r) => badge(r.status) }], { link: (r) => `#/service/${r.id}` }))}`);
@@ -269,11 +271,98 @@ async function bikePage(id) {
   } else $('#bmap').innerHTML = '<div class="empty">Konum bilgisi yok</div>';
   $('#edit')?.addEventListener('click', () => editForm('bikes', b, { onSaved: (x) => (x ? route() : (location.hash = '#/bikes')) }));
   bindQuick(main(), () => b, route);
+  loadPhotos(main());
+  $('#askphoto')?.addEventListener('click', () => askPhoto(b, cur));
+  $('#addphoto')?.addEventListener('click', () => addStaffPhoto(b));
   $('#addcost')?.addEventListener('click', () => editForm('bike_costs', null, { defaults: { bike_id: b.id, date: todayISO() }, onSaved: route }));
   main().querySelectorAll('[data-delcost]').forEach((x) => x.onclick = guard(async (e) => { e.stopPropagation(); if (await confirmBox('Gider kaydı silinsin mi?')) { await DEL(`bike_costs/${x.dataset.delcost}`); route(); } }));
   $('#stat')?.addEventListener('click', () => {
     const body = modal('Durum değiştir', `<form class="grid-form">${inputHtml(field('bikes', 'status'), b.status)}${inputHtml({ k: 'notes', l: 'Not', t: 'textarea' }, b.notes)}<div class="form-actions span2"><button class="btn primary">Kaydet</button></div></form>`);
     body.querySelector('form').onsubmit = guard(async (e) => { e.preventDefault(); await PUT(`bikes/${b.id}`, readForm(e.target)); closeModal(); toast('Durum güncellendi'); route(); });
+  });
+}
+
+// ---------- bike photo history (timeline) ----------
+// Photos come from the rider screen (pick-up selfie + bike photos, photos on request) or from staff.
+const PHOTO_STAGE = { 'teslim alma': 'Teslim alma kontrolü', talep: 'İstenen fotoğraf', 'sürücü': 'Sürücü gönderdi', personel: 'Personel ekledi', 'arıza': 'Arıza bildirimi', 'teslim tutanağı': 'Teslim tutanağı', 'iade tutanağı': 'İade tutanağı' };
+const PHOTO_KIND = { selfie: 'Selfie', bisiklet: 'Bisiklet' };
+const photoCard = (col, id, w, title, actions = '') => card(`${title}${actions ? `<span class="card-act">${actions}</span>` : ''}`, `<div class="ptl" data-col="${col}" data-id="${id}" data-w="${w ? 1 : ''}"><div class="muted">Yükleniyor…</div></div>`);
+// shrink in the browser: full photo ≈ 1600 px, thumbnail ≈ 320 px (both JPEG) → about 200–400 KB per photo in the database
+async function photoData(file) {
+  const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('Fotoğraf okunamadı (JPEG/PNG seçin).')); i.src = URL.createObjectURL(file); });
+  const shot = (max, q) => { const k = Math.min(1, max / Math.max(img.width, img.height)); const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); return c.toDataURL('image/jpeg', q); };
+  const out = { data: shot(1600, 0.8), thumb: shot(320, 0.7) }; URL.revokeObjectURL(img.src); return out;
+}
+function photoEvents(photos) {
+  // consecutive photos of the same moment (same day, stage, person, request) form one event on the line
+  const ev = [];
+  for (const p of photos) {
+    const key = [String(p.created_at).slice(0, 10), p.stage, p.rider_id || 'u' + (p.user_name || ''), p.request_id || '', p.rental_id || ''].join('|');
+    const last = ev[ev.length - 1];
+    if (last && last.key === key && Math.abs(new Date(last.items[last.items.length - 1].created_at.replace(' ', 'T')) - new Date(p.created_at.replace(' ', 'T'))) < 3 * 3600e3) last.items.push(p);
+    else ev.push({ key, items: [p] });
+  }
+  return ev;
+}
+function photoTimelineHtml(box, h, append) {
+  const col = box.dataset.col; const w = !!box.dataset.w;
+  const reqs = append ? '' : h.requests.filter((q) => q.status === 'bekliyor').map((q) => {
+    const wa = waPhone(q.rider_phone); const url = `${location.origin}${location.pathname.replace(/[^/]*$/, '')}portal.html`;
+    const msg = `Pedalla: ${q.bike_code} – ${q.kind === 'selfie' ? 'bitte ein Selfie' : q.kind === 'bisiklet' ? 'bitte ein Foto vom Fahrrad' : 'bitte ein Selfie und ein Foto vom Fahrrad'} im Fahrerbereich senden${q.note ? ` (${q.note})` : ''}: ${url}`;
+    return `<div class="ptl-req"><span class="ptl-req-ic">⏳</span><div class="grow"><b>Fotoğraf bekleniyor · ${esc(PHOTO_KIND[q.kind] || q.kind)}</b><small>${esc(q.rider_name || '—')} · ${col !== 'bike_id' ? esc(q.bike_code) + ' · ' : ''}istendi ${ago(q.created_at)}${q.user_name ? ' · ' + esc(q.user_name) : ''}${q.note ? ` · “${esc(q.note)}”` : ''}</small></div>
+      ${wa ? `<a class="btn xs wa" target="_blank" rel="noopener" href="https://wa.me/${wa}?text=${encodeURIComponent(msg)}">WhatsApp ile hatırlat</a>` : ''}${w ? `<button class="btn xs ghost" data-preqx="${q.id}">İptal</button>` : ''}</div>`;
+  }).join('');
+  if (!append && !h.photos.length) return `${reqs}<p class="muted">Henüz fotoğraf yok. ${col === 'bike_id' ? 'Sürücü teslim alırken selfie ve bisiklet fotoğrafı çektiğinde ya da "Fotoğraf iste" ile istediğinizde burada tarih sırasıyla görünür.' : ''}</p>`;
+  let lastDay = append ? box.dataset.lastDay : '';
+  const rows = photoEvents(h.photos).map((e) => {
+    const p = e.items[0]; const day = String(p.created_at).slice(0, 10);
+    const dayHead = day !== lastDay ? `<li class="ptl-day"><span>${date(day)}</span></li>` : ''; lastDay = day;
+    const who = p.rider_name ? `<a href="#/riders/${p.rider_id}">${esc(p.rider_name)}</a>` : esc(p.user_name || '—');
+    const geo = p.lat != null ? ` · <a href="https://www.google.com/maps?q=${p.lat},${p.lng}" target="_blank" rel="noopener">📍 konum</a>` : '';
+    return `${dayHead}<li class="ptl-ev s-${(p.stage || '').replace(/\s+/g, '-')}"><div class="ptl-dot"></div><div class="ptl-body">
+      <div class="ptl-h"><b>${esc(PHOTO_STAGE[p.stage] || p.stage || 'Fotoğraf')}</b><small>${String(p.created_at).slice(11, 16)} · ${who}${col !== 'bike_id' ? ` · <a href="#/bikes/${p.bike_id}">${esc(p.bike_code)}</a>` : ''}${p.contract_no && col !== 'rental_id' ? ` · <a href="#/rentals/${p.rental_id}">${esc(p.contract_no)}</a>` : ''}${geo}</small></div>
+      ${p.request_note ? `<p class="ptl-note">İstek: “${esc(p.request_note)}”</p>` : ''}${e.items.filter((x) => x.note).map((x) => `<p class="ptl-note">${esc(x.note)}</p>`).join('')}
+      <div class="ptl-imgs">${e.items.map((x) => `<button type="button" class="ptl-img ${x.kind === 'selfie' ? 'selfie' : ''}" data-ph="${x.id}" title="${esc(PHOTO_KIND[x.kind] || '')}">${x.thumb ? `<img src="data:image/jpeg;base64,${x.thumb}" alt="" loading="lazy">` : '<span>JPG</span>'}<i>${esc(PHOTO_KIND[x.kind] || '')}</i></button>`).join('')}</div></div></li>`;
+  }).join('');
+  box.dataset.lastDay = lastDay;
+  return append ? rows : `${reqs}<ol class="ptl-line">${rows}</ol>${h.more ? '<button class="btn sm ghost ptl-more">Daha eski fotoğraflar</button>' : ''}`;
+}
+async function loadPhotos(root, box = null, before = 0) {
+  for (const el of box ? [box] : root.querySelectorAll('.ptl')) {
+    const h = await GET('photos', { [el.dataset.col]: el.dataset.id, ...(before ? { before } : {}) });
+    if (before) { el.querySelector('.ptl-more')?.remove(); el.querySelector('.ptl-line').insertAdjacentHTML('beforeend', photoTimelineHtml(el, h, true)); if (h.more) el.insertAdjacentHTML('beforeend', '<button class="btn sm ghost ptl-more">Daha eski fotoğraflar</button>'); }
+    else el.innerHTML = photoTimelineHtml(el, h, false);
+    el.dataset.oldest = h.photos.length ? h.photos[h.photos.length - 1].id : el.dataset.oldest;
+    el.querySelectorAll('[data-ph]').forEach((b) => b.onclick = guard(() => openPhoto(b.dataset.ph, !!el.dataset.w, () => loadPhotos(root, el))));
+    el.querySelectorAll('[data-preqx]').forEach((b) => b.onclick = guard(async () => { if (await confirmBox('Fotoğraf talebi iptal edilsin mi?')) { await POST(`photo_requests/${b.dataset.preqx}/cancel`); loadPhotos(root, el); } }));
+    const more = el.querySelector('.ptl-more'); if (more) more.onclick = guard(() => loadPhotos(root, el, Number(el.dataset.oldest)));
+  }
+}
+async function openPhoto(id, w, after) {
+  const body = modal('Fotoğraf', '<div class="loading"><div class="pdl-loader"></div></div>', { wide: true });
+  const p = await GET(`photos/${id}`);
+  body.innerHTML = `<figure class="ph-full"><img src="data:${p.mime || 'image/jpeg'};base64,${p.data}" alt=""><figcaption class="muted">${dt(p.created_at)} · ${esc(PHOTO_KIND[p.kind] || p.kind)} · ${esc(PHOTO_STAGE[p.stage] || p.stage || '')}${p.note ? ` · ${esc(p.note)}` : ''}</figcaption></figure>
+    <div class="form-actions"><a class="btn sm" download="pedalla-foto-${p.id}.jpg" href="data:image/jpeg;base64,${p.data}">İndir</a>${w ? '<button class="btn sm danger" id="phdel">Sil</button>' : ''}</div>`;
+  body.querySelector('#phdel')?.addEventListener('click', guard(async () => { if (await confirmBox('Fotoğraf silinsin mi? Bisikletin geçmişinden kalkar.')) { await DEL(`photos/${id}`); closeModal(); toast('Fotoğraf silindi'); after?.(); } }));
+}
+function askPhoto(b, cur) {
+  const body = modal(`Fotoğraf iste · ${b.code}`, `<form class="grid-form"><p class="span2">${esc(cur.rider_name)} sürücü ekranını açtığında en üstte "Fotoğraf çek" görevi görür; çektiği fotoğraf bu bisikletin fotoğraf geçmişine eklenir. Sürücü ekranı anlık bildirim gönderemez; acilse talepten sonra WhatsApp ile de hatırlatabilirsiniz.</p>
+    <label class="field"><span>Ne istensin?</span><select name="kind"><option value="bisiklet">Bisiklet fotoğrafı</option><option value="selfie + bisiklet">Selfie + bisiklet fotoğrafı</option><option value="selfie">Sadece selfie</option></select></label>
+    <label class="field span2"><span>Not (sürücü görür)</span><input name="note" maxlength="300" placeholder="Örn. arka tekerleği ve kilidi yakından çek"></label>
+    <div class="form-actions span2"><button class="btn primary">Talep gönder</button></div></form>`);
+  body.querySelector('form').onsubmit = guard(async (e) => {
+    e.preventDefault(); const x = await POST('photo_requests', { bike_id: b.id, ...readForm(e.target) }); closeModal();
+    toast(x.portal ? `${x.rider} için fotoğraf talebi gönderildi` : `Talep kaydedildi; ${x.rider} için sürücü ekranı girişi açık değil`, x.portal ? 'ok' : 'info'); route();
+  });
+}
+function addStaffPhoto(b) {
+  const body = modal(`Fotoğraf ekle · ${b.code}`, `<form class="grid-form"><label class="field span2"><span>Fotoğraflar</span><input type="file" name="f" accept="image/*" capture="environment" multiple required></label>
+    <label class="field span2"><span>Not</span><input name="note" maxlength="300" placeholder="Örn. iade kontrolü, ön çamurlukta çizik"></label>
+    <div class="form-actions span2"><button class="btn primary">Yükle</button></div></form>`);
+  body.querySelector('form').onsubmit = guard(async (e) => {
+    e.preventDefault(); const files = [...e.target.f.files]; const note = e.target.note.value; const btn = e.target.querySelector('button'); btn.disabled = true;
+    try { for (const f of files) { const d = await photoData(f); await POST('photos', { bike_id: b.id, kind: 'bisiklet', note, ...d }); } } finally { btn.disabled = false; }
+    closeModal(); toast(files.length > 1 ? `${files.length} fotoğraf eklendi` : 'Fotoğraf eklendi'); route();
   });
 }
 
@@ -457,25 +546,32 @@ async function newRentalPage(q) {
     location.hash = `#/rentals/${r.id}/contract`;
   });
 }
-async function rentalPage(id) {
+async function rentalPage(id, q = {}) {
   const r = await GET(`detail/rentals/${id}`); const w = can('rentals', 'w'); const fw = can('finance', 'w');
   const late = r.late_days > 0;
+  const hT = r.handovers.filter((h) => h.kind === 'teslim'); const hI = r.handovers.filter((h) => h.kind === 'iade');
   setMain(`${head(`${esc(r.contract_no)} <span class="h-badge">${badge(late ? 'gecikmede' : r.status, late ? `gecikmede · ${r.late_days} gün` : r.status)}</span>`, `${esc(r.bike.code)} → ${esc(r.customer.company_name || r.customer.name)}`,
-    `<a class="btn primary sm" href="#/rentals/${r.id}/contract">Sözleşme çıktısı</a>${w && r.status === 'aktif' ? '<button class="btn sm" id="ext">Uzat</button><button class="btn sm" id="ret">İade al</button>' : ''}${w && r.status === 'rezervasyon' ? '<button class="btn sm" id="cancel">İptal</button><button class="btn primary sm" id="act">Teslim et</button>' : ''}${w ? '<button class="btn sm" id="edit">Düzenle</button>' : ''}`)}
+    `<a class="btn sm" href="#/rentals/${r.id}/contract">Sözleşme çıktısı</a>${w && r.status === 'aktif' ? `<button class="btn sm" id="ext">Uzat</button>${hI.length ? '' : `<a class="btn primary sm" href="#/rentals/${r.id}/handover/iade">İade tutanağı</a>`}<button class="btn sm" id="ret">İade al</button>` : ''}${w && r.status === 'rezervasyon' ? `<button class="btn sm" id="cancel">İptal</button><button class="btn sm" id="act" title="Tutanak tutmadan teslim et">Hızlı teslim</button><a class="btn primary sm" href="#/rentals/${r.id}/handover/teslim">Tutanakla teslim et</a>` : ''}${w && r.status === 'aktif' && !hT.length ? `<a class="btn sm" href="#/rentals/${r.id}/handover/teslim">Teslim tutanağı</a>` : ''}${w ? '<button class="btn sm" id="edit">Düzenle</button>' : ''}`)}
+  ${r.return_notice_date && r.status === 'aktif' ? `<div class="alert info">Sürücü iade tarihi bildirdi: <b>${date(r.return_notice_date)}</b>${r.return_notice_date < r.end_date ? ` <span>(sözleşme bitişi ${date(r.end_date)}, erken iade)</span>` : ''} · <span>${ago(r.return_notice_at)}</span></div>` : ''}
   ${late ? `<div class="alert danger">Planlanan dönüş tarihi ${date(r.end_date)} idi. Bisiklet ${r.late_days} gündür gecikmede; iadede günlük ${money(r.late_return_fee_per_day)} gecikme bedeli önerilir.</div>` : ''}
   <div class="grid g-3">
     ${card('Kiracı', dl([['Müşteri', `<a href="#/customers/${r.customer.id}">${esc(r.customer.company_name || r.customer.name)}</a>`], ['Yetkili', esc(r.customer.name)], ['Telefon', r.customer.phone ? `<a href="tel:${esc(r.customer.phone)}">${esc(r.customer.phone)}</a>` : '—'], ['E-posta', esc(r.customer.email)], ['Teslim alan / sürücü', r.rider ? `<a href="#/riders/${r.rider.id}">${esc(r.rider.name)}</a> · ${esc(r.rider.phone || '')}<br><small>${esc(r.rider.id_type || 'Kimlik')}: ${r.rider.id_no ? esc(r.rider.id_no) : '<b class="t-danger">eksik</b>'}${r.rider.id_checked ? ' ✓' : ''} · ${r.rider_documents.length ? `${r.rider_documents.length} evrak` : '<b class="t-warn">evrak yok</b>'}</small>` : '<b class="t-danger">girilmedi</b>']]))}
     ${card('Bisiklet', dl([['Kod', `<a href="#/bikes/${r.bike.id}">${esc(r.bike.code)}</a> ${badge(r.bike.status)}`], ['Model', `${esc(r.bike.brand)} ${esc(r.bike.model)}`], ['Teslim km / batarya', `${num(r.start_km)} km · ${r.start_battery != null ? '%' + r.start_battery : '—'}`], ['İade km', r.end_km != null ? `${num(r.end_km)} km (${num(r.end_km - (r.start_km || 0))} km kullanıldı)` : '—'], ['Aksesuarlar', esc(r.accessories)]]))}
-    ${card('Koşullar', dl([['Dönem', `${date(r.start_date)} – ${date(r.end_date)}`], ['İade', date(r.returned_at)], ['Tarife', esc(r.plan?.name || 'Manuel')], ['Ücret', `${money(r.rate)} / ${esc(r.period)} + KDV`], ['Depozito', `${money(r.deposit_amount)} ${badge(r.deposit_status)}<br><small>Tutulan: ${money(r.deposit_held)}</small>`], ['Hasar bedeli', money(r.damage_fee)], ['İade durumu', esc(r.return_condition)], ['Not', esc(r.notes)]]))}
+    ${card('Koşullar', dl([['Dönem', `${date(r.start_date)} – ${date(r.end_date)}`], ['İade', date(r.returned_at)], ['Tarife', esc(r.plan?.name || 'Manuel')], ['Ücret', `${money(r.rate)} / ${esc(r.period)} + KDV`], ['Ödeme şekli', esc(r.pay_method || '—')], ['Depozito', `${money(r.deposit_amount)} ${badge(r.deposit_status)}<br><small>Tutulan: ${money(r.deposit_held)}</small>`], ['Hasar bedeli', money(r.damage_fee)], ['İade durumu', esc(r.return_condition)], ['Not', esc(r.notes)]]))}
   </div>
   ${can('finance') ? card(`Faturalar <span class="card-act">${fw && r.status === 'aktif' ? '<button class="btn sm" id="bill">Vadesi gelen dönemleri faturala</button>' : ''}${fw && r.deposit_status === 'bekliyor' && r.deposit_amount > 0 ? '<button class="btn sm" id="dep">Depozito tahsil et</button>' : ''}</span>`, table(r.invoices, [{ k: 'invoice_no', l: 'No' }, { l: 'Tarih', f: (i) => date(i.issue_date) }, { l: 'Dönem', f: (i) => (i.period_start ? `${date(i.period_start)} – ${date(i.period_end)}` : esc(i.description)) }, { l: 'Vade', f: (i) => (i.days_late ? `<b class="t-danger">${date(i.due_date)}</b>` : date(i.due_date)) }, { l: 'Toplam', f: (i) => money(i.total), cls: 'num' }, { l: 'Kalan', f: (i) => (i.balance > 0.005 ? `<b>${money(i.balance)}</b>` : '—'), cls: 'num' }, { l: 'Durum', f: (i) => badge(i.status) }], { link: (i) => `#/invoices/${i.id}` })) : ''}
+  ${can('finance') && r.plan_rows.length ? card(`Ödeme planı <small class="muted">${esc(r.pay_method || 'ödeme şekli seçilmedi')} · dönem faturaları her gün otomatik kesilir</small>`, planTable(r.plan_rows)) : ''}
+  ${card(`Teslim / iade tutanakları <span class="cnt">${r.handovers.length}</span>${w ? `<span class="card-act">${['rezervasyon', 'aktif'].includes(r.status) && !hT.length ? `<a class="btn sm" href="#/rentals/${r.id}/handover/teslim">+ Teslim tutanağı</a>` : ''}${['aktif', 'tamamlandı'].includes(r.status) && !hI.length ? `<a class="btn sm" href="#/rentals/${r.id}/handover/iade">+ İade tutanağı</a>` : ''}</span>` : ''}`,
+    table(r.handovers, [{ l: 'Tutanak', f: (h) => `<b>${h.kind === 'teslim' ? 'Teslim' : 'İade'}</b>` }, { l: 'Tarih', f: (h) => dt(h.created_at) }, { l: 'Km', f: (h) => num(h.km), cls: 'num' }, { l: 'Batarya', f: (h) => (h.battery != null ? `%${h.battery}` : '—'), cls: 'num' }, { l: 'Hasar', f: (h) => (h.new_damages ? `<b class="${h.kind === 'iade' ? 't-danger' : 't-warn'}">${h.new_damages} yeni</b>` : '—') + (h.damage_count - h.new_damages ? ` <small class="muted">+${h.damage_count - h.new_damages} önceki</small>` : '') }, { l: 'İmzalayan', f: (h) => esc(h.rider_name || '—') }, { l: 'Personel', f: (h) => esc(h.staff_name || '—') }], { link: (h) => `#/handovers/${h.id}`, empty: 'Tutanak yok. Teslimde ve iadede km, hasar ve imzayı kayda almak için tutanak tutun.' }))}
   <div class="grid g-2">
     ${can('finance') ? card('Depozito hareketleri', table(r.deposits, [{ l: 'Tarih', f: (d) => date(d.date) }, { l: 'Hareket', f: (d) => badge(d.type) }, { l: 'Tutar', f: (d) => money(d.amount), cls: 'num' }, { k: 'notes', l: 'Açıklama' }], { empty: 'Depozito hareketi yok' })) : ''}
     ${docsCard('rental', r.id, r.documents, w, 'Kiralama belgeleri (imzalı sözleşme, teslim fotoğrafları)')}
+    ${photoCard('rental_id', r.id, false, 'Fotoğraflar (teslim alma selfie\'si, bisiklet fotoğrafları)')}
     ${card('Bu kiralamadaki servis kayıtları', table(r.services, [{ k: 'order_no', l: 'No' }, { l: 'Tip', f: (s) => esc(s.type) }, { l: 'Durum', f: (s) => badge(s.status) }], { link: (s) => `#/service/${s.id}`, empty: 'Servis kaydı yok' }))}
   </div>`);
   $('#edit')?.addEventListener('click', () => editForm('rentals', r, { onSaved: (x) => (x ? route() : (location.hash = '#/rentals')) }));
   bindDocs(main(), route);
+  loadPhotos(main());
   $('#act')?.addEventListener('click', guard(async () => { await POST(`rentals/${id}/activate`); toast('Bisiklet teslim edildi, kiralama aktif'); route(); }));
   $('#cancel')?.addEventListener('click', guard(async () => { if (await confirmBox('Rezervasyon iptal edilsin mi?')) { await POST(`rentals/${id}/cancel`); route(); } }));
   $('#bill')?.addEventListener('click', guard(async () => { const x = await POST(`rentals/${id}/bill`); toast(x.created ? `${x.created} fatura oluşturuldu` : 'Faturalanacak yeni dönem yok', x.created ? 'ok' : 'info'); route(); }));
@@ -487,6 +583,14 @@ async function rentalPage(id) {
     const body = modal('Kiralamayı uzat', `<form class="grid-form"><label class="field"><span>Yeni dönüş tarihi</span><input name="end_date" type="date" required value="${addDays(r.end_date < todayISO() ? todayISO() : r.end_date, 30)}"></label><div class="form-actions span2"><button class="btn primary">Uzat</button></div></form>`);
     body.querySelector('form').onsubmit = guard(async (e) => { e.preventDefault(); await POST(`rentals/${id}/extend`, readForm(e.target)); closeModal(); toast('Kiralama uzatıldı'); route(); });
   });
+  const openReturn = async (hid) => {
+    const h = hid ? await GET(`handovers/${hid}`).catch(() => null) : null;
+    $('#ret').click();
+    if (!h) return; const f = document.querySelector('#modal form'); if (!f) return;
+    if (h.km != null) f.end_km.value = h.km; const txt = damageText(h);
+    f.return_condition.value = txt ? `İade tutanağına göre yeni hasar: ${txt}` : 'İade tutanağına göre yeni hasar yok.';
+    if (txt) f.send_to_service.checked = true;
+  };
   $('#ret')?.addEventListener('click', () => {
     const lateFee = r.late_days * r.late_return_fee_per_day;
     const body = modal('İade al', `<form class="grid-form">
@@ -503,9 +607,10 @@ async function rentalPage(id) {
     body.querySelector('form').onsubmit = guard(async (e) => {
       e.preventDefault(); const d = readForm(e.target); d.charge_late = d.charge_late === undefined ? true : !!d.charge_late; d.deduct_from_deposit = !!d.deduct_from_deposit; d.send_to_service = !!d.send_to_service;
       const x = await POST(`rentals/${id}/return`, d); closeModal();
-      toast(`İade alındı${x.deposit_refund ? ` · depozito iadesi ${money(x.deposit_refund)}` : ''}${x.service_id ? ' · servis kaydı açıldı' : ''}`); route();
+      toast(`İade alındı${x.deposit_refund ? ` · depozito iadesi ${money(x.deposit_refund)}` : ''}${x.service_id ? ' · servis kaydı açıldı' : ''}`); location.hash = `#/rentals/${id}`; route();
     });
   });
+  if (q.ret && r.status === 'aktif' && w) await openReturn(Number(q.ret));
 }
 
 // ---------- customers ----------
@@ -617,9 +722,13 @@ async function riderPage(id) {
   ${card('Sürücü ekranı', `${dl([['Durum', r.portal_active && r.portal_email ? '<span class="badge b-ok">giriş açık</span>' : '<span class="badge b-muted">kapalı</span>'], ['Giriş e-postası', esc(r.portal_email || '—')], ['Son giriş', dt(r.portal_last_login)], ['Dil', esc({ tr: 'Türkçe', de: 'Deutsch', en: 'English' }[r.lang] || '—')], ['Adres', `<a href="${location.origin}${location.pathname.replace(/[^/]*$/, '')}portal.html" target="_blank">${location.host}${location.pathname.replace(/[^/]*$/, '')}portal.html</a>`]])}
     <p class="muted">${r.portal_email ? 'Sürücü bu e-posta ve sizin belirlediğiniz şifreyle girer. Şifreyi değiştirmek veya girişi kapatmak için "Düzenle".' : 'Sürücü ekranını açmak için "Düzenle"den giriş e-postası ve şifre belirleyin.'}</p>
     ${r.requests?.length ? table(r.requests, [{ l: 'Geliş', f: (x) => dt(x.created_at) }, { l: 'Talep', f: (x) => esc(x.type) }, { l: 'İstenen tarih', f: (x) => date(x.preferred_date) }, { l: 'Durum', f: (x) => badge(x.status) }], { link: (x) => `#/portal_requests/${x.id}` }) : ''}`)}
+  ${card(`Mesajlar ve bildirimler <small class="muted">sürücü ekranı + Android uygulaması</small>${w ? '<span class="card-act"><button class="btn sm" id="msg">Mesaj gönder</button></span>' : ''}`, msgList(r.messages || []))}
+  ${photoCard('rider_id', r.id, false, 'Selfie\'ler ve gönderdiği fotoğraflar')}
   ${card('Kiralamalar', table(r.rentals, [{ k: 'contract_no', l: 'Sözleşme' }, { k: 'bike_code', l: 'Bisiklet' }, { l: 'Dönem', f: (x) => `${date(x.start_date)} – ${date(x.returned_at || x.end_date)}` }, { l: 'Durum', f: (x) => badge(x.is_late ? 'gecikmede' : x.status) }], { link: (x) => `#/rentals/${x.id}`, empty: 'Kiralama yok' }))}`);
   $('#edit')?.addEventListener('click', () => editForm('riders', r, { onSaved: (x) => (x ? route() : (location.hash = '#/riders')) }));
+  $('#msg')?.addEventListener('click', () => riderMessageModal(r, route));
   bindDocs(main(), route);
+  loadPhotos(main());
   if (window.L && r.last_lat != null && $('#rmap')) {
     const m = L.map('rmap').setView([r.last_lat, r.last_lng], 15);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(m);
@@ -649,7 +758,9 @@ async function requestPage(id) {
 // ---------- cash register (kasa) ----------
 async function cashPage(q) {
   const from = q.from || addDays(todayISO(), -30); const to = q.to || todayISO();
-  const d = await GET('cash', { from, to }); const fw = can('finance', 'w');
+  const [d, pays] = await Promise.all([GET('cash', { from, to }), GET('payments', { limit: 3000 }).catch(() => [])]); const fw = can('finance', 'w');
+  // payments that do not go through the cash box (bank transfer, SEPA, card, online)
+  const bank = pays.filter((p) => p.date >= from && p.date <= to && !['nakit', 'depozitodan mahsup'].includes(p.method));
   // running balance (oldest first)
   let bal = d.opening; const asc = [...d.rows].reverse().map((m) => { bal += m.type === 'çıkış' ? -m.amount : m.amount; return { ...m, run: bal }; });
   const rows = asc.reverse().filter((m) => !q.q || `${m.category} ${m.description} ${m.user_name}`.toLowerCase().includes(q.q.toLowerCase()));
@@ -662,7 +773,8 @@ async function cashPage(q) {
   setMain(`${head('Kasa', 'Nakit giriş ve çıkışları. Nakit alınan ödemeler ve depozitolar kasaya otomatik işlenir.', `<button class="btn sm" id="csv">CSV</button>${fw ? '<button class="btn sm" id="count">Gün sonu sayımı</button><button class="btn sm" id="out">− Çıkış</button><button class="btn primary sm" id="in">+ Giriş</button>' : ''}`)}
   <div class="kpis">${kpi('Kasa bakiyesi', money(d.balance), d.last_count ? `Son sayım ${date(d.last_count.date)}` : 'Henüz sayım yapılmadı', 'hero')}${kpi('Bugün giriş', money(d.today_in))}${kpi('Bugün çıkış', money(d.today_out), '', d.today_out ? 'warn' : '')}${kpi('Bu ay net', money(d.month_in - d.month_out), `Giriş ${money(d.month_in)} · çıkış ${money(d.month_out)}`)}</div>
   <form class="toolbar" id="cf"><input type="search" name="q" placeholder="Kategori, açıklama…" value="${esc(q.q || '')}"><label class="inline">Başlangıç <input type="date" name="from" value="${from}"></label><label class="inline">Bitiş <input type="date" name="to" value="${to}"></label><button class="btn sm">Filtrele</button><span class="muted">Dönem: giriş <b>${money(sIn)}</b> · çıkış <b>${money(sOut)}</b> · açılış ${money(d.opening)}</span></form>
-  ${card('', table(rows, cols, { empty: 'Bu dönemde kasa hareketi yok' }), 'flush')}`);
+  ${card('', table(rows, cols, { empty: 'Bu dönemde kasa hareketi yok' }), 'flush')}
+  ${card(`Kasaya girmeyen tahsilatlar <small class="muted">havale, SEPA, kart, online · aynı dönem · kasa bakiyesini etkilemez</small><span class="card-act"><b>${money(bank.reduce((x, p) => x + p.amount, 0))}</b></span>`, table(bank.slice(0, 50), [{ l: 'Tarih', f: (p) => date(p.date) }, { l: 'Fatura', f: (p) => (p.invoice_id ? `<a href="#/invoices/${p.invoice_id}">${esc(p.invoice_no)}</a>` : '—') }, { k: 'customer_label', l: 'Müşteri' }, { k: 'method', l: 'Yöntem' }, { l: 'Referans', f: (p) => esc(p.reference || '—') }, { l: 'Tutar', f: (p) => `<b class="t-ok">+${money(p.amount)}</b>`, cls: 'num' }], { empty: 'Bu dönemde banka / online tahsilat yok' }))}`);
   $('#cf').onsubmit = (e) => { e.preventDefault(); location.hash = `#/cash?${new URLSearchParams(readForm(e.target))}`; };
   $('#csv').onclick = () => csv(rows, cols.filter((c) => c.csv !== null), 'kasa');
   const moveForm = (type) => {
@@ -694,12 +806,13 @@ async function invoicesPage(q) {
     { l: 'Kalan', f: (i) => (i.balance > 0.005 ? `<b>${money(i.balance)}</b>` : '—'), cls: 'num', csv: (i) => i.balance }, { l: 'Durum', f: (i) => badge(i.status), csv: (i) => i.status },
     ...(fw && ['open', 'overdue'].includes(tab) ? [{ l: '', f: (i) => waBtn(i, true), csv: null }] : [])];
   const sumBal = rows.reduce((a, i) => a + (i.status === 'iptal' ? 0 : i.balance), 0);
-  setMain(`${head('Faturalar', 'Kiralama dönem faturaları, hasar/servis faturaları ve gecikmiş ödemeler.', `<button class="btn sm" id="csv">CSV</button>${fw ? '<button class="btn sm" id="gen">Dönem faturalarını oluştur</button><button class="btn primary sm" id="new">+ Fatura</button>' : ''}`)}
+  setMain(`${head('Faturalar', 'Kiralama dönem faturaları, hasar/servis faturaları ve gecikmiş ödemeler.', `<button class="btn sm" id="csv">CSV</button>${fw ? '<button class="btn sm" id="bank">Banka dökümü içe aktar</button><button class="btn sm" id="gen">Dönem faturalarını oluştur</button><button class="btn primary sm" id="new">+ Fatura</button>' : ''}`)}
     <div class="toolbar"><input type="search" id="q" placeholder="Fatura no, müşteri, sözleşme…" value="${esc(q.q || '')}">${tabs([['open', 'Açık', sets.open.length], ['overdue', 'Geciken', sets.overdue.length], ['paid', 'Ödenen', sets.paid.length], ['all', 'Tümü', all.length]], tab)}<span class="muted">Kalan toplam: <b>${money(sumBal)}</b></span></div>
     ${card('', table(rows, cols, { link: (i) => `#/invoices/${i.id}` }), 'flush')}`);
   main().querySelectorAll('.tab').forEach((b) => b.onclick = () => { location.hash = `#/invoices?${new URLSearchParams({ ...q, tab: b.dataset.tab })}`; });
   $('#csv').onclick = () => csv(rows, cols.filter((c) => c.csv !== null), 'faturalar');
   bindWa(main());
+  $('#bank')?.addEventListener('click', () => bankImportModal(route));
   $('#gen')?.addEventListener('click', guard(async () => { const x = await POST('invoices/generate'); toast(x.created ? `${x.created} yeni dönem faturası oluşturuldu` : 'Tüm aktif kiralamaların faturaları güncel', x.created ? 'ok' : 'info'); route(); }));
   $('#new')?.addEventListener('click', () => editForm('invoices', null, { defaults: { due_date: addDays(todayISO(), Number(session.settings.payment_terms_days) || 14), vat_rate: session.settings.vat_rate }, onSaved: (x) => x && (location.hash = `#/invoices/${x.id}`) }));
   let tm; $('#q').oninput = (e) => { clearTimeout(tm); tm = setTimeout(() => { location.hash = `#/invoices?${new URLSearchParams({ tab, q: e.target.value })}`; }, 350); };
@@ -713,7 +826,7 @@ async function invoicePage(id) {
   const open = ['açık', 'kısmi'].includes(i.status);
   const s = session.settings;
   setMain(`${head(`Fatura ${esc(i.invoice_no)} <span class="h-badge">${badge(i.status)}</span>`, `${esc(i.customer.company_name || i.customer.name)} · vade ${date(i.due_date)}${i.days_late ? ` · <b class="t-danger">${i.days_late} gün gecikmede</b>` : ''}`,
-    `${langSw(lang)}<button class="btn sm" id="print">Yazdır / PDF</button>${fw && open ? `${waBtn(i)}<button class="btn sm" id="remind">E-posta hatırlatma</button>${i.days_late ? '<button class="btn sm" id="fee">Gecikme bedeli ekle</button>' : ''}<button class="btn sm" id="edit">Düzenle</button><button class="btn primary sm" id="pay">Ödeme gir</button>` : ''}${fw && i.status === 'açık' && !i.paid_amount ? '<button class="btn sm danger ghost" id="cancel">İptal</button>' : ''}`)}
+    `${langSw(lang)}<button class="btn sm" id="print">Yazdır / PDF</button>${fw && open ? `${waBtn(i)}${i.customer.type === 'bireysel' ? '<button class="btn sm" id="premind" title="Sürücü ekranına ve Android uygulamasına bildirim">Uygulamaya hatırlat</button>' : ''}<button class="btn sm" id="remind">E-posta hatırlatma</button>${i.days_late ? '<button class="btn sm" id="fee">Gecikme bedeli ekle</button>' : ''}<button class="btn sm" id="edit">Düzenle</button><button class="btn primary sm" id="pay">Ödeme gir</button>` : ''}${fw && i.status === 'açık' && !i.paid_amount ? '<button class="btn sm danger ghost" id="cancel">İptal</button>' : ''}`)}
   ${i.days_late ? `<div class="alert warn">Bu fatura ${i.days_late} gündür ödenmedi. ${i.reminders_sent ? `${i.reminders_sent} hatırlatma gönderildi (son: ${dt(i.last_reminder_at)}).` : 'Henüz hatırlatma gönderilmedi.'} Ayarlardaki günlük ${money(s.late_fee_per_day)} oranıyla önerilen gecikme bedeli: <b>${money(i.suggested_late_fee)}</b>.</div>` : ''}
   <div class="grid g-2-1"><div class="card"><div class="card-b" id="docv">${invoiceDoc(i, lang)}</div></div>
   <div class="stack">${card('Ödemeler', table(i.payments, [{ l: 'Tarih', f: (p) => date(p.date) }, { k: 'method', l: 'Yöntem' }, { k: 'reference', l: 'Ref.' }, { l: 'Tutar', f: (p) => money(p.amount), cls: 'num' }, ...(fw ? [{ l: '', f: (p) => `<button class="icon-btn sm" data-delpay="${p.id}" title="Sil">✕</button>` }] : [])], { empty: 'Ödeme yok' }) + `<div class="total-row"><span>Kalan</span><b>${money(i.balance)}</b></div>`)}
@@ -735,6 +848,7 @@ async function invoicePage(id) {
     toast('Hatırlatma kaydedildi'); route();
   }));
   $('#cancel')?.addEventListener('click', guard(async () => { if (await confirmBox('Fatura iptal edilsin mi?')) { await POST(`invoices/${id}/cancel`); route(); } }));
+  $('#premind')?.addEventListener('click', guard(async () => { await POST(`invoices/${id}/remind`, { channel: 'sürücü ekranı' }); toast('Hatırlatma sürücü ekranına gönderildi'); route(); }));
   main().querySelectorAll('[data-delpay]').forEach((b) => b.onclick = guard(async () => { if (await confirmBox('Ödeme kaydı silinsin mi?')) { await DEL(`payments/${b.dataset.delpay}`); route(); } }));
 }
 function invoiceDoc(i, lang = docLangOf(i.customer, session.settings)) {
@@ -915,6 +1029,7 @@ async function serviceDetailPage(id) {
   const steps = SERVICE_STATUS.filter((x) => x !== 'iptal');
   setMain(`${head(`${esc(s.order_no)} <span class="h-badge">${badge(s.status)}</span>`, `<a href="#/bikes/${s.bike.id}">${esc(s.bike.code)}</a> · ${esc(s.bike.brand)} ${esc(s.bike.model)} · ${esc(s.type)}`,
     `${langSw(lang)}<button class="btn sm" id="pintake">Kabul formunu yazdır</button><button class="btn sm" id="preport">Servis raporu</button>`)}
+  ${s.report_id ? `<div class="alert ${s.urgent ? 'danger' : 'warn'}">Bu kayıt sürücü ekranından gelen arıza bildirimiyle otomatik açıldı${s.urgent ? ' · <b>sürücü bisikleti kullanamıyor</b>' : ''}. ${s.brought_by_rider ? `<a href="#/riders/${s.brought_by_rider.id}">${esc(s.brought_by_rider.name)}</a>${s.brought_by_rider.phone ? ` · <a href="tel:${esc(s.brought_by_rider.phone)}">${esc(s.brought_by_rider.phone)}</a>` : ''}` : ''} · <a href="#/portal_requests/${s.report_id}">bildirim</a></div>` : ''}
   <div class="steps">${steps.map((st, i) => `<button class="step ${st === s.status ? 'on' : ''} ${steps.indexOf(s.status) > i ? 'done' : ''}" data-st="${st}" ${!w || closed ? 'disabled' : ''}><span>${i + 1}</span>${st}</button>`).join('')}</div>
   <div class="grid g-2">
     ${card('Kabul bilgileri', dl([['Kabul', `${dt(s.received_at)} · ${esc(s.received_by_name || '')}`], ['Getiren', `${esc(s.brought_by || '—')}${s.customer ? ` · <a href="#/customers/${s.customer.id}">${esc(s.customer.company_name || s.customer.name)}</a>` : ''}`], ['Km / batarya', `${num(s.km)} km · ${s.battery_level != null ? '%' + s.battery_level : '—'}`], ['Şikayet', esc(s.complaint)], ['Görsel durum', esc(s.visual_condition)], ['Aksesuarlar', esc(s.accessories)], ['Tahmini', `${money(s.estimated_cost)} · ${date(s.estimated_ready)}`], ['İmzalayan', esc(s.signature_name)], ['Teslim', dt(s.delivered_at)]])
@@ -931,7 +1046,9 @@ async function serviceDetailPage(id) {
   </div>
   ${card('Kullanılan parçalar', table(s.parts, [{ k: 'sku', l: 'Kod' }, { k: 'name', l: 'Parça' }, { l: 'Miktar', f: (p) => `${num(p.qty, 2)} ${esc(p.unit)}`, cls: 'num' }, { l: 'Birim fiyat', f: (p) => money(p.unit_price), cls: 'num' }, { l: 'Tutar', f: (p) => money(p.qty * p.unit_price), cls: 'num' }, ...(w && !closed ? [{ l: '', f: (p) => `<button class="icon-btn sm" data-rmp="${p.id}" title="Kaldır (stoğa geri al)">✕</button>` }] : [])], { empty: 'Henüz parça kullanılmadı' })
     + (w && !closed ? partsPicker(parts, s.bike) : '')
-    + `<div class="totals"><div><span>Parça</span><b>${money(s.parts_total)}</b></div><div><span>İşçilik (${num(s.labor_hours, 2)} sa × ${money(s.labor_rate)})</span><b>${money(s.labor_total)}</b></div><div class="grand"><span>Toplam (net)</span><b>${money(s.grand_total)}</b></div></div>`)}`);
+    + `<div class="totals"><div><span>Parça</span><b>${money(s.parts_total)}</b></div><div><span>İşçilik (${num(s.labor_hours, 2)} sa × ${money(s.labor_rate)})</span><b>${money(s.labor_total)}</b></div><div class="grand"><span>Toplam (net)</span><b>${money(s.grand_total)}</b></div></div>`)}
+  ${s.report_id ? photoCard('service_id', s.id, false, 'Sürücünün gönderdiği fotoğraflar') : ''}`);
+  loadPhotos(main());
   onLang((l) => { lang = l; });
   $('#pintake').onclick = () => printHtml(intakeDoc(s, lang), `${lang === 'en' ? 'Service intake' : 'Serviceannahme'} ${s.order_no}`);
   $('#preport').onclick = () => printHtml(serviceReportDoc(s, lang), `${lang === 'en' ? 'Service report' : 'Servicebericht'} ${s.order_no}`);
@@ -1078,10 +1195,12 @@ async function rolesPage() {
 }
 
 // ---------- settings ----------
+const ONOFF = [{ v: '1', l: 'Açık' }, { v: '0', l: 'Kapalı' }];
 const SETTINGS_FORM = [
   ['Şirket', [['company_name', 'Şirket adı'], ['company_address', 'Adres'], ['pickup_address', 'Teslim alma adresi (site ve sürücü ekranı)'], ['company_phone', 'Telefon'], ['company_email', 'E-posta'], ['company_tax_no', 'USt-IdNr / vergi no'], ['company_iban', 'IBAN']]],
   ['Finans', [['currency', 'Para birimi'], ['vat_rate', 'KDV oranı %', 'number'], ['payment_terms_days', 'Ödeme vadesi (gün)', 'number'], ['late_fee_per_day', 'Geç ödeme bedeli / gün (€)', 'number'], ['late_return_fee_per_day', 'Geç iade bedeli / gün (€)', 'number']]],
-  ['Sürücü ekranı', [['portal_signup', 'Sürücüler sürücü ekranından kendi hesabını oluşturabilsin', 'select', [{ v: '1', l: 'Açık' }, { v: '0', l: 'Kapalı' }]]]],
+  ['Otomatik tahsilat ve hatırlatmalar', [['auto_billing', 'Aktif kiralamaların dönem faturalarını her gün otomatik kes', 'select', ONOFF], ['auto_reminders', 'Bireysel kiracılara ödeme hatırlatması gönder (sürücü ekranı + Android bildirimi)', 'select', ONOFF], ['reminder_days_before', 'İlk hatırlatma: vadeden kaç gün önce', 'number'], ['dunning_days', 'Gecikme hatırlatmaları: vadeden kaç gün sonra (virgülle, ör. 1,7,14)'], ['auto_late_fee', 'Geciken faturalara günlük gecikme bedelini otomatik ekle', 'select', [{ v: '0', l: 'Kapalı' }, { v: '1', l: 'Açık' }]], ['pay_provider', 'Online ödeme sağlayıcısı (kart / SEPA). Henüz bağlı değil; bağlanınca sürücü ekranında "Online öde" düğmesi çıkar', 'readonly']]],
+  ['Sürücü ekranı', [['portal_signup', 'Sürücüler sürücü ekranından kendi hesabını oluşturabilsin', 'select', [{ v: '1', l: 'Açık' }, { v: '0', l: 'Kapalı' }]], ['photo_pickup', 'Teslim almada selfie + bisiklet fotoğrafı iste (bisikletin fotoğraf geçmişine eklenir)', 'select', [{ v: '1', l: 'Açık' }, { v: '0', l: 'Kapalı' }]], ['self_extend', 'Sürücü kiralamasını kendisi uzatabilsin (gecikmiş ödeme yoksa ve bisiklet sonrasında rezerve değilse; değilse talep olarak gelir)', 'select', ONOFF], ['self_extend_max', 'Tek seferde en fazla kaç dönem uzatabilsin', 'number'], ['auto_service_from_report', 'Sürücünün arıza bildirimiyle servis kaydı otomatik açılsın', 'select', ONOFF]]],
   ['Kiralama periyotları', [['rental_periods', 'Sürücülerin ve sizin seçebileceğiniz periyotlar (kapalı olanlar tarife, kiralama ve sürücü ekranında görünmez)', 'periods']]],
   ['Bisiklet tipleri', [['bike_types', 'Bisiklet tipleri (her satıra bir tip; bisiklet ve tarife formlarında seçilir)', 'textarea']]],
   ['Servis & filo', [['service_interval_days', 'Bakım aralığı (gün)', 'number'], ['service_interval_km', 'Bakım aralığı (km)', 'number'], ['labor_rate', 'Saatlik işçilik ücreti (€)', 'number'], ['low_battery_alert', 'Düşük batarya uyarısı %', 'number'], ['map_center_lat', 'Harita merkezi enlem'], ['map_center_lng', 'Harita merkezi boylam'], ['telemetry_key', 'GPS cihaz API anahtarı']]],
@@ -1090,7 +1209,7 @@ const SETTINGS_FORM = [
 ];
 async function settingsPage() {
   const s = await GET('settings'); const w = can('admin', 'w');
-  setMain(`${head('Ayarlar', 'Şirket bilgileri, finans kuralları ve belge metinleri.')}<form id="stf">${SETTINGS_FORM.map(([g, fs]) => card(g, `<div class="grid-form">${fs.map(([k, l, t, o]) => (t === 'periods' ? `<div class="field span2"><span>${esc(l)}</span><div class="per-pick">${PERIODS.map((p) => `<label class="check"><input type="checkbox" name="per_${p}" ${enabledPeriods(s).includes(p) ? 'checked' : ''} ${w ? '' : 'disabled'}> ${{ 'gün': 'Günlük', hafta: 'Haftalık', ay: 'Aylık' }[p]}</label>`).join('')}</div></div>` : inputHtml({ k, l, t: t || 'text', step: 'any', o }, s[k], { disabled: !w }))).join('')}</div>${g === 'Bisiklet tipleri' ? '<div id="btimgs" class="bt-imgs"></div>' : ''}${g.startsWith('WhatsApp') ? '<p class="muted">Kullanılabilecek alanlar: {name} {invoice_no} {amount} {due_date} {iban} {company}. Müşterinin belge diline göre Almanca veya İngilizce mesaj seçilir.</p>' : ''}`)).join('')}
+  setMain(`${head('Ayarlar', 'Şirket bilgileri, finans kuralları ve belge metinleri.')}<form id="stf">${SETTINGS_FORM.map(([g, fs]) => card(g, `<div class="grid-form">${fs.map(([k, l, t, o]) => (t === 'readonly' ? `<div class="field span2"><span>${esc(l)}</span><div class="ro-val">${s[k] ? esc(s[k]) : '<span class="muted">Bağlı değil · ödemeler havale / SEPA ile, banka dökümü içe aktarılarak işlenir</span>'}</div></div>` : t === 'periods' ? `<div class="field span2"><span>${esc(l)}</span><div class="per-pick">${PERIODS.map((p) => `<label class="check"><input type="checkbox" name="per_${p}" ${enabledPeriods(s).includes(p) ? 'checked' : ''} ${w ? '' : 'disabled'}> ${{ 'gün': 'Günlük', hafta: 'Haftalık', ay: 'Aylık' }[p]}</label>`).join('')}</div></div>` : inputHtml({ k, l, t: t || 'text', step: 'any', o }, s[k], { disabled: !w }))).join('')}</div>${g === 'Bisiklet tipleri' ? '<div id="btimgs" class="bt-imgs"></div>' : ''}${g.startsWith('WhatsApp') ? '<p class="muted">Kullanılabilecek alanlar: {name} {invoice_no} {amount} {due_date} {iban} {company}. Müşterinin belge diline göre Almanca veya İngilizce mesaj seçilir.</p>' : ''}`)).join('')}
   ${card('GPS takip cihazı entegrasyonu', `<p>Takip cihazları konumlarını şu adrese <code>POST</code> eder. Cihaz ID'si bisiklet kartındaki "GPS takip cihazı ID" alanıyla eşleşir.</p><pre class="code">POST ${location.origin}/api/telemetry
 {"key":"${esc(s.telemetry_key || '…')}","tracker_id":"TRK-4101","lat":53.5503,"lng":9.9353,"battery":76,"speed":14}</pre>`)}
   ${w ? '<div class="form-actions"><button class="btn primary">Ayarları kaydet</button></div>' : ''}</form>
@@ -1139,6 +1258,229 @@ async function searchPage(term) {
   setMain(`${head(`“${esc(term)}” için sonuçlar`)}${html ? `<div class="grid g-2">${html}</div>` : '<div class="empty big">Sonuç bulunamadı.</div>'}`);
 }
 
+
+// ======================================================================
+// Hand-over / return protocol (teslim / iade tutanağı): km, battery, checklist, damage marks, two signatures
+// ======================================================================
+// simple long-john cargo bike, front to the right (right side view); the left side view is the same drawing mirrored
+const BIKE_SHAPE = `<g class="bk" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="112" cy="214" r="58"/><circle cx="112" cy="214" r="7"/><circle cx="508" cy="228" r="44"/><circle cx="508" cy="228" r="6"/>
+  <path d="M112 214 L236 214 L208 98 M112 214 L206 112 M236 214 L286 150 M286 92 L286 160 M286 200 L470 200 L508 228 M470 200 L470 150"/>
+  <rect x="300" y="122" width="168" height="78" rx="8" class="bk-box"/><path d="M186 92 L232 92" class="bk-thick"/><path d="M286 92 L298 66 L322 62"/>
+  <circle cx="236" cy="214" r="13"/><rect x="246" y="160" width="36" height="16" rx="4" transform="rotate(-52 264 168)" class="bk-bat"/>
+  <path d="M60 170 Q112 140 164 170" class="bk-fender"/><path d="M470 196 Q508 172 548 196" class="bk-fender"/></g>`;
+function bikeSvg(marks, side, { id = '', small = false } = {}) {
+  const ms = marks.filter((m) => (m.side || 'sol') === side);
+  return `<svg viewBox="0 0 600 300" class="dmg-svg ${small ? 'sm' : ''}" ${id ? `id="${id}"` : ''} role="img" aria-label="${side === 'sol' ? 'Sol taraf' : 'Sağ taraf'}">
+    <rect width="600" height="300" class="dmg-bg"/>${side === 'sol' ? `<g transform="translate(600,0) scale(-1,1)">${BIKE_SHAPE}</g>` : BIKE_SHAPE}
+    <text x="12" y="24" class="dmg-lbl">${side === 'sol' ? '◀ ön · SOL' : 'SAĞ · ön ▶'}</text>
+    ${ms.map((m) => `<g class="dmg-m ${m.old ? 'old' : 'new'}"><circle cx="${m.x * 6}" cy="${m.y * 3}" r="13"/><text x="${m.x * 6}" y="${m.y * 3 + 5}" text-anchor="middle">${m.n}</text></g>`).join('')}</svg>`;
+}
+function signPad(el) {
+  const c = el.querySelector('canvas'); const ctx = c.getContext('2d'); let drawing = false; let dirty = false;
+  const fit = () => { const r = c.getBoundingClientRect(); const k = window.devicePixelRatio || 1; c.width = Math.round(r.width * k); c.height = Math.round(r.height * k); ctx.scale(k, k); ctx.lineWidth = 2.2; ctx.lineCap = 'round'; ctx.strokeStyle = '#111'; dirty = false; };
+  const pos = (e) => { const r = c.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+  c.addEventListener('pointerdown', (e) => { drawing = true; c.setPointerCapture(e.pointerId); const [x, y] = pos(e); ctx.beginPath(); ctx.moveTo(x, y); e.preventDefault(); });
+  c.addEventListener('pointermove', (e) => { if (!drawing) return; const [x, y] = pos(e); ctx.lineTo(x, y); ctx.stroke(); dirty = true; e.preventDefault(); });
+  const end = () => { drawing = false; }; c.addEventListener('pointerup', end); c.addEventListener('pointercancel', end);
+  el.querySelector('[data-clear]').onclick = () => { ctx.clearRect(0, 0, c.width, c.height); dirty = false; };
+  setTimeout(fit, 30);
+  // white background so the signature also prints on dark paper settings
+  return { value: () => { if (!dirty) return null; const o = document.createElement('canvas'); o.width = c.width; o.height = c.height; const g = o.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, o.width, o.height); g.drawImage(c, 0, 0); return o.toDataURL('image/png'); } };
+}
+const padHtml = (name, label) => `<div class="sigpad" data-pad="${name}"><span class="lbl">${label}</span><canvas></canvas><button type="button" class="btn xs ghost" data-clear>Temizle</button></div>`;
+async function handoverPage(rentalId, kind) {
+  const st = await GET('handovers/start', { rental_id: rentalId }); const r = st.rental; const isT = kind === 'teslim';
+  let marks = st.previous.map((d, i) => ({ ...d, n: i + 1, old: 1 })); let side = 'sağ';
+  const canAct = isT ? r.status === 'rezervasyon' : r.status === 'aktif';
+  setMain(`${head(`${isT ? 'Teslim tutanağı' : 'İade tutanağı'} · ${esc(r.contract_no)}`, `${esc(r.bike.code)} · ${esc(r.bike.brand || '')} ${esc(r.bike.model || '')} → ${esc(r.customer.company_name || r.customer.name)}${r.rider ? ' · ' + esc(r.rider.name) : ''}`, `<a class="btn sm" href="#/rentals/${r.id}">← Kiralamaya dön</a>`)}
+  <form id="hf" class="stack">
+  <div class="grid g-2">
+    ${card('Bisiklet', `<div class="grid-form">
+      <label class="field"><span>Kilometre *</span><input name="km" type="number" step="any" required value="${esc(r.bike.odometer_km ?? '')}"></label>
+      <label class="field"><span>Batarya %</span><input name="battery" type="number" min="0" max="100" value="${esc(r.bike.battery_level ?? '')}"></label>
+      <label class="field span2"><span>${isT ? 'Teslim edilen aksesuarlar' : 'Geri gelen aksesuarlar'}</span><input name="accessories" value="${esc(r.accessories || 'Kilit x1, şarj cihazı x1, yağmur brandası x1')}"></label>
+      <label class="field span2"><span>${isT ? 'Teslim alan kişi' : 'Getiren kişi'} *</span><input name="rider_name" required value="${esc(r.rider?.name || r.customer.name || '')}"></label>
+      <label class="field span2"><span>Not</span><textarea name="notes" rows="2" placeholder="${isT ? 'Örn. sürücüye kilit ve şarj anlatıldı' : 'Örn. temiz geldi; şarj aleti eksik'}"></textarea></label></div>`)}
+    ${card('Kontrol listesi', `<div class="checklist">${st.checklist_items.map((c, i) => `<div class="ck"><span>${esc(c)}</span><div class="seg">${['ok', 'sorun', 'yok'].map((v) => `<label><input type="radio" name="ck_${i}" value="${v}" ${v === 'ok' ? 'checked' : ''}><span>${v === 'ok' ? 'Sağlam' : v === 'sorun' ? 'Sorunlu' : 'Yok'}</span></label>`).join('')}</div></div>`).join('')}</div>`)}
+  </div>
+  ${card(`Hasar işaretleme <small class="muted">çizime dokunarak hasarın yerini işaretleyin${st.previous.length ? ' · gri işaretler önceki tutanaktan' : ''}</small>`, `<div class="dmg-wrap">
+    <div class="dmg-side seg"><label><input type="radio" name="dside" value="sağ" checked><span>Sağ taraf</span></label><label><input type="radio" name="dside" value="sol"><span>Sol taraf</span></label></div>
+    <div id="dmgfig"></div><div id="dmglist"></div></div>`)}
+  <div class="grid g-2">
+    ${card('Fotoğraflar', `<label class="field"><span>Bu tutanağa fotoğraf ekle (bisiklet, hasarlar, km göstergesi)</span><input type="file" id="hph" accept="image/*" capture="environment" multiple></label><p class="muted" id="hphn"></p>`)}
+    ${card('İmzalar', `<div class="sigs">${padHtml('rider', `${isT ? 'Teslim alan' : 'Getiren'} (sürücü / kiracı) *`)}${padHtml('staff', `Pedalla · ${esc(session.user.name)}`)}</div>`)}
+  </div>
+  ${photoCard('rental_id', r.id, false, 'Bu kiralamanın önceki fotoğrafları (teslim alma selfie\'si vb.)')}
+  <div class="card"><div class="card-f">${canAct ? `<label class="check"><input type="checkbox" name="go" checked> ${isT ? 'Kaydedince kiralamayı başlat (bisiklet teslim edildi)' : 'Kaydedince iade işlemine geç (depozito, hasar bedeli)'}</label>` : ''}<span class="grow"></span><a class="btn" href="#/rentals/${r.id}">Vazgeç</a><button class="btn primary">Tutanağı kaydet</button></div></div>
+  </form>`);
+  const pads = {}; main().querySelectorAll('[data-pad]').forEach((el) => { pads[el.dataset.pad] = signPad(el); });
+  const DT = ['çizik', 'ezik', 'kırık', 'eksik', 'kir / leke', 'diğer'];
+  const draw = () => {
+    $('#dmgfig').innerHTML = bikeSvg(marks, side, { id: 'dsvg' });
+    $('#dmglist').innerHTML = marks.length ? `<table class="tbl dmg-t"><thead><tr><th>#</th><th>Taraf</th><th>Tür</th><th>Not</th><th></th></tr></thead><tbody>${marks.map((m, i) => `<tr class="${m.old ? 'muted' : ''}"><td><span class="dmg-n ${m.old ? 'old' : ''}">${m.n}</span></td><td>${esc(m.side || 'sol')}</td>
+      <td>${m.old ? esc(m.type) + ' <small>(önceki)</small>' : `<select data-mt="${i}">${DT.map((x) => `<option ${x === m.type ? 'selected' : ''}>${x}</option>`).join('')}</select>`}</td>
+      <td>${m.old ? esc(m.note || '') : `<input data-mn="${i}" value="${esc(m.note || '')}" placeholder="Örn. ön çamurlukta 3 cm çizik">`}</td><td><button type="button" class="icon-btn sm" data-mx="${i}" title="Kaldır">✕</button></td></tr>`).join('')}</tbody></table>` : '<p class="muted">Hasar işaretlenmedi.</p>';
+    $('#dsvg').onclick = (e) => { const b = e.currentTarget.getBoundingClientRect(); marks.push({ x: Math.round(((e.clientX - b.left) / b.width) * 1000) / 10, y: Math.round(((e.clientY - b.top) / b.height) * 1000) / 10, side, type: 'çizik', note: '', old: 0 }); renum(); draw(); main().querySelector(`[data-mn="${marks.length - 1}"]`)?.focus(); };
+    main().querySelectorAll('[data-mt]').forEach((s) => s.onchange = () => { marks[s.dataset.mt].type = s.value; });
+    main().querySelectorAll('[data-mn]').forEach((s) => s.oninput = () => { marks[s.dataset.mn].note = s.value; });
+    main().querySelectorAll('[data-mx]').forEach((b) => b.onclick = () => { marks.splice(Number(b.dataset.mx), 1); renum(); draw(); });
+  };
+  const renum = () => marks.forEach((m, i) => { m.n = i + 1; });
+  main().querySelectorAll('[name=dside]').forEach((x) => x.onchange = () => { side = x.value; draw(); });
+  draw();
+  $('#hph').onchange = () => { $('#hphn').textContent = $('#hph').files.length ? `${$('#hph').files.length} fotoğraf seçildi, tutanakla birlikte yüklenecek` : ''; };
+  loadPhotos(main());
+  $('#hf').onsubmit = guard(async (e) => {
+    e.preventDefault(); const f = e.target; const d = readForm(f);
+    const rider_sign = pads.rider.value(); if (!rider_sign) throw new Error(`${isT ? 'Teslim alan' : 'Getiren'} kişinin imzası gerekli.`);
+    const checklist = {}; st.checklist_items.forEach((c, i) => { checklist[c] = f.querySelector(`[name=ck_${i}]:checked`)?.value; });
+    const btn = f.querySelector('button.primary'); btn.disabled = true;
+    try {
+      const h = await POST('handovers', { rental_id: r.id, kind, km: d.km, battery: d.battery, accessories: d.accessories, rider_name: d.rider_name, notes: d.notes, checklist, damages: marks, rider_sign, staff_sign: pads.staff.value(), activate: isT && !!d.go });
+      const files = [...$('#hph').files];
+      for (const file of files) { const p = await photoData(file); await POST('photos', { bike_id: r.bike_id, handover_id: h.id, kind: 'bisiklet', note: isT ? 'Teslim tutanağı' : 'İade tutanağı', ...p }); }
+      toast(isT ? (d.go ? 'Tutanak kaydedildi, kiralama başladı' : 'Teslim tutanağı kaydedildi') : 'İade tutanağı kaydedildi');
+      location.hash = !isT && d.go ? `#/rentals/${r.id}?ret=${h.id}` : `#/handovers/${h.id}`;
+    } finally { btn.disabled = false; }
+  });
+}
+function handoverDoc(h, lang) {
+  const t = docT(lang); const r = h.rental; const isT = h.kind === 'teslim';
+  const sides = ['sol', 'sağ'].filter((s) => h.damages.some((m) => (m.side || 'sol') === s));
+  return `<div class="doc">${docHeader(t[`ho_${h.kind}`], r.contract_no)}
+  <div class="doc-2">${dl([[t.ho_time, dDateTime(lang, h.created_at)], [t.customer, esc(r.customer_label)], [isT ? t.ho_sign_rider_teslim : t.ho_sign_rider_iade, esc(h.rider_name || r.rider_name || '')], [t.ho_staff, esc(h.staff_name || '')]])}
+  ${dl([[t.bike, `${esc(r.bike_code)} · ${esc(r.brand || '')} ${esc(r.model || '')}`], [t.frame_no, esc(r.frame_no)], [t.km, dNum(lang, h.km)], [t.battery, h.battery != null ? h.battery + ' %' : '—'], [t.accessories, esc(h.accessories || '—')]])}</div>
+  <h3>${t.checklist}</h3><table class="tbl doc-t ck-t"><thead><tr><th>${t.check}</th><th>${t.ok}</th><th>${t.issue}</th><th>${t.missing}</th></tr></thead><tbody>${h.checklist_items.map((c) => `<tr><td>${esc(tv(lang, c))}</td>${['ok', 'sorun', 'yok'].map((v) => `<td class="c">${h.checklist[c] === v ? '☒' : '☐'}</td>`).join('')}</tr>`).join('')}</tbody></table>
+  <h3>${t.ho_damage_h}</h3>${h.damages.length ? `<div class="dmg-print">${sides.map((s) => bikeSvg(h.damages, s, { small: true })).join('')}</div>
+    <table class="tbl doc-t"><thead><tr><th>${t.ho_no}</th><th>${t.ho_side}</th><th>${t.ho_kind}</th><th>${t.ho_note}</th><th></th></tr></thead><tbody>${h.damages.map((m) => `<tr><td>${m.n}</td><td>${esc(tv(lang, m.side || 'sol'))}</td><td>${esc(tv(lang, m.type))}</td><td>${esc(m.note || '')}</td><td>${m.old ? t.ho_old : `<b>${t.ho_new}</b>`}</td></tr>`).join('')}</tbody></table>` : `<p class="box">${t.ho_none}</p>`}
+  ${h.notes ? `<h3>${t.ho_notes}</h3><p class="box">${esc(h.notes)}</p>` : ''}
+  ${h.photos.length ? `<h3>${t.ho_photos}</h3><div class="ho-photos">${h.photos.map((p) => `<img src="data:image/jpeg;base64,${p.thumb}" alt="">`).join('')}</div>` : ''}
+  <p class="small">${t[`ho_confirm_${h.kind}`]}</p>
+  <div class="sign ho-sign"><div>${h.rider_sign ? `<img src="${h.rider_sign}" alt="">` : '<b></b>'}<span>${isT ? t.ho_sign_rider_teslim : t.ho_sign_rider_iade} · ${esc(h.rider_name || '')}</span></div><div>${h.staff_sign ? `<img src="${h.staff_sign}" alt="">` : '<b></b>'}<span>${t.ho_sign_staff} · ${esc(h.staff_name || '')}</span></div></div></div>`;
+}
+async function handoverViewPage(id) {
+  const h = await GET(`handovers/${id}`); let lang = docLangOf({ doc_lang: h.rental.doc_lang }, session.settings);
+  const nw = h.damages.filter((m) => !m.old).length;
+  setMain(`${head(`${h.kind === 'teslim' ? 'Teslim tutanağı' : 'İade tutanağı'} · ${esc(h.rental.contract_no)}`, `${dt(h.created_at)} · ${esc(h.staff_name || '')}${nw ? ` · <b class="${h.kind === 'iade' ? 't-danger' : ''}">${nw} yeni hasar işareti</b>` : ''}`,
+    `${langSw(lang)}<a class="btn sm" href="#/rentals/${h.rental_id}">← Kiralamaya dön</a>${can('admin', 'w') ? '<button class="btn sm danger ghost" id="del">Sil</button>' : ''}<button class="btn primary sm" id="print">Yazdır / PDF</button>`)}
+    <div class="card doc-card"><div class="card-b" id="docv">${handoverDoc(h, lang)}</div></div>`);
+  onLang((l) => { lang = l; $('#docv').innerHTML = handoverDoc(h, lang); });
+  $('#print').onclick = () => printHtml(handoverDoc(h, lang), `${h.kind === 'teslim' ? (lang === 'en' ? 'Handover' : 'Übergabe') : (lang === 'en' ? 'Return' : 'Rückgabe')} ${h.rental.contract_no}`);
+  $('#del')?.addEventListener('click', guard(async () => { if (await confirmBox('Tutanak silinsin mi? Fotoğrafları bisikletin geçmişinde kalır.')) { await DEL(`handovers/${id}`); location.hash = `#/rentals/${h.rental_id}`; } }));
+}
+// text for the return form from the new damage marks of a return protocol
+const damageText = (h) => h.damages.filter((m) => !m.old).map((m) => `${m.n}) ${m.side || 'sol'} · ${m.type}${m.note ? ': ' + m.note : ''}`).join('; ');
+
+// ======================================================================
+// Payment plan, bank statement import
+// ======================================================================
+const PLAN_BADGE = { 'ödendi': 'ödendi', 'gecikmiş': 'gecikmede', 'kısmi': 'kısmi', 'bekliyor': 'açık', 'planlandı': 'rezervasyon' };
+const planTable = (rows) => table(rows, [{ l: 'Dönem', f: (p) => `${date(p.start)} – ${date(p.end)}` }, { l: 'Son ödeme', f: (p) => (p.state === 'gecikmiş' ? `<b class="t-danger">${date(p.due)}</b>` : date(p.due)) },
+  { l: 'Fatura', f: (p) => (p.invoice_id ? `<a href="#/invoices/${p.invoice_id}">${esc(p.invoice_no)}</a>` : '<span class="muted">dönem başında kesilir</span>') }, { l: 'Tutar (brüt)', f: (p) => money(p.amount), cls: 'num' },
+  { l: 'Kalan', f: (p) => (p.balance > 0.005 && p.state !== 'planlandı' ? `<b>${money(p.balance)}</b>` : '—'), cls: 'num' }, { l: 'Durum', f: (p) => badge(PLAN_BADGE[p.state] || p.state, p.state) }], { empty: 'Ödeme planı yok (ücret girilmemiş)' });
+async function readTextFile(file) {
+  const buf = await file.arrayBuffer(); let txt = new TextDecoder('utf-8').decode(buf);
+  if (txt.includes('�')) txt = new TextDecoder('windows-1252').decode(buf); // German bank CSVs are often Latin-1
+  return txt;
+}
+function bankImportModal(after) {
+  const body = modal('Banka dökümü içe aktar', `<form class="grid-form" id="bif"><p class="span2 muted">Bankanızdan indirdiğiniz hesap hareketlerini (CSV) seçin veya satırları buraya yapıştırın. Açıklamasında fatura numarası (ör. F-2026-0012) geçen gelen ödemeler bulunur ve faturaya işlenir. Aynı satır ikinci kez kaydedilmez.</p>
+    <label class="field span2"><span>CSV dosyası</span><input type="file" name="f" accept=".csv,.txt,text/csv,text/plain"></label>
+    <label class="field span2"><span>veya satırları yapıştırın</span><textarea name="text" rows="6" placeholder="01.11.2026;Miete F-2026-0012 Lukas Weber;153,51"></textarea></label>
+    <div class="form-actions span2"><button class="btn primary">Eşleştir</button></div></form><div id="bires"></div>`, { wide: true });
+  let text = '';
+  body.querySelector('#bif').onsubmit = guard(async (e) => {
+    e.preventDefault(); const f = e.target.f.files[0]; text = f ? await readTextFile(f) : e.target.text.value;
+    if (!text.trim()) throw new Error('Dosya seçin veya satır yapıştırın.');
+    const x = await POST('bank-import', { text }); const ok = (s) => ['eşleşti', 'tutar farklı'].includes(s);
+    body.querySelector('#bires').innerHTML = `<p class="muted">${x.lines} satır okundu, ${x.rows.length} satırda fatura numarası bulundu.</p>${x.rows.length ? table(x.rows, [
+      { l: '', f: (r) => (ok(r.state) ? `<input type="checkbox" class="bi" value="${esc(r.hash)}" ${r.state === 'eşleşti' ? 'checked' : ''}>` : '') }, { l: 'Fatura', f: (r) => (r.invoice_id ? `<a href="#/invoices/${r.invoice_id}">${esc(r.invoice_no)}</a>` : esc(r.invoice_no)) },
+      { l: 'Müşteri', f: (r) => esc(r.customer || '—') }, { l: 'Tarih', f: (r) => date(r.date) }, { l: 'Tutar', f: (r) => money(r.amount), cls: 'num' }, { l: 'Fatura kalanı', f: (r) => money(r.balance), cls: 'num' },
+      { l: 'Durum', f: (r) => badge(r.state === 'eşleşti' ? 'ödendi' : ok(r.state) ? 'kısmi' : 'iptal', r.state) }, { l: 'Satır', f: (r) => `<small class="muted">${esc(r.line.slice(0, 90))}</small>` }]) + `<div class="form-actions"><button class="btn primary" id="bisave">Seçilenleri ödeme olarak kaydet</button></div>` : '<div class="empty">Fatura numarası geçen satır bulunamadı.</div>'}`;
+    body.querySelector('#bisave')?.addEventListener('click', guard(async () => {
+      const hashes = [...body.querySelectorAll('.bi:checked')].map((c) => c.value); if (!hashes.length) throw new Error('Kaydedilecek satır seçin.');
+      const y = await POST('bank-import', { text, commit: true, hashes }); closeModal(); toast(`${y.booked} ödeme kaydedildi`); after?.();
+    }));
+  });
+}
+
+// ======================================================================
+// Overdue payments (red list) with automatic reminders
+// ======================================================================
+const LEVEL_TXT = (n) => (n >= 3 ? `${n}. hatırlatma (son)` : n ? `${n}. hatırlatma` : 'vadesi geçti');
+async function overduePage() {
+  const d = await GET('overdue'); const fw = can('finance', 'w'); const a = d.auto;
+  setMain(`${head('Geciken ödemeler', 'Vadesi geçmiş faturalar müşteri bazında, en uzun gecikme en üstte.', `${fw ? '<button class="btn sm" id="run">Hatırlatmaları şimdi çalıştır</button>' : ''}<a class="btn sm" href="#/invoices?tab=overdue">Fatura listesi</a>`)}
+  <div class="kpis">${kpi('Geciken toplam', money(d.total), `${d.count} fatura · ${d.groups.length} müşteri`, d.total ? 'danger hero' : 'hero')}
+    ${kpi('7 gün içinde vadesi dolacak', money(d.soon.reduce((x, i) => x + i.balance, 0)), `${d.soon.length} fatura`, d.soon.length ? 'warn' : '')}
+    ${kpi('Otomatik hatırlatma', a.reminders ? 'Açık' : 'Kapalı', a.reminders ? `vadeden ${a.before} gün önce · sonra ${d.levels.join(', ')}. gün` : 'Ayarlar\'dan açılabilir', a.reminders ? '' : 'warn', can('admin') ? '#/settings' : '')}
+    ${kpi('Son otomatik çalışma', d.last_run ? date(d.last_run) : '—', a.billing ? 'dönem faturaları otomatik' : 'dönem faturaları elle')}</div>
+  <div class="alert info">Bireysel kiracılara hatırlatmalar sürücü ekranına ve Pedalla Android uygulamasına bildirim olarak otomatik gider. Firmalara giden hatırlatma ve WhatsApp mesajı otomatik gönderilemez; aşağıdaki WhatsApp düğmesi mesajı hazır açar, siz gönderirsiniz.${a.late_fee ? ` <span>Gecikme bedeli günde ${money(a.fee_per_day)} olarak otomatik ekleniyor.</span>` : ''}</div>
+  ${d.groups.length ? d.groups.map((g) => `<section class="card od-card lv${Math.min(3, g.level)}"><div class="card-b">
+    <div class="od-h"><div><a href="#/customers/${g.customer_id}"><b>${esc(g.customer)}</b></a> <span class="badge b-danger">${g.max_days} gün</span> <span class="badge b-${g.level >= 3 ? 'danger' : 'warn'}">${LEVEL_TXT(g.level)}</span> ${g.type === 'kurumsal' ? '<span class="badge b-muted">firma</span>' : ''}
+      <small class="muted">${g.riders.map((x) => `<a href="#/riders/${x.id}">${esc(x.name)}</a>${x.portal ? '' : ' <span>(sürücü ekranı kapalı)</span>'}`).join(', ')}${g.bikes.length ? ' · ' + g.bikes.map(esc).join(', ') : ''}${g.phone ? ` · <a href="tel:${esc(g.phone)}">${esc(g.phone)}</a>` : ''}${g.last_reminder_at ? ` · son hatırlatma ${ago(g.last_reminder_at)}` : ' · henüz hatırlatılmadı'}</small></div>
+      <div class="od-sum"><b class="t-danger">${money(g.total)}</b></div></div>
+    ${table(g.invoices, [{ l: 'Fatura', f: (i) => `<a href="#/invoices/${i.id}">${esc(i.invoice_no)}</a>${i.contract_no ? ` <small class="muted">${esc(i.contract_no)}</small>` : ''}` }, { l: 'Vade', f: (i) => date(i.due_date) }, { l: 'Gecikme', f: (i) => `<b class="t-danger">${i.days} gün</b>` },
+      { l: 'Kalan', f: (i) => money(i.balance), cls: 'num' }, { l: 'Hatırlatma', f: (i) => `${i.reminders_sent || 0}×${i.last_reminder_at ? ` <small class="muted">${ago(i.last_reminder_at)}</small>` : ''}` },
+      ...(fw ? [{ l: '', f: (i) => `<span class="od-act">${waBtn(i, true)}${i.rider_id && g.type === 'bireysel' ? `<button class="btn xs" data-prem="${i.id}" title="Sürücü ekranına ve telefona hatırlatma">Uygulamaya hatırlat</button>` : ''}${i.suggested_late_fee > (i.late_fee || 0) ? `<button class="btn xs ghost" data-fee="${i.id}" data-amt="${i.suggested_late_fee}">+ ${money(i.suggested_late_fee)} gecikme</button>` : ''}</span>` }] : [])])}
+  </div></section>`).join('') : '<div class="empty big">Geciken ödeme yok 🎉</div>'}
+  ${d.soon.length ? card('Yakında vadesi dolacaklar (7 gün)', table(d.soon, [{ l: 'Fatura', f: (i) => `<a href="#/invoices/${i.id}">${esc(i.invoice_no)}</a>` }, { k: 'customer', l: 'Müşteri' }, { l: 'Sürücü', f: (i) => esc(i.rider_name || '—') }, { l: 'Vade', f: (i) => date(i.due_date) }, { l: 'Tutar', f: (i) => money(i.balance), cls: 'num' }])) : ''}`);
+  bindWa(main(), route);
+  $('#run')?.addEventListener('click', guard(async () => { const x = await POST('daily'); toast(`${x.invoices} fatura, ${x.messages} hatırlatma${x.late_fees ? `, ${x.late_fees} gecikme bedeli` : ''}`); route(); }));
+  main().querySelectorAll('[data-prem]').forEach((b) => b.onclick = guard(async () => { await POST(`invoices/${b.dataset.prem}/remind`, { channel: 'sürücü ekranı' }); toast('Hatırlatma sürücü ekranına gönderildi'); route(); }));
+  main().querySelectorAll('[data-fee]').forEach((b) => b.onclick = guard(async () => { await POST(`invoices/${b.dataset.fee}/late-fee`, { amount: b.dataset.amt }); toast('Gecikme bedeli eklendi'); route(); }));
+}
+
+// ======================================================================
+// Management summary (yönetici özeti)
+// ======================================================================
+async function summaryPage(q) {
+  const d = await GET('summary', q.month ? { month: q.month } : {}); const k = d.kpi;
+  const [yy, mm] = d.month.split('-'); const mLabel = `${MONTHS[uiLang][Number(mm) - 1]} ${yy}`;
+  const trend = d.trend.map((x) => ({ ...x, label: MONTHS[uiLang][Number(x.m.slice(5)) - 1] }));
+  const per = [...d.per_bike].sort((a, b) => b.profit - a.profit || b.net_total - a.net_total);
+  setMain(`${head('Yönetici özeti', `${mLabel} · ${d.bikes} aktif filo bisikleti${d.to > todayISO() ? ' · ay devam ediyor' : ''}`, `<input type="month" id="mon" value="${d.month}" class="sm-input"><button class="btn sm" id="print">Yazdır</button>`)}
+  <div id="sumv">
+  <div class="kpis">
+    ${kpi('Gelir (net)', money(k.revenue), `kira ${money(k.revenue_rental)} · servis ${money(k.revenue_service)}`, 'hero')}
+    ${kpi('Tahsil edilen', money(k.collected), 'bu ay gelen ödemeler')}
+    ${kpi('Doluluk', `%${k.occupancy}`, meter(k.occupancy) + `şu an ${k.rented_now} bisiklet kirada`)}
+    ${kpi('Brüt kâr', money(k.profit), `parça ve bisiklet giderleri ${money(k.costs)}`, k.profit < 0 ? 'danger' : '')}
+    ${kpi('Aylık tekrarlayan gelir', money(k.mrr), 'aktif sözleşmeler (net)')}
+    ${kpi('Açık alacak', money(k.receivables), `${money(k.overdue)} gecikmiş`, k.overdue ? 'danger' : '', '#/overdue')}
+    ${kpi('Boşta bisiklet', k.idle_now, 'müsait durumda bekliyor', k.idle_now ? 'warn' : '', '#/bikes?status=müsait')}
+    ${kpi('Kiralamalar', `+${k.new_rentals} / −${k.ended_rentals}`, 'bu ay başlayan / biten')}
+  </div>
+  <div class="grid g-2">
+    ${card('Gelir ve tahsilat (son 6 ay, net)', barChart(trend, [{ k: 'revenue', l: 'Faturalanan', c: 'var(--brand)' }, { k: 'collected', l: 'Tahsil edilen', c: 'var(--slate)' }]))}
+    ${card('Doluluk oranı (son 6 ay)', barChart(trend, [{ k: 'occupancy', l: 'Doluluk %', c: 'var(--brand)' }], { fmt: (v) => `%${Math.round(v)}` }))}
+  </div>
+  <div class="grid g-2">
+    ${card(`Boşta bekleyen bisikletler <span class="cnt">${d.idle.length}</span>`, table(d.idle, [{ l: 'Bisiklet', f: (b) => `<b>${esc(b.code)}</b> ${esc(b.model || '')}` }, { l: 'Tip', f: (b) => esc(b.type || '—') }, { l: 'Boşta', f: (b) => `<b class="${b.days > 14 ? 't-danger' : b.days > 7 ? 't-warn' : ''}">${b.days} gün</b>`, cls: 'num' }, { l: 'Son kiralama bitişi', f: (b) => date(b.since) }], { link: (b) => `#/bikes/${b.id}`, empty: 'Boşta bisiklet yok, filo tam kullanımda' }))}
+    ${card('Tip bazında doluluk', table(d.by_type, [{ k: 'type', l: 'Tip' }, { l: 'Bisiklet', f: (x) => x.bikes, cls: 'num' }, { l: 'Şu an kirada', f: (x) => x.rented_now, cls: 'num' }, { l: 'Bu ay doluluk', f: (x) => `${meter(x.occupancy)} %${x.occupancy}` }]))}
+  </div>
+  ${card('Bisiklet başına kâr', table(per, [{ l: 'Bisiklet', f: (b) => `<b>${esc(b.code)}</b> <small class="muted">${esc(b.model || '')}</small>` }, { l: 'Durum', f: (b) => badge(b.status) }, { l: 'Kirada (gün)', f: (b) => `${b.rented_days}/${d.days}`, cls: 'num' }, { l: 'Doluluk', f: (b) => `%${b.occupancy}`, cls: 'num' },
+    { l: 'Bu ay gelir', f: (b) => money(b.revenue), cls: 'num' }, { l: 'Bu ay gider', f: (b) => (b.cost ? money(b.cost) : '—'), cls: 'num' }, { l: 'Bu ay kâr', f: (b) => `<b class="${b.profit < 0 ? 't-danger' : ''}">${money(b.profit)}</b>`, cls: 'num' },
+    { l: 'Toplam net', f: (b) => money(b.net_total), cls: 'num' }, { l: 'Alış maliyetini çıkarma', f: (b) => (b.payback == null ? '—' : `${meter(b.payback)} %${b.payback}`) }], { link: (b) => `#/bikes/${b.id}` }), 'flush')}
+  <p class="muted small">Gelir: o ay kesilen faturaların net tutarı (iptaller hariç). Gider: o ay servise giren bisikletlerde kullanılan parçaların alış maliyeti ve bisiklete yazılan giderler; personel işçiliği dahil değil. Doluluk: kirada geçen bisiklet-günü / filodaki bisiklet-günü (hizmet dışı ve kayıp bisikletler hariç).</p>
+  </div>`);
+  $('#mon').onchange = (e) => { location.hash = `#/summary?month=${e.target.value}`; };
+  $('#print').onclick = () => printHtml(`<div class="doc sum-print"><h2>${esc(session.settings.company_name || 'Pedalla')} · Yönetici özeti · ${mLabel}</h2>${$('#sumv').innerHTML}</div>`, `Pedalla ${d.month}`);
+}
+
+// ======================================================================
+// Messages to a rider (rider screen inbox + phone notification in the Android app)
+// ======================================================================
+const msgList = (list) => (list.length ? `<ul class="msg-list">${list.map((m) => `<li class="l-${m.level}"><div><b>${esc(m.title)}</b><p>${esc(m.body)}</p><small class="muted">${dt(m.created_at)}${m.user_name ? ' · ' + esc(m.user_name) : ' · otomatik'} · ${m.read_at ? `okundu ${ago(m.read_at)}` : m.pushed_at ? 'telefona iletildi' : 'iletilmeyi bekliyor'}</small></div></li>`).join('')}</ul>` : '<p class="muted">Henüz mesaj yok. Fotoğraf isteği, ödeme hatırlatması, servis ve talep cevapları burada da görünür.</p>');
+function riderMessageModal(r, after) {
+  const body = modal(`Mesaj gönder · ${r.name}`, `<form class="grid-form"><p class="span2 muted">Mesaj sürücü ekranındaki gelen kutusuna düşer; Pedalla Android uygulaması kuruluysa telefona bildirim olarak da gelir (en geç ~15 dakika içinde).${r.portal_active && r.portal_email ? '' : ' <b class="t-warn">Bu sürücünün sürücü ekranı girişi kapalı.</b>'}</p>
+    <label class="field span2"><span>Başlık (isteğe bağlı)</span><input name="title" maxlength="80" placeholder="Pedalla"></label>
+    <label class="field span2"><span>Mesaj *</span><textarea name="text" rows="4" maxlength="600" required placeholder="Örn. Yarın 10:00'da bisikleti bakım için getirebilir misiniz?"></textarea></label>
+    <div class="form-actions span2"><button class="btn primary">Gönder</button></div></form>`);
+  body.querySelector('form').onsubmit = guard(async (e) => { e.preventDefault(); await POST(`riders/${r.id}/message`, readForm(e.target)); closeModal(); toast('Mesaj gönderildi'); after?.(); });
+}
+
 // ---------- router ----------
 const ROUTES = [
   [/^$/, () => dashboardPage(), 'dashboard'],
@@ -1151,7 +1493,11 @@ const ROUTES = [
   [/^parts\/order$/, () => orderListPage(), 'stock'],
   [/^rentals$/, (m, q) => rentalsPage(q), 'rentals'],
   [/^rentals\/new$/, (m, q) => newRentalPage(q), 'rentals'],
-  [/^rentals\/(\d+)$/, (m) => rentalPage(m[1]), 'rentals'],
+  [/^rentals\/(\d+)$/, (m, q) => rentalPage(m[1], q), 'rentals'],
+  [/^rentals\/(\d+)\/handover\/(teslim|iade)$/, (m) => handoverPage(m[1], m[2]), 'rentals'],
+  [/^handovers\/(\d+)$/, (m) => handoverViewPage(m[1]), 'rentals'],
+  [/^overdue$/, () => overduePage(), 'finance'],
+  [/^summary$/, (m, q) => summaryPage(q), 'reports'],
   [/^rentals\/(\d+)\/contract$/, (m) => contractPage(m[1]), 'rentals'],
   [/^customers\/(\d+)$/, (m) => customerPage(m[1]), 'customers'],
   [/^riders\/(\d+)$/, (m) => riderPage(m[1]), 'customers'],

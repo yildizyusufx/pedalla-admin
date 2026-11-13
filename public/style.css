@@ -371,3 +371,56 @@ tr.off td { opacity: .45; }
 .bt-img { aspect-ratio: 4 / 3; border-radius: 8px; background: var(--surface-2, #f4f5f7); display: grid; place-items: center; overflow: hidden; } .bt-img img { width: 100%; height: 100%; object-fit: contain; background: #fff; }
 .bt-acts { display: flex; gap: 6px; flex-wrap: wrap; }
 .row-acts { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+
+/* ---- bike photo history (timeline) ---- */
+.ptl-req { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px; margin-bottom: 12px; border: 1px dashed var(--warn); border-radius: 12px; background: color-mix(in srgb, var(--warn) 8%, transparent); }
+.ptl-req .grow { flex: 1; min-width: 180px; } .ptl-req b { display: block; font-size: 13.5px; } .ptl-req small { color: var(--muted); font-size: 12px; }
+.ptl-req-ic { font-size: 18px; }
+.ptl-line { list-style: none; margin: 0; padding: 0 0 0 22px; position: relative; }
+.ptl-line::before { content: ''; position: absolute; left: 7px; top: 6px; bottom: 6px; width: 2px; background: var(--line); border-radius: 2px; }
+.ptl-day { margin: 4px 0 10px -22px; } .ptl-day span { display: inline-block; font-size: 12px; font-weight: 700; letter-spacing: .02em; color: var(--ink-2); background: var(--surface-2); border: 1px solid var(--line); padding: 3px 10px; border-radius: 99px; position: relative; }
+.ptl-ev { position: relative; margin: 0 0 16px; }
+.ptl-dot { position: absolute; left: -20px; top: 4px; width: 12px; height: 12px; border-radius: 50%; background: var(--slate, #7A929E); box-shadow: 0 0 0 3px var(--surface); }
+.ptl-ev.s-teslim-alma .ptl-dot { background: var(--brand, #EB4056); } .ptl-ev.s-talep .ptl-dot { background: #e3a32a; } .ptl-ev.s-personel .ptl-dot { background: #34495e; }
+.ptl-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; } .ptl-h b { font-size: 13.5px; } .ptl-h small { color: var(--muted); font-size: 12px; }
+.ptl-note { margin: 4px 0 0; font-size: 12.5px; color: var(--ink-2); }
+.ptl-imgs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.ptl-img { position: relative; width: 104px; height: 104px; padding: 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--surface-2); cursor: zoom-in; }
+.ptl-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ptl-img i { position: absolute; left: 6px; bottom: 6px; font-style: normal; font-size: 10.5px; font-weight: 700; color: #fff; background: rgba(0, 0, 0, .55); padding: 1px 6px; border-radius: 99px; }
+.ptl-img.selfie { border-radius: 50%; width: 88px; height: 88px; margin: 8px; } .ptl-img.selfie i { left: 50%; transform: translateX(-50%); bottom: 4px; }
+.ptl-more { margin-top: 4px; }
+.ph-full { margin: 0; } .ph-full img { display: block; max-width: 100%; max-height: 70vh; margin: 0 auto; border-radius: 10px; } .ph-full figcaption { text-align: center; margin-top: 8px; font-size: 12.5px; }
+@media (max-width: 600px) { .ptl-img { width: 84px; height: 84px; } .ptl-img.selfie { width: 72px; height: 72px; margin: 6px; } }
+
+/* ---- hand-over / return protocol ---- */
+.dmg-wrap { display: grid; gap: 10px; }
+.dmg-side { justify-self: start; }
+.dmg-svg { width: 100%; max-width: 760px; height: auto; display: block; border-radius: 12px; cursor: crosshair; touch-action: manipulation; }
+.dmg-svg.sm { max-width: 330px; cursor: default; border: 1px solid #ddd; }
+.dmg-bg { fill: var(--surface-2); }
+.dmg-svg .bk { stroke: var(--ink-2); stroke-width: 5; } .dmg-svg .bk-box { fill: color-mix(in srgb, var(--slate, #7a929e) 14%, transparent); } .dmg-svg .bk-thick { stroke-width: 9; }
+.dmg-svg .bk-bat { fill: color-mix(in srgb, var(--brand) 25%, transparent); } .dmg-svg .bk-fender { stroke-width: 3; opacity: .6; }
+.dmg-lbl { font: 700 14px system-ui, sans-serif; fill: var(--muted); letter-spacing: .04em; }
+.dmg-m circle { fill: var(--brand); stroke: #fff; stroke-width: 3; } .dmg-m.old circle { fill: #8a9aa3; }
+.dmg-m text { font: 800 14px system-ui, sans-serif; fill: #fff; pointer-events: none; }
+.dmg-t td { vertical-align: middle; } .dmg-t input, .dmg-t select { width: 100%; min-width: 110px; }
+.dmg-n { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--brand); color: #fff; font-weight: 800; font-size: 12px; } .dmg-n.old { background: #8a9aa3; }
+.sigs { display: grid; gap: 14px; }
+.sigpad { position: relative; display: grid; gap: 6px; }
+.sigpad canvas { width: 100%; height: 150px; border: 1.5px dashed var(--line); border-radius: 12px; background: #fff; touch-action: none; cursor: crosshair; }
+.sigpad [data-clear] { position: absolute; right: 8px; bottom: 8px; }
+.dmg-print { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; } .dmg-print .dmg-bg { fill: #fafafa; } .dmg-print .bk { stroke: #333; }
+.ho-photos { display: flex; flex-wrap: wrap; gap: 6px; } .ho-photos img { width: 92px; height: 92px; object-fit: cover; border-radius: 6px; border: 1px solid #ddd; }
+.ho-sign div { min-height: 70px; } .ho-sign img { height: 64px; max-width: 100%; object-fit: contain; align-self: flex-start; margin-bottom: 4px; }
+/* ---- overdue list ---- */
+.od-card { border-left: 5px solid var(--warn); } .od-card.lv2, .od-card.lv3 { border-left-color: var(--danger); }
+.od-h { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; margin-bottom: 8px; } .od-h small { display: block; margin-top: 4px; }
+.od-sum b { font-size: 22px; white-space: nowrap; } .od-act { display: inline-flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+/* ---- messages to riders ---- */
+.msg-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; max-height: 420px; overflow: auto; }
+.msg-list li { padding: 10px 12px; border-radius: 10px; background: var(--surface-2); border-left: 4px solid var(--info); } .msg-list li.l-warn { border-left-color: var(--warn); } .msg-list li.l-danger { border-left-color: var(--danger); } .msg-list li.l-ok { border-left-color: var(--ok); }
+.msg-list p { margin: 2px 0 4px; }
+.ro-val { padding: 8px 0; } .sm-input { height: 32px; border-radius: 8px; border: 1px solid var(--line); padding: 0 8px; background: var(--surface); color: var(--ink); }
+.sum-print .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; } .sum-print .kpi { border: 1px solid #ddd; padding: 8px; border-radius: 6px; display: flex; flex-direction: column; }
+@media (max-width: 760px) { .od-h { flex-direction: column; } .sigpad canvas { height: 130px; } }

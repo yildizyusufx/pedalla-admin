@@ -75,6 +75,33 @@ CREATE TABLE IF NOT EXISTS portal_requests (
 CREATE TABLE IF NOT EXISTS bike_costs (
   id INTEGER PRIMARY KEY, bike_id INTEGER NOT NULL REFERENCES bikes(id), date TEXT NOT NULL, category TEXT, amount REAL NOT NULL,
   description TEXT, user_id INTEGER, created_at TEXT DEFAULT (datetime('now')));
+-- bike photo history: pick-up selfies, bike photos sent from the rider screen (on request or at pick-up) and staff photos.
+-- data = full JPEG (resized in the browser), thumb = small JPEG for the timeline
+CREATE TABLE IF NOT EXISTS bike_photos (
+  id INTEGER PRIMARY KEY, bike_id INTEGER NOT NULL REFERENCES bikes(id), rider_id INTEGER, rental_id INTEGER, request_id INTEGER,
+  kind TEXT DEFAULT 'bisiklet', stage TEXT, mime TEXT, size INTEGER, data TEXT, thumb TEXT, note TEXT, lat REAL, lng REAL,
+  uploaded_by INTEGER, created_at TEXT DEFAULT (datetime('now')));
+CREATE INDEX IF NOT EXISTS ix_photo_bike ON bike_photos(bike_id, id);
+CREATE INDEX IF NOT EXISTS ix_photo_rider ON bike_photos(rider_id, id);
+CREATE INDEX IF NOT EXISTS ix_photo_rental ON bike_photos(rental_id, id);
+-- photo requests from staff to the rider of a bike ("bisikletin fotoğrafını çek")
+CREATE TABLE IF NOT EXISTS photo_requests (
+  id INTEGER PRIMARY KEY, bike_id INTEGER NOT NULL REFERENCES bikes(id), rider_id INTEGER, rental_id INTEGER, kind TEXT DEFAULT 'bisiklet',
+  note TEXT, status TEXT DEFAULT 'bekliyor', requested_by INTEGER, done_at TEXT, created_at TEXT DEFAULT (datetime('now')));
+CREATE INDEX IF NOT EXISTS ix_preq_rider ON photo_requests(rider_id, status);
+-- messages to riders: shown in the rider screen inbox and sent as phone notifications by the Android app.
+-- code + params are turned into TR/DE/EN text when read (shared/messages.js), dedupe stops the daily job from sending twice
+CREATE TABLE IF NOT EXISTS rider_messages (
+  id INTEGER PRIMARY KEY, rider_id INTEGER NOT NULL, code TEXT NOT NULL, params TEXT, link TEXT, level TEXT DEFAULT 'info', dedupe TEXT,
+  created_by INTEGER, created_at TEXT DEFAULT (datetime('now')), read_at TEXT, pushed_at TEXT);
+CREATE INDEX IF NOT EXISTS ix_msg_rider ON rider_messages(rider_id, id);
+CREATE UNIQUE INDEX IF NOT EXISTS ix_msg_dedupe ON rider_messages(dedupe);
+-- hand-over and return protocols (Übergabe-/Rückgabeprotokoll): km, battery, checklist, damage marks on a bike drawing, two signatures
+CREATE TABLE IF NOT EXISTS handovers (
+  id INTEGER PRIMARY KEY, rental_id INTEGER NOT NULL REFERENCES rentals(id), bike_id INTEGER NOT NULL REFERENCES bikes(id), kind TEXT NOT NULL,
+  km REAL, battery INTEGER, checklist TEXT, damages TEXT, accessories TEXT, notes TEXT, rider_name TEXT, rider_sign TEXT, staff_sign TEXT,
+  staff_id INTEGER, created_at TEXT DEFAULT (datetime('now')));
+CREATE INDEX IF NOT EXISTS ix_handover_rental ON handovers(rental_id, id);
 CREATE TABLE IF NOT EXISTS audit_log (
   id INTEGER PRIMARY KEY, ts TEXT DEFAULT (datetime('now')), user_id INTEGER, action TEXT, entity TEXT, entity_id INTEGER, details TEXT);
 `;
@@ -88,11 +115,15 @@ export const INTAKE_CHECKLIST = [
 // Columns added after the first release. createApi adds any that are missing (works on existing databases too).
 export const MIGRATIONS = {
   riders: { self_registered: 'INTEGER DEFAULT 0', last_lat: 'REAL', last_lng: 'REAL', last_loc_at: 'TEXT', last_loc_acc: 'REAL', portal_email: 'TEXT', portal_password_hash: 'TEXT', portal_active: 'INTEGER DEFAULT 0', portal_last_login: 'TEXT', lang: 'TEXT', id_type: 'TEXT', id_expiry: 'TEXT', birth_date: 'TEXT', nationality: 'TEXT', address: 'TEXT', license_no: 'TEXT', id_checked: 'INTEGER DEFAULT 0' },
-  service_orders: { brought_by_rider_id: 'INTEGER' },
+  service_orders: { brought_by_rider_id: 'INTEGER', report_id: 'INTEGER', urgent: 'INTEGER DEFAULT 0' },
   customers: { doc_lang: "TEXT DEFAULT 'de'" },
   deposits: { method: 'TEXT' },
   users: { lang: 'TEXT' },
-  portal_requests: { bike_type: 'TEXT', period: 'TEXT', duration: 'INTEGER' },
+  portal_requests: { bike_type: 'TEXT', period: 'TEXT', duration: 'INTEGER', category: 'TEXT', rideable: 'INTEGER' },
   bikes: { service_interval_days: 'INTEGER', uid: 'TEXT', lock_requested: 'INTEGER DEFAULT 0', stolen_at: 'TEXT' },
+  rentals: { pay_method: 'TEXT', return_notice_date: 'TEXT', return_notice_at: 'TEXT' },
+  invoices: { pay_link: 'TEXT', pay_provider: 'TEXT', pay_ref: 'TEXT' },
+  payments: { import_hash: 'TEXT', provider: 'TEXT' },
+  bike_photos: { handover_id: 'INTEGER', service_id: 'INTEGER' },
 };
 export const ID_TYPES = ['Kimlik kartı (Personalausweis)', 'Pasaport', 'Oturum izni (Aufenthaltstitel)', 'Ehliyet'];

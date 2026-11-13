@@ -1,6 +1,8 @@
 // Pedalla Admin – API core. Runs on Node (node:sqlite) and in the browser demo (sql.js).
 // db adapter: { all(sql, p), get(sql, p), run(sql, p) -> {changes, lastId}, exec(sql), tx(fn) }
-import { RESOURCES, DEFAULT_ROLE_PERMS, DEFAULT_SETTINGS, PERMS, ROLES, REQUEST_TYPES, RIDER_REQUIRED_DOCS, ID_TYPES, enabledPeriods } from './meta.js';
+import { RESOURCES, DEFAULT_ROLE_PERMS, DEFAULT_SETTINGS, PERMS, ROLES, REQUEST_TYPES, RIDER_REQUIRED_DOCS, ID_TYPES, FAULT_CATEGORIES, DAMAGE_TYPES, enabledPeriods } from './meta.js';
+import { renderMessage } from './messages.js';
+import { provider, amountsIn, parseDate, lineHash } from './payments.js';
 import { SCHEMA, INTAKE_CHECKLIST, MIGRATIONS } from './schema.js';
 
 export class ApiError extends Error { constructor(status, msg) { super(msg); this.status = status; } }
@@ -17,7 +19,7 @@ export function addPeriod(d, period, n = 1) {
 }
 const daysBetween = (a, b) => Math.round((new Date(b + 'T00:00:00Z') - new Date(a + 'T00:00:00Z')) / 86400000);
 
-export async function createApi(db, { hashPassword, verifyPassword, randomToken }) {
+export async function createApi(db, { hashPassword, verifyPassword, randomToken, cronSecret = null }) {
   await db.exec(SCHEMA);
   for (const [table, cols] of Object.entries(MIGRATIONS)) {
     const have = new Set((await db.all(`PRAGMA table_info(${table})`)).map((c) => c.name));
@@ -156,6 +158,8 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
     if (res === 'portal_requests' && body.status !== undefined) { sets.push('handled_by=?', 'handled_at=?'); vals.push(user?.id ?? null, nowTs()); }
     if (sets.length) await db.run(`UPDATE ${res} SET ${sets.join(',')} WHERE id=?`, [...vals, id]);
     if (res === 'invoices') await recalcInvoice(id);
+    if (res === 'portal_requests' && body.status && body.status !== before.status && ['onaylandı', 'reddedildi', 'tamamlandı'].includes(body.status) && before.rider_id)
+      await notifyRider(before.rider_id, 'request_answer', { type: before.type, status: body.status, date: body.preferred_date ?? before.preferred_date, note: body.admin_note ?? before.admin_note ?? '' }, { link: 'req', level: body.status === 'reddedildi' ? 'warn' : 'ok', user });
     if (res === 'bikes') {
       const intervalChanged = body.service_interval_days !== undefined && Number(body.service_interval_days || 0) !== Number(before.service_interval_days || 0);
       const dateTyped = body.next_service_date !== undefined && body.next_service_date && body.next_service_date !== before.next_service_date;
@@ -182,7 +186,7 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
     if (res === 'users' && user.id === Number(id)) err(409, 'Kendi kullanıcınızı silemezsiniz.');
     if (res === 'payments') { await db.run('DELETE FROM cash_moves WHERE payment_id=?', [id]); await db.run('DELETE FROM payments WHERE id=?', [id]); await recalcInvoice(row.invoice_id); await audit(user, 'silme', res, id); return { ok: true }; }
     // linked records block the delete (checked here too, because Turso does not enforce foreign keys)
-    const cleanup = { bikes: ['bike_locations', 'bike_costs'], riders: ['portal_requests'] }[res] || [];
+    const cleanup = { bikes: ['bike_locations', 'bike_costs', 'bike_photos', 'photo_requests'], riders: ['portal_requests'] }[res] || [];
     for (const [t, col] of await refsTo(res)) {
       if (cleanup.includes(t)) continue;
       if (await db.get(`SELECT 1 FROM ${t} WHERE ${col}=? LIMIT 1`, [id])) err(409, `Bu kayda bağlı ${(RESOURCES[t]?.label || t).toLocaleLowerCase('tr')} olduğu için silinemiyor.`);
@@ -251,6 +255,390 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
     await audit(user, 'belge', own[0], Number(b.owner_id), `${b.doc_type || ''} ${b.name || ''}`);
     return r.lastId;
   }
+  // ---------- bike photo history (pick-up selfies, photos on request, staff photos) ----------
+  // Photos are resized in the browser (full ≈ 1600 px JPEG + ≈ 320 px thumbnail) and stored base64 in the database,
+  // like documents: Vercel has no lasting file storage. Lists only ever send thumbnails; the full photo is fetched on click.
+  const PHOTO_KINDS = ['bisiklet', 'selfie'];
+  const PHOTO_REQ_KINDS = ['bisiklet', 'selfie', 'selfie + bisiklet'];
+  const PICKUP_BIKE_PHOTOS = 2; // pick-up check: one selfie + at least this many bike photos
+  const jpeg = (d, max, label) => {
+    const m = /^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/.exec(String(d || ''));
+    if (!m) err(400, `${label} JPEG olmalı.`);
+    const size = Math.floor(m[1].length * 3 / 4);
+    if (size > max) err(413, `${label} çok büyük.`);
+    return [m[1], size];
+  };
+  async function addPhoto(p, user) {
+    const [data, size] = jpeg(p.data, 2.5 * 1048576, 'Fotoğraf');
+    const thumb = p.thumb ? jpeg(p.thumb, 120 * 1024, 'Küçük görsel')[0] : null;
+    const num = (v) => (v === '' || v == null || !Number.isFinite(Number(v)) ? null : Number(v));
+    const x = await db.run('INSERT INTO bike_photos(bike_id,rider_id,rental_id,request_id,handover_id,service_id,kind,stage,mime,size,data,thumb,note,lat,lng,uploaded_by,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      [Number(p.bike_id), p.rider_id || null, p.rental_id || null, p.request_id || null, p.handover_id || null, p.service_id || null, PHOTO_KINDS.includes(p.kind) ? p.kind : 'bisiklet', p.stage || null, 'image/jpeg', size, data, thumb,
+        String(p.note || '').slice(0, 500) || null, num(p.lat), num(p.lng), user?.id ?? null, nowTs()]);
+    return x.lastId;
+  }
+  // a request is done once every asked kind has arrived
+  async function settlePhotoRequest(id) {
+    const q = await db.get('SELECT * FROM photo_requests WHERE id=?', [id]); if (!q || q.status !== 'bekliyor') return;
+    const kinds = new Set((await db.all('SELECT DISTINCT kind FROM bike_photos WHERE request_id=?', [id])).map((r) => r.kind));
+    const need = q.kind === 'selfie + bisiklet' ? ['selfie', 'bisiklet'] : [q.kind];
+    if (need.every((k) => kinds.has(k))) await db.run("UPDATE photo_requests SET status='gönderildi', done_at=? WHERE id=?", [nowTs(), id]);
+  }
+  const PHOTO_SQL = `SELECT p.id, p.bike_id, p.rider_id, p.rental_id, p.request_id, p.kind, p.stage, p.size, p.thumb, p.note, p.lat, p.lng, p.created_at,
+      rd.name AS rider_name, u.name AS user_name, b.code AS bike_code, x.contract_no, q.note AS request_note
+    FROM bike_photos p LEFT JOIN riders rd ON rd.id=p.rider_id LEFT JOIN users u ON u.id=p.uploaded_by LEFT JOIN bikes b ON b.id=p.bike_id
+    LEFT JOIN rentals x ON x.id=p.rental_id LEFT JOIN photo_requests q ON q.id=p.request_id`;
+  async function photoHistory(query) {
+    const col = ['bike_id', 'rider_id', 'rental_id', 'service_id', 'handover_id'].find((k) => query[k]) || err(400, 'Bisiklet, sürücü veya kiralama seçin.');
+    const id = Number(query[col]); const limit = Math.min(100, Math.max(1, Number(query.limit) || 40));
+    const before = Number(query.before) || 0;
+    const photos = await db.all(`${PHOTO_SQL} WHERE p.${col}=? ${before ? 'AND p.id<?' : ''} ORDER BY p.id DESC LIMIT ?`, before ? [id, before, limit + 1] : [id, limit + 1]);
+    const more = photos.length > limit; if (more) photos.pop();
+    const requests = before || !['bike_id', 'rider_id', 'rental_id'].includes(col) ? [] : await db.all(`SELECT q.*, rd.name AS rider_name, rd.phone AS rider_phone, u.name AS user_name, b.code AS bike_code FROM photo_requests q
+      LEFT JOIN riders rd ON rd.id=q.rider_id LEFT JOIN users u ON u.id=q.requested_by LEFT JOIN bikes b ON b.id=q.bike_id WHERE q.${col}=? ORDER BY q.id DESC LIMIT 20`, [id]);
+    return { photos, requests, more };
+  }
+  async function requestPhoto(b, user) {
+    const bike = await getOne('bikes', Number(b.bike_id));
+    const kind = PHOTO_REQ_KINDS.includes(b.kind) ? b.kind : 'bisiklet';
+    const r = await db.get("SELECT * FROM rentals WHERE bike_id=? AND status IN ('aktif','rezervasyon') AND rider_id IS NOT NULL ORDER BY status='aktif' DESC, id DESC LIMIT 1", [bike.id]);
+    if (!r) err(409, 'Bu bisiklet şu an bir sürücüde değil (aktif kiralama ve sürücü yok).');
+    const rd = await db.get('SELECT id, name, portal_active, portal_email FROM riders WHERE id=?', [r.rider_id]);
+    const x = await db.run('INSERT INTO photo_requests(bike_id,rider_id,rental_id,kind,note,status,requested_by,created_at) VALUES(?,?,?,?,?,?,?,?)',
+      [bike.id, r.rider_id, r.id, kind, String(b.note || '').slice(0, 300) || null, 'bekliyor', user?.id ?? null, nowTs()]);
+    await audit(user, 'fotoğraf talebi', 'bikes', bike.id, `${bike.code} · ${rd?.name || ''} · ${kind}`);
+    await notifyRider(r.rider_id, 'photo_request', { bike: bike.code, kind, note: String(b.note || '').slice(0, 300) }, { link: 'home', level: 'warn', user });
+    return { id: x.lastId, rider: rd?.name, portal: !!(rd?.portal_active && rd?.portal_email) };
+  }
+
+  // ---------- rider messages: rider screen inbox + phone notifications (Android app polls /portal/inbox) ----------
+  async function notifyRider(riderId, code, params = {}, { link = null, level = 'info', dedupe = null, user = null } = {}) {
+    if (!riderId) return null;
+    const r = await db.run('INSERT OR IGNORE INTO rider_messages(rider_id,code,params,link,level,dedupe,created_by,created_at) VALUES(?,?,?,?,?,?,?,?)',
+      [Number(riderId), code, JSON.stringify(params), link, level, dedupe, user?.id ?? null, nowTs()]);
+    return r.changes ? r.lastId : null;
+  }
+  // the rider who pays an invoice personally (individual customer); company invoices are not sent to riders
+  async function invoiceRider(inv) {
+    if (inv.rental_id) return (await db.get("SELECT x.rider_id FROM rentals x JOIN customers c ON c.id=x.customer_id WHERE x.id=? AND c.type='bireysel'", [inv.rental_id]))?.rider_id || null;
+    return (await db.get("SELECT rd.id FROM riders rd JOIN customers c ON c.id=rd.customer_id WHERE c.id=? AND c.type='bireysel' ORDER BY rd.id LIMIT 1", [inv.customer_id]))?.id || null;
+  }
+  async function inbox(r, q = {}) {
+    const after = Number(q.after) || 0; const lang = r.lang || 'de';
+    const rows = await db.all(`SELECT * FROM rider_messages WHERE rider_id=? ${after ? 'AND id>?' : ''} ORDER BY id DESC LIMIT 60`, after ? [r.id, after] : [r.id]);
+    if (q.push && rows.length) await db.run('UPDATE rider_messages SET pushed_at=? WHERE rider_id=? AND pushed_at IS NULL AND id>?', [nowTs(), r.id, after]);
+    const unread = Number((await db.get('SELECT COUNT(*) AS n FROM rider_messages WHERE rider_id=? AND read_at IS NULL', [r.id]))?.n) || 0;
+    return { unread, last_id: rows[0]?.id || after, messages: rows.map((m) => ({ id: m.id, code: m.code, level: m.level, link: m.link, created_at: m.created_at, read: !!m.read_at, ...renderMessage(m.code, JSON.parse(m.params || '{}'), lang) })) };
+  }
+  const messageList = async (riderId) => (await db.all('SELECT m.*, u.name AS user_name FROM rider_messages m LEFT JOIN users u ON u.id=m.created_by WHERE m.rider_id=? ORDER BY m.id DESC LIMIT 40', [riderId]))
+    .map((m) => ({ id: m.id, code: m.code, level: m.level, created_at: m.created_at, read_at: m.read_at, pushed_at: m.pushed_at, user_name: m.user_name, ...renderMessage(m.code, JSON.parse(m.params || '{}'), 'tr') }));
+
+  // ---------- daily job: period invoices, reminders before/after the due date, service and return reminders ----------
+  // Runs once a day: from the Vercel cron (/api/cron/daily) and, as a fallback, on the first request of the day.
+  const dunningLevels = () => String(setting('dunning_days') || '1,7,14').split(/[,\s]+/).map(Number).filter((n) => n > 0).sort((a, b) => a - b);
+  async function runDaily(force = false, user = null) {
+    const t = today();
+    await db.run("INSERT OR IGNORE INTO settings(key,value) VALUES('last_daily_run','')");
+    if (!force) { const c = await db.run("UPDATE settings SET value=? WHERE key='last_daily_run' AND value<>?", [t, t]); if (!c.changes) return null; }
+    else await db.run("UPDATE settings SET value=? WHERE key='last_daily_run'", [t]);
+    SETTINGS.last_daily_run = t;
+    const sys = user || { id: null, name: 'Otomatik' };
+    const out = { date: t, invoices: 0, messages: 0, late_fees: 0 };
+    if (setting('auto_billing') !== '0') for (const r of await db.all("SELECT id FROM rentals WHERE status='aktif'")) out.invoices += await billRental(r.id, sys);
+    if (setting('auto_reminders') !== '0') {
+      const before = Math.max(0, Number(setting('reminder_days_before')) || 0); const levels = dunningLevels();
+      for (const i of await db.all("SELECT * FROM invoices WHERE status IN ('açık','kısmi') ORDER BY due_date")) {
+        const rid = await invoiceRider(i); if (!rid) continue;
+        const bal = r2(i.total + (i.late_fee || 0) - i.paid_amount); const d = daysBetween(i.due_date, t);
+        if (d <= 0 && -d <= before) {
+          if (await notifyRider(rid, 'invoice_due', { no: i.invoice_no, amount: bal, date: i.due_date, days: -d }, { link: 'pay', level: 'warn', dedupe: `inv_due:${i.id}` })) out.messages++;
+        } else if (d > 0) {
+          const lv = levels.filter((x) => x <= d).length; if (!lv) continue;
+          if (await notifyRider(rid, 'invoice_overdue', { no: i.invoice_no, amount: bal, date: i.due_date, days: d, level: lv }, { link: 'pay', level: 'danger', dedupe: `inv_late:${i.id}:${lv}` })) {
+            out.messages++;
+            await db.run('UPDATE invoices SET reminders_sent=reminders_sent+1, last_reminder_at=? WHERE id=?', [nowTs(), i.id]);
+            await audit(sys, 'otomatik hatırlatma', 'invoices', i.id, `${i.invoice_no} · ${lv}. hatırlatma · ${d} gün`);
+          }
+        }
+      }
+      for (const x of await db.all("SELECT r.id, r.rider_id, r.end_date, b.code, b.next_service_date, b.id AS bike_id FROM rentals r JOIN bikes b ON b.id=r.bike_id WHERE r.status='aktif' AND r.rider_id IS NOT NULL")) {
+        const left = daysBetween(t, x.end_date);
+        if (left < 0) { if (await notifyRider(x.rider_id, 'return_late', { bike: x.code, date: x.end_date, days: -left }, { link: 'home', level: 'danger', dedupe: `ret_late:${x.id}:${x.end_date}` })) out.messages++; }
+        else if (left <= 7) { if (await notifyRider(x.rider_id, 'return_soon', { bike: x.code, date: x.end_date, days: left }, { link: 'home', level: 'warn', dedupe: `ret_soon:${x.id}:${x.end_date}` })) out.messages++; }
+        if (x.next_service_date && x.next_service_date <= addDays(t, 7)) { if (await notifyRider(x.rider_id, 'service_due', { bike: x.code, date: x.next_service_date }, { link: 'req', level: 'warn', dedupe: `svc_due:${x.bike_id}:${x.next_service_date}` })) out.messages++; }
+      }
+    }
+    if (setting('auto_late_fee') === '1') {
+      for (const i of await db.all("SELECT * FROM invoices WHERE status IN ('açık','kısmi') AND due_date < ?", [t])) {
+        const fee = lateFeeFor(i); if (fee > (i.late_fee || 0) + 0.004) { await db.run('UPDATE invoices SET late_fee=? WHERE id=?', [fee, i.id]); await recalcInvoice(i.id); out.late_fees++; }
+      }
+    }
+    if (out.invoices || out.messages || out.late_fees) await audit(sys, 'günlük iş', 'system', null, `${out.invoices} fatura, ${out.messages} hatırlatma, ${out.late_fees} gecikme bedeli`);
+    return out;
+  }
+
+  // ---------- payment plan of a rental: issued period invoices + the periods still to come ----------
+  async function paymentPlan(rentalId) {
+    const r = await db.get('SELECT * FROM rentals WHERE id=?', [rentalId]); if (!r) return [];
+    const vat = Number(setting('vat_rate')) || 0; const terms = Number(setting('payment_terms_days')) || 14; const t = today();
+    const inv = await db.all("SELECT * FROM invoices WHERE rental_id=? AND period_start IS NOT NULL AND status<>'iptal' ORDER BY period_start", [rentalId]);
+    const rows = inv.map((i) => {
+      const amount = r2(i.total + (i.late_fee || 0)); const balance = r2(amount - i.paid_amount);
+      return { invoice_id: i.id, invoice_no: i.invoice_no, start: i.period_start, end: i.period_end, due: i.due_date, amount, paid: r2(i.paid_amount), balance, pay_link: i.pay_link || null,
+        state: i.status === 'ödendi' ? 'ödendi' : i.due_date < t ? 'gecikmiş' : i.status === 'kısmi' ? 'kısmi' : 'bekliyor' };
+    });
+    if (['aktif', 'rezervasyon'].includes(r.status) && r.rate) {
+      let start = inv.length ? addDays(inv[inv.length - 1].period_end, 1) : r.start_date; let n = 0;
+      while (start <= r.end_date && n < 24) {
+        let end = addDays(addPeriod(start, r.period), -1); if (end > r.end_date) end = r.end_date;
+        const amount = r2(r.rate * (1 + vat / 100));
+        rows.push({ start, end, due: addDays(start, terms), amount, paid: 0, balance: amount, state: 'planlandı' });
+        start = addDays(end, 1); n++;
+      }
+    }
+    return rows;
+  }
+
+  // ---------- bank statement import: match invoice numbers in the statement text, book the payments ----------
+  async function bankImport(b, user) {
+    const lines = String(b.text || '').split(/\r?\n/).map((s) => s.trim()).filter(Boolean).slice(0, 3000);
+    const rows = []; let withAmount = 0;
+    for (const line of lines) {
+      const m = line.match(/\bF[\s-]?(\d{4})[\s-]?(\d{4,6})\b/i); const amounts = amountsIn(line);
+      if (amounts.length) withAmount++;
+      if (!m) continue;
+      const no = `F-${m[1]}-${m[2]}`; const hash = lineHash(line);
+      const inv = await db.get(`SELECT * FROM (${baseSql('invoices')}) AS t WHERE invoice_no=?`, [no]);
+      const row = { line: line.slice(0, 300), hash, invoice_no: no, date: parseDate(line) || today(), amount: null, state: 'fatura bulunamadı' };
+      if (inv) {
+        const bal = r2(inv.balance);
+        row.invoice_id = inv.id; row.customer = inv.customer_label; row.balance = bal;
+        row.amount = amounts.find((a) => Math.abs(a - bal) < 0.011) ?? amounts.find((a) => a <= bal + 0.011) ?? amounts[0] ?? null;
+        if (await db.get('SELECT 1 FROM payments WHERE import_hash=?', [hash])) row.state = 'zaten kayıtlı';
+        else if (inv.status === 'ödendi') row.state = 'fatura zaten ödendi';
+        else if (inv.status === 'iptal') row.state = 'fatura iptal';
+        else if (row.amount == null) row.state = 'tutar bulunamadı';
+        else row.state = Math.abs(row.amount - bal) < 0.011 ? 'eşleşti' : 'tutar farklı';
+      }
+      rows.push(row);
+    }
+    let booked = 0;
+    if (b.commit) {
+      const pick = new Set(Array.isArray(b.hashes) ? b.hashes : []);
+      for (const row of rows) {
+        if (!pick.has(row.hash) || !['eşleşti', 'tutar farklı'].includes(row.state)) continue;
+        const p = await addPayment({ invoice_id: row.invoice_id, date: row.date, amount: row.amount, method: 'banka havalesi', reference: 'Banka dökümü', notes: row.line }, user);
+        await db.run('UPDATE payments SET import_hash=? WHERE id=?', [row.hash, p.id]); row.state = 'kaydedildi'; booked++;
+      }
+    }
+    return { lines: lines.length, with_amount: withAmount, rows, booked };
+  }
+  // a payment confirmed by an online provider (webhook) – idempotent per provider reference
+  async function recordOnlinePayment(name, ev) {
+    if (!ev || !ev.paid) return { ignored: true };
+    const inv = (ev.invoice_no && await db.get('SELECT * FROM invoices WHERE invoice_no=?', [ev.invoice_no])) || (ev.ref && await db.get('SELECT * FROM invoices WHERE pay_ref=?', [ev.ref]));
+    if (!inv) err(404, 'Fatura bulunamadı.');
+    const ref = String(ev.ref || ev.id || '').slice(0, 120);
+    if (ref && await db.get('SELECT 1 FROM payments WHERE provider=? AND reference=?', [name, ref])) return { duplicate: true };
+    const p = await addPayment({ invoice_id: inv.id, date: ev.date || today(), amount: Number(ev.amount), method: ev.method || 'kredi kartı', reference: ref, notes: `Online ödeme (${name})` }, { id: null, name });
+    await db.run('UPDATE payments SET provider=? WHERE id=?', [name, p.id]);
+    return { ok: true, payment_id: p.id };
+  }
+
+  // ---------- hand-over / return protocols (Übergabe- und Rückgabeprotokoll) ----------
+  const HANDOVER_KINDS = ['teslim', 'iade'];
+  const signPng = (d, label) => { if (!d) return null; if (!/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(String(d)) || String(d).length > 500000) err(400, `${label} okunamadı, tekrar imzalayın.`); return String(d); };
+  const pct = (v) => Math.max(0, Math.min(100, Math.round(Number(v) * 10) / 10 || 0));
+  async function saveHandover(b, user) {
+    const r = await getOne('rentals', Number(b.rental_id));
+    if (!HANDOVER_KINDS.includes(b.kind)) err(400, 'Geçersiz tutanak türü.');
+    if (b.kind === 'teslim' && !['rezervasyon', 'aktif'].includes(r.status)) err(409, 'Teslim tutanağı sadece rezervasyon veya aktif kiralamada tutulur.');
+    if (b.kind === 'iade' && !['aktif', 'tamamlandı'].includes(r.status)) err(409, 'İade tutanağı sadece aktif veya tamamlanan kiralamada tutulur.');
+    const rider_sign = signPng(b.rider_sign, 'Sürücünün imzası'); const staff_sign = signPng(b.staff_sign, 'Personel imzası');
+    if (!rider_sign) err(400, 'Teslim alan / getiren kişinin imzası gerekli.');
+    const activate = b.kind === 'teslim' && b.activate && r.status === 'rezervasyon';
+    if (activate) { const rd = r.rider_id ? await db.get('SELECT id_no FROM riders WHERE id=?', [r.rider_id]) : null; if (!rd?.id_no) err(400, 'Teslimden önce sürücünün kimlik bilgilerini girin (kiralamada Düzenle).'); }
+    const damages = (Array.isArray(b.damages) ? b.damages : []).slice(0, 60).map((d, i) => ({ n: i + 1, x: pct(d.x), y: pct(d.y), side: d.side === 'sağ' ? 'sağ' : 'sol', type: DAMAGE_TYPES.includes(d.type) ? d.type : 'diğer', note: String(d.note || '').slice(0, 200), old: d.old ? 1 : 0 }));
+    const checklist = {}; for (const k of INTAKE_CHECKLIST) if (b.checklist?.[k]) checklist[k] = ['ok', 'sorun', 'yok'].includes(b.checklist[k]) ? b.checklist[k] : 'ok';
+    const n = (v) => (v === '' || v == null || !Number.isFinite(Number(v)) ? null : Number(v));
+    const km = n(b.km); const battery = n(b.battery);
+    const x = await db.run('INSERT INTO handovers(rental_id,bike_id,kind,km,battery,checklist,damages,accessories,notes,rider_name,rider_sign,staff_sign,staff_id,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      [r.id, r.bike_id, b.kind, km, battery, JSON.stringify(checklist), JSON.stringify(damages), String(b.accessories || '').slice(0, 500) || null, String(b.notes || '').slice(0, 1000) || null,
+        String(b.rider_name || '').slice(0, 120) || null, rider_sign, staff_sign, user?.id ?? null, nowTs()]);
+    if (km != null) await db.run('UPDATE bikes SET odometer_km=MAX(COALESCE(odometer_km,0), ?) WHERE id=?', [km, r.bike_id]);
+    if (b.kind === 'teslim') await db.run('UPDATE rentals SET start_km=COALESCE(?,start_km), start_battery=COALESCE(?,start_battery), accessories=COALESCE(?,accessories) WHERE id=?', [km, battery, String(b.accessories || '') || null, r.id]);
+    if (b.kind === 'iade' && r.status === 'tamamlandı' && km != null) await db.run('UPDATE rentals SET end_km=COALESCE(end_km, ?) WHERE id=?', [km, r.id]);
+    await audit(user, b.kind === 'teslim' ? 'teslim tutanağı' : 'iade tutanağı', 'rentals', r.id, `${r.contract_no} · ${damages.filter((d) => !d.old).length} yeni hasar işareti`);
+    if (activate) await activateRental(r.id, user);
+    return await handoverDetail(x.lastId);
+  }
+  async function handoverDetail(id) {
+    const h = await db.get('SELECT h.*, u.name AS staff_name FROM handovers h LEFT JOIN users u ON u.id=h.staff_id WHERE h.id=?', [id]) || err(404, 'Tutanak bulunamadı.');
+    h.checklist = JSON.parse(h.checklist || '{}'); h.damages = JSON.parse(h.damages || '[]');
+    h.rental = await db.get(`SELECT x.*, b.code AS bike_code, b.brand, b.model, b.frame_no, b.type AS bike_type, COALESCE(c.company_name,c.name) AS customer_label, c.doc_lang, c.name AS customer_name,
+        rd.name AS rider_name, rd.id_type, rd.id_no FROM rentals x JOIN bikes b ON b.id=x.bike_id JOIN customers c ON c.id=x.customer_id LEFT JOIN riders rd ON rd.id=x.rider_id WHERE x.id=?`, [h.rental_id]);
+    h.photos = await db.all('SELECT id, kind, thumb, note, created_at FROM bike_photos WHERE handover_id=? ORDER BY id', [id]);
+    h.checklist_items = INTAKE_CHECKLIST;
+    return h;
+  }
+  async function handoverList(rentalId) {
+    const rows = await db.all('SELECT h.id, h.kind, h.km, h.battery, h.rider_name, h.damages, h.created_at, u.name AS staff_name FROM handovers h LEFT JOIN users u ON u.id=h.staff_id WHERE h.rental_id=? ORDER BY h.id', [rentalId]);
+    for (const h of rows) { const d = JSON.parse(h.damages || '[]'); h.damage_count = d.length; h.new_damages = d.filter((x) => !x.old).length; delete h.damages; }
+    return rows;
+  }
+  // damage marks of the last hand-over of a rental (start point of the return protocol)
+  async function lastHandoverDamages(rentalId, bikeId) {
+    const h = await db.get("SELECT damages FROM handovers WHERE rental_id=? AND kind='teslim' ORDER BY id DESC LIMIT 1", [rentalId])
+      || await db.get("SELECT damages FROM handovers WHERE bike_id=? ORDER BY id DESC LIMIT 1", [bikeId]);
+    return JSON.parse(h?.damages || '[]').map((d) => ({ ...d, old: 1 }));
+  }
+
+  // ---------- fault / damage report from the rider screen → service order ----------
+  async function faultReport(r, b) {
+    const x = b.rental_id ? await db.get("SELECT * FROM rentals WHERE id=? AND rider_id=? AND status IN ('aktif','rezervasyon')", [Number(b.rental_id), r.id])
+      : await db.get("SELECT * FROM rentals WHERE rider_id=? AND status='aktif' ORDER BY id DESC LIMIT 1", [r.id]);
+    if (!x) err(400, 'Aktif kiralamanız yok.');
+    const cat = FAULT_CATEGORIES.find((c) => c[0] === b.category) || ['diğer', 'arıza'];
+    const text = String(b.notes || '').trim().slice(0, 1000);
+    const photos = (Array.isArray(b.photos) ? b.photos : []).slice(0, 4);
+    if (!text && !photos.length) err(400, 'Kısaca ne olduğunu yazın veya fotoğraf ekleyin.');
+    const rideable = ['0', 0, false, 'false'].includes(b.rideable) ? 0 : 1;
+    const bike = await db.get('SELECT code FROM bikes WHERE id=?', [x.bike_id]);
+    const q = await db.run("INSERT INTO portal_requests(rider_id,customer_id,rental_id,bike_id,type,notes,category,rideable,status,created_at) VALUES(?,?,?,?,'arıza bildirimi',?,?,?,'yeni',?)",
+      [r.id, x.customer_id, x.id, x.bike_id, text || null, cat[0], rideable, nowTs()]);
+    let so = null;
+    if (setting('auto_service_from_report') !== '0') {
+      so = await createService({ bike_id: x.bike_id, customer_id: x.customer_id, rental_id: x.id, brought_by_rider_id: r.id, brought_by: r.name, type: cat[1], request_id: q.lastId,
+        complaint: `Sürücü bildirimi · ${cat[0]}${rideable ? '' : ' · BİSİKLET KULLANILAMIYOR'}${text ? ': ' + text : ''}` }, portalUser(r), true);
+      await db.run('UPDATE service_orders SET report_id=?, urgent=? WHERE id=?', [q.lastId, rideable ? 0 : 1, so.id]);
+    }
+    let lat = Number(b.lat), lng = Number(b.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || !lat) { const fresh = r.last_loc_at && r.last_loc_at > new Date(Date.now() - 30 * 60e3).toISOString().slice(0, 19).replace('T', ' '); lat = fresh ? r.last_lat : null; lng = fresh ? r.last_lng : null; }
+    for (const p of photos) await addPhoto({ bike_id: x.bike_id, rider_id: r.id, rental_id: x.id, service_id: so?.id || null, kind: 'bisiklet', stage: 'arıza', note: `${cat[0]}${text ? ': ' + text.slice(0, 120) : ''}`, data: p.data, thumb: p.thumb, lat: lat != null ? r6(lat) : null, lng: lng != null ? r6(lng) : null }, null);
+    await audit(portalUser(r), 'arıza bildirimi', 'portal_requests', q.lastId, `${r.name} · ${bike?.code} · ${cat[0]}${rideable ? '' : ' · kullanılamıyor'}`);
+    if (so) await notifyRider(r.id, 'report_received', { bike: bike?.code, no: so.order_no }, { link: 'req', level: 'ok' });
+    return { request_id: q.lastId, service_no: so?.order_no || null };
+  }
+
+  // ---------- extension and return notice from the rider screen ----------
+  async function riderExtend(r, rentalId, b) {
+    const x = await db.get("SELECT * FROM rentals WHERE id=? AND rider_id=? AND status='aktif'", [rentalId, r.id]) || err(404, 'Aktif kiralama bulunamadı.');
+    const max = Math.max(1, Number(setting('self_extend_max')) || 3);
+    const n = Math.min(max, Math.max(1, Math.round(Number(b.periods) || 1)));
+    const end = addDays(addPeriod(addDays(x.end_date, 1), x.period, n), -1);
+    const overdue = await db.get("SELECT 1 FROM invoices WHERE customer_id=? AND status IN ('açık','kısmi') AND due_date < ? LIMIT 1", [x.customer_id, today()]);
+    const clash = await db.get("SELECT contract_no FROM rentals WHERE bike_id=? AND id<>? AND status IN ('aktif','rezervasyon') AND start_date <= ? AND end_date > ?", [x.bike_id, x.id, end, x.end_date]);
+    const bike = await db.get('SELECT code FROM bikes WHERE id=?', [x.bike_id]);
+    if (setting('self_extend') !== '0' && !overdue && !clash) {
+      await extendRental(x.id, { end_date: end }, portalUser(r));
+      return { done: true, end_date: end };
+    }
+    const why = overdue ? 'gecikmiş ödeme var' : clash ? `bisiklet sonrasında ${clash.contract_no} ile rezerve` : 'onay gerekli';
+    if (!await db.get("SELECT 1 FROM portal_requests WHERE rider_id=? AND rental_id=? AND type='kiralama uzatma' AND status='yeni'", [r.id, x.id]))
+      await db.run("INSERT INTO portal_requests(rider_id,customer_id,rental_id,bike_id,type,preferred_date,notes,status,created_at) VALUES(?,?,?,?,'kiralama uzatma',?,?,'yeni',?)",
+        [r.id, x.customer_id, x.id, x.bike_id, end, `${n} × ${x.period} uzatma isteği (${why})${b.notes ? ' · ' + String(b.notes).slice(0, 300) : ''}`, nowTs()]);
+    await audit(portalUser(r), 'uzatma isteği', 'rentals', x.id, `${bike?.code} → ${end} (${why})`);
+    return { done: false, end_date: end, reason: overdue ? 'overdue' : clash ? 'booked' : 'approval' };
+  }
+  async function riderReturnNotice(r, rentalId, b) {
+    const x = await db.get("SELECT * FROM rentals WHERE id=? AND rider_id=? AND status='aktif'", [rentalId, r.id]) || err(404, 'Aktif kiralama bulunamadı.');
+    const d = String(b.date || '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || d < today()) err(400, 'Geçerli bir iade tarihi seçin.');
+    await db.run('UPDATE rentals SET return_notice_date=?, return_notice_at=? WHERE id=?', [d, nowTs(), x.id]);
+    await db.run("UPDATE portal_requests SET status='iptal', handled_at=? WHERE rider_id=? AND rental_id=? AND type='iade randevusu' AND status='yeni'", [nowTs(), r.id, x.id]);
+    await db.run("INSERT INTO portal_requests(rider_id,customer_id,rental_id,bike_id,type,preferred_date,preferred_time,notes,status,created_at) VALUES(?,?,?,?,'iade randevusu',?,?,?,'yeni',?)",
+      [r.id, x.customer_id, x.id, x.bike_id, d, String(b.time || '').slice(0, 20) || null, `İade bildirimi${d < x.end_date ? ` (sözleşme bitişi ${x.end_date}, erken iade)` : d > x.end_date ? ` (sözleşme bitişi ${x.end_date}, sonra)` : ''}${b.notes ? ' · ' + String(b.notes).slice(0, 300) : ''}`, nowTs()]);
+    await audit(portalUser(r), 'iade bildirimi', 'rentals', x.id, `${x.contract_no} → ${d}`);
+    return { ok: true };
+  }
+
+  // ---------- overdue payments (red list) ----------
+  async function overdueList() {
+    const t = today(); const levels = dunningLevels();
+    const rows = await db.all(`SELECT i.id, i.invoice_no, i.customer_id, i.rental_id, i.issue_date, i.due_date, i.total, i.late_fee, i.paid_amount, i.reminders_sent, i.last_reminder_at, i.status,
+        ROUND(i.total+i.late_fee-i.paid_amount,2) AS balance, CAST(julianday(?)-julianday(i.due_date) AS INTEGER) AS days,
+        COALESCE(c.company_name,c.name) AS customer, c.name AS customer_name, c.phone AS customer_phone, c.doc_lang AS customer_lang, c.type AS customer_type, c.email AS customer_email,
+        x.contract_no, x.rider_id, rd.name AS rider_name, rd.phone AS rider_phone, rd.portal_active, b.code AS bike_code, x.status AS rental_status
+      FROM invoices i JOIN customers c ON c.id=i.customer_id LEFT JOIN rentals x ON x.id=i.rental_id LEFT JOIN riders rd ON rd.id=x.rider_id LEFT JOIN bikes b ON b.id=x.bike_id
+      WHERE i.status IN ('açık','kısmi') AND i.due_date < ? ORDER BY i.due_date`, [t, t]);
+    const groups = new Map();
+    for (const i of rows) {
+      i.level = levels.filter((x) => x <= i.days).length; i.suggested_late_fee = lateFeeFor(i);
+      const g = groups.get(i.customer_id) || { customer_id: i.customer_id, customer: i.customer, customer_name: i.customer_name, phone: i.customer_phone, email: i.customer_email, type: i.customer_type, lang: i.customer_lang, invoices: [], total: 0, max_days: 0, riders: [], bikes: [], last_reminder_at: null };
+      g.invoices.push(i); g.total = r2(g.total + i.balance); g.max_days = Math.max(g.max_days, i.days);
+      if (i.rider_name && !g.riders.some((x) => x.id === i.rider_id)) g.riders.push({ id: i.rider_id, name: i.rider_name, phone: i.rider_phone, portal: !!i.portal_active });
+      if (i.bike_code && !g.bikes.includes(i.bike_code)) g.bikes.push(i.bike_code);
+      if (i.last_reminder_at && (!g.last_reminder_at || i.last_reminder_at > g.last_reminder_at)) g.last_reminder_at = i.last_reminder_at;
+      groups.set(i.customer_id, g);
+    }
+    const list = [...groups.values()].map((g) => ({ ...g, level: levels.filter((x) => x <= g.max_days).length })).sort((a, b) => b.max_days - a.max_days || b.total - a.total);
+    const soon = await db.all(`SELECT i.id, i.invoice_no, i.due_date, ROUND(i.total+i.late_fee-i.paid_amount,2) AS balance, COALESCE(c.company_name,c.name) AS customer, c.type AS customer_type, x.rider_id, rd.name AS rider_name
+      FROM invoices i JOIN customers c ON c.id=i.customer_id LEFT JOIN rentals x ON x.id=i.rental_id LEFT JOIN riders rd ON rd.id=x.rider_id
+      WHERE i.status IN ('açık','kısmi') AND i.due_date BETWEEN ? AND ? ORDER BY i.due_date`, [t, addDays(t, 7)]);
+    return { groups: list, total: r2(list.reduce((a, g) => a + g.total, 0)), count: rows.length, soon, levels, last_run: setting('last_daily_run') || null,
+      auto: { billing: setting('auto_billing') !== '0', reminders: setting('auto_reminders') !== '0', before: Number(setting('reminder_days_before')) || 0, late_fee: setting('auto_late_fee') === '1', fee_per_day: Number(setting('late_fee_per_day')) || 0 } };
+  }
+
+  // ---------- management summary: month revenue, occupancy, idle bikes, profit per bike ----------
+  async function summary(q = {}) {
+    const t = today(); const month = /^\d{4}-\d{2}$/.test(q.month || '') ? q.month : t.slice(0, 7);
+    const from = month + '-01'; const to = addDays(addPeriod(from, 'ay', 1), -1); const until = to < t ? to : t;
+    const one = async (sql, p = []) => r2(Object.values((await db.get(sql, p)) || {})[0] || 0);
+    const bikes = await db.all("SELECT id, code, type, model, status, purchase_price, purchase_date, created_at FROM bikes ORDER BY code");
+    const fleetBikes = bikes.filter((b) => !['hizmet dışı', 'kayıp/çalıntı'].includes(b.status));
+    // rented days per bike in a date range (aktif + tamamlandı rentals, clipped to the range)
+    const rentedDays = async (a, z) => Object.fromEntries((await db.all(`SELECT bike_id, SUM(julianday(MIN(COALESCE(returned_at, CASE WHEN status='aktif' THEN ? ELSE end_date END), ?)) - julianday(MAX(start_date, ?)) + 1) AS d
+      FROM rentals WHERE status IN ('aktif','tamamlandı') AND start_date <= ? AND COALESCE(returned_at, CASE WHEN status='aktif' THEN ? ELSE end_date END) >= ? GROUP BY bike_id`, [z, z, a, z, z, a])).map((x) => [x.bike_id, Math.max(0, Math.round(x.d))]));
+    const days = Math.max(1, daysBetween(from, until) + 1);
+    const rd = from <= until ? await rentedDays(from, until) : {};
+    const totalRented = fleetBikes.reduce((a, b) => a + Math.min(days, rd[b.id] || 0), 0);
+    const occupancy = fleetBikes.length ? Math.round((totalRented / (fleetBikes.length * days)) * 100) : 0;
+    const revByBike = Object.fromEntries((await db.all(`SELECT x.bike_id, SUM(i.net) AS s FROM invoices i JOIN rentals x ON x.id=i.rental_id WHERE i.status<>'iptal' AND i.service_id IS NULL AND i.issue_date BETWEEN ? AND ? GROUP BY x.bike_id`, [from, to])).map((x) => [x.bike_id, x.s]));
+    const costByBike = {};
+    for (const x of await db.all(`SELECT s.bike_id, SUM(sp.qty*p.cost) AS s FROM service_parts sp JOIN parts p ON p.id=sp.part_id JOIN service_orders s ON s.id=sp.service_id WHERE s.status<>'iptal' AND substr(s.received_at,1,10) BETWEEN ? AND ? GROUP BY s.bike_id`, [from, to])) costByBike[x.bike_id] = (costByBike[x.bike_id] || 0) + x.s;
+    for (const x of await db.all('SELECT bike_id, SUM(amount) AS s FROM bike_costs WHERE date BETWEEN ? AND ? GROUP BY bike_id', [from, to])) costByBike[x.bike_id] = (costByBike[x.bike_id] || 0) + x.s;
+    // all-time net per bike (same rule as the bike page: income – parts – recorded costs)
+    const incAll = Object.fromEntries((await db.all(`SELECT b.id, COALESCE((SELECT SUM(i.net) FROM invoices i WHERE i.status<>'iptal' AND (i.rental_id IN (SELECT id FROM rentals WHERE bike_id=b.id) OR i.service_id IN (SELECT id FROM service_orders WHERE bike_id=b.id))),0)
+        - COALESCE((SELECT SUM(sp.qty*p.cost) FROM service_parts sp JOIN parts p ON p.id=sp.part_id JOIN service_orders s ON s.id=sp.service_id WHERE s.bike_id=b.id AND s.status<>'iptal'),0)
+        - COALESCE((SELECT SUM(amount) FROM bike_costs WHERE bike_id=b.id),0) AS net FROM bikes b`)).map((x) => [x.id, x.net]));
+    const lastEnd = Object.fromEntries((await db.all("SELECT bike_id, MAX(COALESCE(returned_at, end_date)) AS d FROM rentals WHERE status IN ('tamamlandı','iptal','aktif') GROUP BY bike_id")).map((x) => [x.bike_id, x.d]));
+    const per_bike = bikes.map((b) => {
+      const rev = r2(revByBike[b.id] || 0); const cost = r2(costByBike[b.id] || 0); const net = r2(incAll[b.id] || 0); const pp = Number(b.purchase_price) || 0;
+      const dd = Math.min(days, rd[b.id] || 0);
+      return { id: b.id, code: b.code, type: b.type, model: b.model, status: b.status, rented_days: dd, occupancy: Math.round((dd / days) * 100), revenue: rev, cost, profit: r2(rev - cost), net_total: net, purchase: pp, payback: pp > 0 ? Math.round((net / pp) * 100) : null };
+    });
+    const idle = bikes.filter((b) => b.status === 'müsait').map((b) => {
+      const since = (lastEnd[b.id] && lastEnd[b.id] <= t ? lastEnd[b.id] : null) || b.purchase_date || String(b.created_at || t).slice(0, 10);
+      return { id: b.id, code: b.code, type: b.type, model: b.model, since, days: Math.max(0, daysBetween(since, t)) };
+    }).sort((a, b) => b.days - a.days);
+    const byType = {};
+    for (const b of fleetBikes) { const x = byType[b.type || '—'] ||= { type: b.type || '—', bikes: 0, rented_days: 0, rented_now: 0 }; x.bikes++; x.rented_days += Math.min(days, rd[b.id] || 0); if (b.status === 'kirada') x.rented_now++; }
+    const trend = [];
+    for (let k = 5; k >= 0; k--) {
+      const f = addPeriod(from, 'ay', -k); const z0 = addDays(addPeriod(f, 'ay', 1), -1); const z = z0 < t ? z0 : t; if (f > t) continue;
+      const dd = daysBetween(f, z) + 1; const rr = await rentedDays(f, z);
+      const used = fleetBikes.reduce((a, b) => a + Math.min(dd, rr[b.id] || 0), 0);
+      trend.push({ m: f.slice(0, 7), revenue: await one("SELECT COALESCE(SUM(net),0) FROM invoices WHERE status<>'iptal' AND issue_date BETWEEN ? AND ?", [f, z0]), collected: await one('SELECT COALESCE(SUM(amount),0) FROM payments WHERE date BETWEEN ? AND ?', [f, z0]), occupancy: fleetBikes.length ? Math.round((used / (fleetBikes.length * dd)) * 100) : 0 });
+    }
+    const revenue = await one("SELECT COALESCE(SUM(net),0) FROM invoices WHERE status<>'iptal' AND issue_date BETWEEN ? AND ?", [from, to]);
+    const revenue_service = await one("SELECT COALESCE(SUM(net),0) FROM invoices WHERE status<>'iptal' AND service_id IS NOT NULL AND issue_date BETWEEN ? AND ?", [from, to]);
+    const costs = r2(Object.values(costByBike).reduce((a, x) => a + x, 0)); // parts used + recorded bike costs (staff labour is not a cost per bike)
+    return {
+      month, from, to, days, bikes: fleetBikes.length,
+      kpi: {
+        revenue, revenue_rental: r2(revenue - revenue_service), revenue_service, collected: await one('SELECT COALESCE(SUM(amount),0) FROM payments WHERE date BETWEEN ? AND ?', [from, to]),
+        costs, profit: r2(revenue - costs), occupancy, rented_now: bikes.filter((b) => b.status === 'kirada').length, idle_now: idle.length,
+        mrr: await one("SELECT COALESCE(SUM(CASE period WHEN 'ay' THEN rate WHEN 'hafta' THEN rate*52.0/12 ELSE rate*30 END),0) FROM rentals WHERE status='aktif'"),
+        receivables: await one("SELECT COALESCE(SUM(total+late_fee-paid_amount),0) FROM invoices WHERE status IN ('açık','kısmi')"),
+        overdue: await one("SELECT COALESCE(SUM(total+late_fee-paid_amount),0) FROM invoices WHERE status IN ('açık','kısmi') AND due_date < ?", [t]),
+        new_rentals: await one("SELECT COUNT(*) FROM rentals WHERE status<>'iptal' AND start_date BETWEEN ? AND ?", [from, to]),
+        ended_rentals: await one('SELECT COUNT(*) FROM rentals WHERE returned_at BETWEEN ? AND ?', [from, to]),
+        deposits_held: await one("SELECT COALESCE(SUM(CASE WHEN type='tahsil' THEN amount ELSE -amount END),0) FROM deposits"),
+      },
+      trend, idle, per_bike, by_type: Object.values(byType).map((x) => ({ ...x, occupancy: x.bikes ? Math.round((x.rented_days / (x.bikes * days)) * 100) : 0 })),
+    };
+  }
+
   const listDocuments = (type, id) => db.all('SELECT d.id, d.owner_type, d.owner_id, d.doc_type, d.name, d.mime, d.size, d.notes, d.created_at, u.name AS uploaded_by_name FROM documents d LEFT JOIN users u ON u.id=d.uploaded_by WHERE d.owner_type=? AND d.owner_id=? ORDER BY d.id DESC', [type, id]);
 
   // ---------- finance ----------
@@ -282,7 +670,11 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
     while (start <= until && start <= r.end_date && n < 60) {
       let end = addDays(addPeriod(start, r.period), -1);
       if (end > r.end_date) end = r.end_date;
-      await createInvoice({ customer_id: r.customer_id, rental_id: r.id, description: `Kiralama ${r.contract_no} · ${bike?.code} · ${start} – ${end}`, net: r.rate, period_start: start, period_end: end, issue_date: start }, user);
+      const invId = await createInvoice({ customer_id: r.customer_id, rental_id: r.id, description: `Kiralama ${r.contract_no} · ${bike?.code} · ${start} – ${end}`, net: r.rate, period_start: start, period_end: end, issue_date: start }, user);
+      if (r.rider_id && start >= addDays(today(), -3)) {
+        const inv = await db.get('SELECT * FROM invoices WHERE id=?', [invId]);
+        if (await invoiceRider(inv)) await notifyRider(r.rider_id, 'invoice_new', { no: inv.invoice_no, amount: r2(inv.total), date: inv.due_date }, { link: 'pay', level: 'info', dedupe: `inv_new:${invId}` });
+      }
       start = addDays(end, 1); n++;
     }
     return n;
@@ -299,6 +691,7 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
       await cashMove({ date: body.date || today(), type: 'giriş', amount: body.amount, category: 'Fatura tahsilatı', description: `${inv.invoice_no} · ${c?.n || ''}`, payment_id: r.lastId, rental_id: inv.rental_id }, user);
     }
     await audit(user, 'ödeme', 'invoices', inv.id, `${inv.invoice_no}: ${r2(body.amount)} €`);
+    if (body.method !== 'depozitodan mahsup') { const rid = await invoiceRider(inv); if (rid) await notifyRider(rid, 'payment_received', { no: inv.invoice_no, amount: r2(body.amount) }, { link: 'pay', level: 'ok', user }); }
     return await getOne('payments', r.lastId);
   }
   function lateFeeFor(inv) {
@@ -425,9 +818,13 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
     const r = await getOne('rentals', id);
     if (!['aktif', 'rezervasyon'].includes(r.status)) err(409, 'Sadece aktif kiralamalar uzatılabilir.');
     if (!b.end_date || b.end_date <= r.end_date) err(400, 'Yeni dönüş tarihi mevcut tarihten sonra olmalı.');
-    await db.run('UPDATE rentals SET end_date=? WHERE id=?', [b.end_date, id]);
+    const clash = await db.get("SELECT contract_no FROM rentals WHERE bike_id=? AND id<>? AND status IN ('aktif','rezervasyon') AND start_date <= ? AND end_date > ?", [r.bike_id, id, b.end_date, r.end_date]);
+    if (clash) err(409, `Bisiklet bu tarihlerde ${clash.contract_no} ile rezerve; uzatma çakışıyor.`);
+    await db.run('UPDATE rentals SET end_date=?, return_notice_date=NULL WHERE id=?', [b.end_date, id]);
     await audit(user, 'uzatma', 'rentals', id, `${r.end_date} → ${b.end_date}`);
     await billRental(id, user);
+    if (r.rider_id) await notifyRider(r.rider_id, 'extended', { bike: r.bike_code, date: b.end_date }, { link: 'home', level: 'ok', user });
+    await db.run("UPDATE portal_requests SET status='tamamlandı', handled_at=?, admin_note=COALESCE(admin_note, ?) WHERE rental_id=? AND type='kiralama uzatma' AND status='yeni'", [nowTs(), `Uzatıldı: ${b.end_date}`, id]);
     return await getOne('rentals', id);
   }
   async function cancelRental(id, user) {
@@ -473,6 +870,10 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
     await update('service_orders', id, b, user);
     if (b.status && b.status !== s.status) {
       if (b.status === 'teslim edildi') await finishService(id, user);
+      if (b.status === 'hazır') {
+        const rid = s.brought_by_rider_id || (s.rental_id ? (await db.get('SELECT rider_id FROM rentals WHERE id=?', [s.rental_id]))?.rider_id : null);
+        await notifyRider(rid, 'service_ready', { bike: s.bike_code, no: s.order_no }, { link: 'req', level: 'ok', user, dedupe: `svc_ready:${id}` });
+      }
       await audit(user, 'servis durumu', 'service_orders', id, `${s.status} → ${b.status}`);
     }
     return await serviceDetail(id);
@@ -611,6 +1012,12 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
       add('info', 'customers', 'Yeni sürücü kaydı', `${x.name} · ${String(x.created_at || '').slice(0, 10)} · kimlik kontrolü bekliyor`, `#/riders/${x.id}`);
     for (const q of await db.all("SELECT q.*, rd.name AS rn, b.code FROM portal_requests q LEFT JOIN riders rd ON rd.id=q.rider_id LEFT JOIN bikes b ON b.id=q.bike_id WHERE q.status='yeni' ORDER BY q.id DESC"))
       add('info', 'rentals', 'Yeni sürücü talebi', `${q.rn} · ${q.type}${q.code ? ' · ' + q.code : ''}${q.preferred_date ? ' · ' + q.preferred_date : ''}`, `#/portal_requests/${q.id}`);
+    for (const q of await db.all("SELECT q.*, rd.name AS rn, b.code FROM photo_requests q LEFT JOIN riders rd ON rd.id=q.rider_id JOIN bikes b ON b.id=q.bike_id WHERE (q.status='bekliyor' AND q.created_at < datetime('now','-1 day')) OR (q.status='gönderildi' AND q.done_at > datetime('now','-3 day')) ORDER BY q.id DESC LIMIT 30"))
+      add(q.status === 'bekliyor' ? 'warn' : 'info', 'fleet', q.status === 'bekliyor' ? 'Fotoğraf bekleniyor' : 'İstenen fotoğraf geldi', `${q.code} · ${q.rn || '—'} · ${q.kind}${q.note ? ' · ' + q.note : ''}`, `#/bikes/${q.bike_id}`);
+    for (const s of await db.all("SELECT s.id, s.order_no, s.urgent, s.complaint, b.code, rd.name AS rn FROM service_orders s JOIN bikes b ON b.id=s.bike_id LEFT JOIN riders rd ON rd.id=s.brought_by_rider_id WHERE s.report_id IS NOT NULL AND s.status='kabul edildi' ORDER BY s.id DESC LIMIT 30"))
+      add(s.urgent ? 'danger' : 'warn', 'service', s.urgent ? 'Arıza bildirimi · bisiklet kullanılamıyor' : 'Arıza bildirimi', `${s.code} · ${s.rn || '—'} · ${String(s.complaint || '').replace(/^Sürücü bildirimi · /, '').slice(0, 90)}`, `#/service/${s.id}`);
+    for (const r of await db.all("SELECT r.id, r.return_notice_date, r.end_date, b.code, rd.name AS rn FROM rentals r JOIN bikes b ON b.id=r.bike_id LEFT JOIN riders rd ON rd.id=r.rider_id WHERE r.status='aktif' AND r.return_notice_date IS NOT NULL AND r.return_notice_date >= ? ORDER BY r.return_notice_date", [t]))
+      add('info', 'rentals', 'İade tarihi bildirildi', `${r.code} · ${r.rn || '—'} · ${r.return_notice_date}${r.return_notice_date < r.end_date ? ' (erken)' : ''}`, `#/rentals/${r.id}`);
     const rank = { danger: 0, warn: 1, info: 2 };
     return n.sort((a, b) => rank[a.level] - rank[b.level]);
   }
@@ -696,6 +1103,7 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
     if (user && !can(user, 'rentals')) b.rentals = [];
     b.revenue = r2((await db.get("SELECT COALESCE(SUM(i.net),0) AS s FROM invoices i JOIN rentals r ON r.id=i.rental_id WHERE r.bike_id=? AND i.status<>'iptal'", [id])).s);
     b.costs = await list('bike_costs', { bike_id: id });
+    b.photo_count = Number((await db.get('SELECT COUNT(*) AS n FROM bike_photos WHERE bike_id=?', [id]))?.n) || 0;
     b.economics = await bikeEconomics(b);
     if (user && !can(user, 'finance')) { b.economics = null; b.revenue = null; }
     return b;
@@ -734,7 +1142,9 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
     r.rider_documents = r.rider_id ? await listDocuments('rider', r.rider_id) : [];
     r.late_days = r.status === 'aktif' ? Math.max(0, daysBetween(r.end_date, today())) : 0;
     r.late_return_fee_per_day = Number(setting('late_return_fee_per_day'));
-    if (user && !can(user, 'finance')) { r.invoices = []; r.deposits = []; }
+    r.handovers = await handoverList(id);
+    r.plan_rows = await paymentPlan(id);
+    if (user && !can(user, 'finance')) { r.invoices = []; r.deposits = []; r.plan_rows = []; }
     return r;
   }
   async function customerDetail(id, user) {
@@ -756,6 +1166,7 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
     r.rentals = await list('rentals', { rider_id: id });
     r.documents = await listDocuments('rider', id);
     r.requests = await list('portal_requests', { rider_id: id, limit: 50 });
+    r.messages = await messageList(id);
     r.invoices = await db.all(`SELECT * FROM (${baseSql('invoices')}) AS t WHERE rental_id IN (SELECT id FROM rentals WHERE rider_id=?) ORDER BY issue_date DESC, id DESC`, [id]);
     r.deposits = await db.all('SELECT d.*, x.contract_no FROM deposits d JOIN rentals x ON x.id=d.rental_id WHERE x.rider_id=? ORDER BY d.date DESC, d.id DESC', [id]);
     if (user && !can(user, 'finance')) { r.invoices = []; r.deposits = []; for (const k of ['balance', 'open_balance', 'overdue', 'due_soon', 'pay_state', 'deposit_held', 'deposit_pending']) r[k] = null; }
@@ -792,7 +1203,7 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
     const t = today();
     const cust = r.customer_id ? await db.get('SELECT id,type,name,company_name,phone,email,doc_lang FROM customers WHERE id=?', [r.customer_id]) : null;
     const payer = !!cust && cust.type === 'bireysel';
-    const rentals = await db.all(`SELECT x.id, x.contract_no, x.status, x.start_date, x.end_date, x.returned_at, x.period, x.rate, x.deposit_amount, x.deposit_status, x.customer_id,
+    const rentals = await db.all(`SELECT x.id, x.contract_no, x.status, x.start_date, x.end_date, x.returned_at, x.period, x.rate, x.deposit_amount, x.deposit_status, x.customer_id, x.return_notice_date, x.pay_method,
         b.id AS bike_id, b.code AS bike_code, b.type AS bike_type, b.brand, b.model, b.color, b.battery_level, b.odometer_km, b.next_service_date, b.last_service_date, b.status AS bike_status, p.name AS plan_name
       FROM rentals x JOIN bikes b ON b.id=x.bike_id LEFT JOIN pricing_plans p ON p.id=x.plan_id WHERE x.rider_id=? ORDER BY CASE x.status WHEN 'aktif' THEN 0 WHEN 'rezervasyon' THEN 1 ELSE 2 END, x.start_date DESC LIMIT 20`, [r.id]);
     const vatRate = Number(setting('vat_rate')) || 0;
@@ -804,6 +1215,7 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
         const next = last ? addDays(last, 1) : x.start_date;
         if (next <= x.end_date) x.next_charge = { date: next, amount: r2(x.rate * (1 + vatRate / 100)) };
       }
+      if (['aktif', 'rezervasyon'].includes(x.status) && payer) x.plan = await paymentPlan(x.id);
     }
     const rentalIds = rentals.map((x) => x.id);
     const inList = (ids) => (ids.length ? ids.join(',') : '0');
@@ -835,6 +1247,24 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
       else if (i.due_date <= addDays(t, 7)) add('warn', 'invoice_due', { no: i.invoice_no, amount: i.balance, date: i.due_date, days: daysBetween(t, i.due_date) });
     }
     if (missing.length) add('warn', 'docs_missing', { docs: missing });
+    // photo tasks: pick-up check (selfie + bike photos) for rentals that just started, and photo requests from staff
+    const photo_tasks = [];
+    const thumbs = (rows) => rows.map((p) => ({ id: p.id, kind: p.kind, thumb: p.thumb, created_at: p.created_at }));
+    if (setting('photo_pickup') !== '0') {
+      for (const x of rentals.filter((y) => (y.status === 'aktif' && y.start_date >= addDays(t, -7)) || (y.status === 'rezervasyon' && y.start_date <= addDays(t, 1)))) {
+        const ph = await db.all("SELECT id, kind, thumb, created_at FROM bike_photos WHERE rental_id=? AND stage='teslim alma' ORDER BY id", [x.id]);
+        const selfie = ph.filter((p) => p.kind === 'selfie').length; const bike = ph.filter((p) => p.kind === 'bisiklet').length;
+        const done = selfie > 0 && bike >= PICKUP_BIKE_PHOTOS;
+        // a finished check stays on screen for two hours so the rider sees it went through
+        if (!done || ph.some((p) => p.created_at > new Date(Date.now() - 2 * 3600e3).toISOString().slice(0, 19).replace('T', ' ')))
+          photo_tasks.push({ type: 'pickup', rental_id: x.id, bike: x.bike_code, need: { selfie: 1, bisiklet: PICKUP_BIKE_PHOTOS }, have: { selfie, bisiklet: bike }, done, photos: thumbs(ph) });
+      }
+    }
+    for (const q of await db.all("SELECT q.*, b.code FROM photo_requests q JOIN bikes b ON b.id=q.bike_id WHERE q.rider_id=? AND (q.status='bekliyor' OR (q.status='gönderildi' AND q.done_at > datetime('now','-2 hour'))) ORDER BY q.id", [r.id])) {
+      const ph = await db.all('SELECT id, kind, thumb, created_at FROM bike_photos WHERE request_id=? ORDER BY id', [q.id]);
+      const need = q.kind === 'selfie + bisiklet' ? { selfie: 1, bisiklet: 1 } : { [q.kind]: 1 };
+      photo_tasks.push({ type: 'request', request_id: q.id, bike: q.code, kind: q.kind, note: q.note, created_at: q.created_at, need, have: { selfie: ph.filter((p) => p.kind === 'selfie').length, bisiklet: ph.filter((p) => p.kind === 'bisiklet').length }, done: q.status !== 'bekliyor', photos: thumbs(ph) });
+    }
     if (r.id_expiry && r.id_expiry < addDays(t, 30)) add(r.id_expiry < t ? 'danger' : 'warn', r.id_expiry < t ? 'id_expired' : 'id_expiring', { date: r.id_expiry });
     for (const q of requests.filter((y) => y.handled_at && y.handled_at >= addDays(t, -7) && ['onaylandı', 'reddedildi', 'tamamlandı'].includes(y.status))) add(q.status === 'reddedildi' ? 'warn' : 'ok', 'request_' + ({ 'onaylandı': 'ok', 'reddedildi': 'no', 'tamamlandı': 'done' })[q.status], { type: q.type, date: q.preferred_date, note: q.admin_note });
     for (const sv of services.filter((y) => y.status === 'hazır')) add('ok', 'service_ready', { no: sv.order_no, bike: sv.bike_code });
@@ -844,7 +1274,7 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
     return {
       rider: { id: r.id, name: r.name, phone: r.phone, email: r.email, portal_email: r.portal_email, lang: r.lang || cust?.doc_lang || setting('doc_lang') || 'de', id_type: r.id_type, id_no: r.id_no, id_expiry: r.id_expiry, address: r.address, birth_date: r.birth_date, nationality: r.nationality },
       customer: cust ? { name: cust.company_name || cust.name, type: cust.type } : null, payer,
-      rentals, invoices, payments, services, requests, documents, required_docs: required, missing_docs: missing, notifications: n,
+      rentals, invoices, payments, services, requests, documents, required_docs: required, missing_docs: missing, notifications: n, photo_tasks,
       summary: { open_balance: r2(open.reduce((a, i) => a + i.balance, 0)), overdue: r2(open.filter((i) => i.days_late > 0).reduce((a, i) => a + i.balance, 0)), next_due: open.slice().sort((a, b) => (a.due_date < b.due_date ? -1 : 1))[0] || null },
       company: { name: setting('company_name'), phone: setting('company_phone'), email: setting('company_email'), address: setting('company_address'), pickup: setting('pickup_address') || setting('company_address'), iban: setting('company_iban') },
       request_types: PORTAL_REQ,
@@ -852,6 +1282,9 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
       plans: (await db.all('SELECT bike_type, period, price, deposit FROM pricing_plans WHERE active=1 ORDER BY bike_type, price')).filter((p) => enabledPeriods(SETTINGS).includes(p.period)),
       periods: enabledPeriods(SETTINGS),
       vat_rate: vatRate, self_registered: !!r.self_registered,
+      self_extend: setting('self_extend') !== '0', self_extend_max: Math.max(1, Number(setting('self_extend_max')) || 3), fault_categories: FAULT_CATEGORIES.map((c) => c[0]),
+      unread: Number((await db.get('SELECT COUNT(*) AS n FROM rider_messages WHERE rider_id=? AND read_at IS NULL', [r.id]))?.n) || 0,
+      online_pay: !!provider(setting('pay_provider')),
     };
   }
   async function portalHandle(seg, method, body, token) {
@@ -990,14 +1423,63 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
       const d = await db.get("SELECT * FROM documents WHERE id=? AND owner_type='rider' AND owner_id=?", [Number(c), r.id]) || err(404, 'Belge bulunamadı.');
       return ok(d);
     }
+    if (b === 'photos' && method === 'POST' && !c) {
+      // purpose: 'request' (staff asked), 'pickup' (selfie + bike photos when the rental starts) or 'free' (rider sends one, e.g. damage)
+      const kind = PHOTO_KINDS.includes(body.kind) ? body.kind : 'bisiklet';
+      let p;
+      if (body.request_id) {
+        const q = await db.get("SELECT * FROM photo_requests WHERE id=? AND rider_id=? AND status='bekliyor'", [Number(body.request_id), r.id]) || err(404, 'Bu fotoğraf talebi artık açık değil.');
+        p = { bike_id: q.bike_id, rental_id: q.rental_id, request_id: q.id, stage: 'talep' };
+      } else {
+        const x = body.rental_id ? await db.get("SELECT * FROM rentals WHERE id=? AND rider_id=? AND status IN ('aktif','rezervasyon')", [Number(body.rental_id), r.id])
+          : await db.get("SELECT * FROM rentals WHERE rider_id=? AND status IN ('aktif','rezervasyon') ORDER BY status='aktif' DESC, id DESC LIMIT 1", [r.id]);
+        if (!x) err(400, 'Aktif kiralamanız yok.');
+        p = { bike_id: x.bike_id, rental_id: x.id, stage: body.purpose === 'pickup' ? 'teslim alma' : 'sürücü' };
+      }
+      // position: sent with the photo, or the phone location shared in the last 30 minutes
+      let lat = Number(body.lat), lng = Number(body.lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng) || !lat) {
+        const fresh = r.last_loc_at && r.last_loc_at > new Date(Date.now() - 30 * 60e3).toISOString().slice(0, 19).replace('T', ' ');
+        lat = fresh ? r.last_lat : null; lng = fresh ? r.last_lng : null;
+      }
+      const id = await addPhoto({ ...p, rider_id: r.id, kind, note: body.note, data: body.data, thumb: body.thumb, lat: lat != null ? r6(lat) : null, lng: lng != null ? r6(lng) : null }, null);
+      if (p.request_id) await settlePhotoRequest(p.request_id);
+      await audit(portalUser(r), 'fotoğraf', 'bikes', p.bike_id, `${r.name}: ${kind} · ${p.stage}`);
+      return ok({ id, ...(await portalData(r)) });
+    }
+    if (b === 'inbox' && method === 'GET') return ok(await inbox(r, body));
+    if (b === 'inbox' && method === 'POST' && c === 'read') {
+      if (Array.isArray(body.ids) && body.ids.length) await db.run(`UPDATE rider_messages SET read_at=? WHERE rider_id=? AND read_at IS NULL AND id IN (${body.ids.map(Number).filter(Number.isFinite).join(',') || 0})`, [nowTs(), r.id]);
+      else await db.run('UPDATE rider_messages SET read_at=? WHERE rider_id=? AND read_at IS NULL', [nowTs(), r.id]);
+      return ok(await inbox(r, {}));
+    }
+    if (b === 'reports' && method === 'POST') { const x = await faultReport(r, body); return ok({ ...x, ...(await portalData(r)) }); }
+    if (b === 'rentals' && method === 'POST' && seg[3] === 'extend') { const x = await riderExtend(r, Number(c), body); return ok({ result: x, ...(await portalData(r)) }); }
+    if (b === 'rentals' && method === 'POST' && seg[3] === 'return-notice') { await riderReturnNotice(r, Number(c), body); return ok(await portalData(r)); }
+    if (b === 'pay' && method === 'GET' && c) {
+      // how to pay one invoice: bank transfer data (+ GiroCode payload) and, once a provider is connected, its payment link
+      const cust = r.customer_id ? await db.get('SELECT * FROM customers WHERE id=?', [r.customer_id]) : null;
+      if (!cust || cust.type !== 'bireysel') err(403, 'Bu faturayı firmanız ödüyor.');
+      const inv = await db.get("SELECT * FROM invoices WHERE id=? AND customer_id=? AND status IN ('açık','kısmi')", [Number(c), cust.id]) || err(404, 'Açık fatura bulunamadı.');
+      const balance = r2(inv.total + (inv.late_fee || 0) - inv.paid_amount);
+      let link = inv.pay_link || null; const pv = provider(setting('pay_provider'));
+      if (!link && pv) { try { const x = await pv.createLink({ ...inv, balance }, { company: setting('company_name'), rider: r }); if (x?.url) { link = x.url; await db.run('UPDATE invoices SET pay_link=?, pay_provider=?, pay_ref=? WHERE id=?', [x.url, setting('pay_provider'), x.ref || null, inv.id]); } } catch (e) { console.error(e); } }
+      return ok({ invoice_no: inv.invoice_no, amount: balance, due_date: inv.due_date, name: setting('company_name'), iban: setting('company_iban'), reference: inv.invoice_no, link });
+    }
+    if (b === 'photos' && method === 'GET' && c) {
+      const ph = await db.get('SELECT id, kind, mime, data, created_at FROM bike_photos WHERE id=? AND rider_id=?', [Number(c), r.id]) || err(404, 'Fotoğraf bulunamadı.');
+      return ok(ph);
+    }
     err(404, 'Bulunamadı.');
   }
 
   // ---------- router ----------
   const permOf = (res) => RESOURCES[res]?.perm;
-  async function handle({ method, path, query = {}, body = {}, token }) {
+  async function handle({ method, path, query = {}, body = {}, token, headers = {} }) {
     try {
       await getSettings();
+      // daily job fallback: the first request of the day runs it when the cron has not (yet)
+      if (setting('last_daily_run') !== today()) { try { await runDaily(); } catch (e) { console.error('daily job', e); } }
       const seg = path.replace(/^\/api\/?/, '').split('/').filter(Boolean).map(decodeURIComponent);
       const [a, b, c] = seg;
       if (a === 'login' && method === 'POST') {
@@ -1017,6 +1499,15 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
         return ok(await telemetry(body));
       }
       if (a === 'portal') return await portalHandle(seg, method, method === 'GET' ? query : body, token);
+      if (a === 'cron' && b === 'daily') {
+        // Vercel cron (vercel.json). With CRON_SECRET set, Vercel sends it as a bearer token; without it the job only runs once a day anyway
+        if (cronSecret && token !== cronSecret && !await userFromToken(token)) err(401, 'Yetkisiz.');
+        return ok({ ran: await runDaily(query.force === '1' && !!(await userFromToken(token))) || 'bugün zaten çalıştı', last_run: setting('last_daily_run') });
+      }
+      if (a === 'payments' && b === 'webhook' && method === 'POST') {
+        const pv = provider(c); if (!pv) err(404, 'Bu ödeme sağlayıcısı bağlı değil.');
+        return ok(await recordOnlinePayment(c, await pv.parseWebhook({ body, headers })));
+      }
       const user = await userFromToken(token);
       if (!user) err(401, 'Oturum açın.');
       if (a === 'logout') { await db.run('DELETE FROM sessions WHERE token=?', [token]); return ok({ ok: true }); }
@@ -1024,6 +1515,32 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
       if (a === 'dashboard') { need(user, 'dashboard'); return ok(await dashboard(user)); }
       if (a === 'notifications') return ok(await notifications(user));
       if (a === 'reports') { need(user, 'reports'); return ok(await reports(query)); }
+      if (a === 'summary') { need(user, 'reports'); return ok(await summary(query)); }
+      if (a === 'overdue') { need(user, 'finance'); return ok(await overdueList()); }
+      if (a === 'daily' && method === 'POST') { need(user, 'finance', 'w'); return ok(await runDaily(true, user)); }
+      if (a === 'payment-plan' && b) { need(user, 'finance'); return ok(await paymentPlan(Number(b))); }
+      if (a === 'bank-import' && method === 'POST') { need(user, 'finance', 'w'); return ok(await bankImport(body, user)); }
+      if (a === 'handovers') {
+        if (method === 'GET' && b === 'start') {
+          // data for a new protocol form: rental, bike, damages from the last hand-over, pick-up photos of the rider
+          need(user, 'rentals'); const r = await rentalDetail(Number(query.rental_id), user);
+          return ok({ rental: r, previous: await lastHandoverDamages(r.id, r.bike_id), checklist_items: INTAKE_CHECKLIST, damage_types: DAMAGE_TYPES });
+        }
+        if (method === 'GET' && b) { need(user, 'rentals'); return ok(await handoverDetail(Number(b))); }
+        if (method === 'POST' && !b) { need(user, 'rentals', 'w'); return ok(await saveHandover(body, user)); }
+        if (method === 'DELETE' && b) {
+          need(user, 'admin', 'w'); const h = await handoverDetail(Number(b));
+          await db.run('UPDATE bike_photos SET handover_id=NULL WHERE handover_id=?', [h.id]); await db.run('DELETE FROM handovers WHERE id=?', [h.id]);
+          await audit(user, 'silme', 'handovers', h.id, `${h.kind} tutanağı ${h.rental?.contract_no || ''}`); return ok({ ok: true });
+        }
+      }
+      if (a === 'riders' && method === 'POST' && c === 'message') {
+        need(user, 'customers', 'w'); const rd = await getOne('riders', Number(b));
+        const text = String(body.text || '').trim().slice(0, 600); if (!text) err(400, 'Mesaj yazın.');
+        await notifyRider(rd.id, 'custom', { title: String(body.title || '').slice(0, 80), text }, { link: 'inbox', level: 'info', user });
+        await audit(user, 'sürücüye mesaj', 'riders', rd.id, text.slice(0, 120));
+        return ok({ ok: true, portal: !!(rd.portal_active && rd.portal_email), messages: await messageList(rd.id) });
+      }
       if (a === 'simulate' && method === 'POST') { need(user, 'fleet', 'w'); return ok(await simulate()); }
       if (a === 'lookup' && b === 'users') {
         // staff list (names only) – needed by every role for technician / assignee pickers
@@ -1129,7 +1646,14 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
         need(user, 'finance', 'w'); const id = Number(b);
         const inv = await getOne('invoices', id);
         if (c === 'late-fee') { await db.run('UPDATE invoices SET late_fee=? WHERE id=?', [r2(body.amount ?? lateFeeFor(inv)), id]); await recalcInvoice(id); await audit(user, 'gecikme bedeli', 'invoices', id, String(body.amount ?? '')); }
-        if (c === 'remind') { await db.run('UPDATE invoices SET reminders_sent=reminders_sent+1, last_reminder_at=? WHERE id=?', [nowTs(), id]); await audit(user, 'hatırlatma', 'invoices', id, `${inv.invoice_no} ${body.channel || 'e-posta'}`); }
+        if (c === 'remind') {
+          if (body.channel === 'sürücü ekranı') {
+            const rid = await invoiceRider(inv); if (!rid) err(409, 'Bu faturayı bir firma ödüyor veya sürücüsü yok; sürücü ekranına hatırlatma gönderilemez.');
+            const d = daysBetween(inv.due_date, today());
+            await notifyRider(rid, d > 0 ? 'invoice_overdue' : 'invoice_due', { no: inv.invoice_no, amount: r2(inv.balance), date: inv.due_date, days: Math.abs(d) }, { link: 'pay', level: d > 0 ? 'danger' : 'warn', user });
+          }
+          await db.run('UPDATE invoices SET reminders_sent=reminders_sent+1, last_reminder_at=? WHERE id=?', [nowTs(), id]); await audit(user, 'hatırlatma', 'invoices', id, `${inv.invoice_no} ${body.channel || 'e-posta'}`);
+        }
         if (c === 'cancel') { if (inv.paid_amount > 0) err(409, 'Ödemesi olan fatura iptal edilemez.'); await db.run("UPDATE invoices SET status='iptal' WHERE id=?", [id]); await audit(user, 'iptal', 'invoices', id, inv.invoice_no); }
         return ok(await invoiceDetail(id));
       }
@@ -1172,6 +1696,34 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
           return ok({ ok: true });
         }
       }
+      if (a === 'photos') {
+        if (method === 'GET' && !b) {
+          need(user, query.bike_id ? 'fleet' : query.rider_id ? 'customers' : 'rentals');
+          return ok(await photoHistory(query));
+        }
+        const ph = b ? await db.get('SELECT * FROM bike_photos WHERE id=?', [Number(b)]) || err(404, 'Fotoğraf bulunamadı.') : null;
+        if (method === 'GET') { if (!['fleet', 'rentals', 'customers'].some((x) => can(user, x))) err(403, 'Bu işlem için yetkiniz yok.'); return ok(ph); }
+        need(user, 'fleet', 'w');
+        if (method === 'POST' && !b) {
+          const bike = await getOne('bikes', Number(body.bike_id));
+          const cur = await db.get("SELECT id, rider_id FROM rentals WHERE bike_id=? AND status='aktif' ORDER BY id DESC LIMIT 1", [bike.id]);
+          const hid = body.handover_id ? (await db.get('SELECT id, kind, rental_id FROM handovers WHERE id=? AND bike_id=?', [Number(body.handover_id), bike.id])) : null;
+          const id = await addPhoto({ bike_id: bike.id, rental_id: hid?.rental_id || body.rental_id || cur?.id || null, rider_id: null, handover_id: hid?.id || null, service_id: body.service_id || null, kind: body.kind,
+            stage: hid ? `${hid.kind} tutanağı` : 'personel', note: body.note, data: body.data, thumb: body.thumb }, user);
+          await audit(user, 'fotoğraf', 'bikes', bike.id, `${bike.code} · ${body.note || ''}`);
+          return ok({ id });
+        }
+        if (method === 'DELETE' && b) { await db.run('DELETE FROM bike_photos WHERE id=?', [ph.id]); await audit(user, 'fotoğraf silme', 'bikes', ph.bike_id, `#${ph.id}`); return ok({ ok: true }); }
+      }
+      if (a === 'photo_requests') {
+        need(user, 'fleet', 'w');
+        if (method === 'POST' && !b) return ok(await requestPhoto(body, user));
+        if (method === 'POST' && c === 'cancel') {
+          const q = await db.get('SELECT * FROM photo_requests WHERE id=?', [Number(b)]) || err(404, 'Talep bulunamadı.');
+          if (q.status === 'bekliyor') await db.run("UPDATE photo_requests SET status='iptal', done_at=? WHERE id=?", [nowTs(), q.id]);
+          return ok({ ok: true });
+        }
+      }
       if (a === 'documents') {
         if (method === 'GET' && !b) { const own = DOC_OWNERS[query.owner_type] || err(400, 'Geçersiz belge sahibi.'); need(user, own[1]); return ok(await listDocuments(query.owner_type, Number(query.owner_id))); }
         const doc = b ? await db.get('SELECT * FROM documents WHERE id=?', [Number(b)]) || err(404, 'Belge bulunamadı.') : null;
@@ -1211,5 +1763,5 @@ export async function createApi(db, { hashPassword, verifyPassword, randomToken 
     return typeNames().map((name) => ({ name, image: imgs[name] || null }));
   }
 
-  return { handle, db, billRental, createRental, returnRental, createService, addServicePart, addPayment, addStockMove, telemetry, finishService, updateService, audit };
+  return { handle, db, runDaily, notifyRider, billRental, createRental, returnRental, createService, addServicePart, addPayment, addStockMove, telemetry, finishService, updateService, audit };
 }

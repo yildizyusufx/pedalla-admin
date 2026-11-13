@@ -2,6 +2,8 @@
 // Used by the rider portal and by the admin panel language switch.
 // [de, en]
 export const VALUES = {
+  // bike photo history
+  'bisiklet': ['Fahrrad', 'bike'], 'selfie': ['Selfie', 'selfie'], 'selfie + bisiklet': ['Selfie + Fahrrad', 'selfie + bike'], 'gönderildi': ['gesendet', 'sent'],
   // bike status
   'müsait': ['verfügbar', 'available'], 'kirada': ['vermietet', 'rented'], 'rezerve': ['reserviert', 'reserved'], 'serviste': ['im Service', 'in service'],
   'arızalı': ['defekt', 'faulty'], 'kayıp/çalıntı': ['verloren/gestohlen', 'lost/stolen'], 'hizmet dışı': ['außer Betrieb', 'out of service'],
@@ -55,6 +57,12 @@ export const VALUES = {
   "durdurma": ["Stoppen", "stop"],
   "çalıntı bildirimi": ["Diebstahlmeldung", "theft report"],
   "aktifleştirme": ["Aktivierung", "reactivation"],
+  // ---- fault reports, payment plan, hand-over protocol
+  'lastik / patlak': ['Reifen / Platten', 'tyre / puncture'], 'batarya / şarj': ['Akku / Laden', 'battery / charging'], 'motor / elektrik': ['Motor / Elektrik', 'motor / electrics'],
+  'zincir / vites': ['Kette / Schaltung', 'chain / gears'], 'kilit / anahtar': ['Schloss / Schlüssel', 'lock / key'], 'kaza': ['Unfall', 'accident'], 'hasar / kırık': ['Schaden / Bruch', 'damage / broken'],
+  'planlandı': ['geplant', 'scheduled'], 'gecikmiş': ['überfällig', 'overdue'],
+  'çizik': ['Kratzer', 'scratch'], 'ezik': ['Delle', 'dent'], 'kırık': ['Bruch', 'broken'], 'eksik': ['fehlt', 'missing'], 'kir / leke': ['Schmutz / Fleck', 'dirt / stain'],
+  'teslim': ['Übergabe', 'handover'], 'sürücü ekranı': ['Fahrer-App', 'rider app'],
 };
 const IDX = { de: 0, en: 1 };
 export const tval = (lang, v) => (v == null || lang === 'tr' || !(lang in IDX) ? v : VALUES[v]?.[IDX[lang]] ?? v);

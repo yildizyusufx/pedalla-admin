@@ -17,6 +17,12 @@ const T = {
     terms_h: 'Konditionen', period: 'Mietzeitraum', fee: 'Mietpreis', per: 'pro', plus_vat: 'zzgl. USt.', gross: 'brutto',
     deposit: 'Kaution', deposit_paid: 'bei Übergabe erhalten', payment_terms: 'Zahlungsziel', days_from_invoice: 'Tage ab Rechnungsdatum',
     late_return: 'Verspätete Rückgabe', late_payment: 'Verzugsgebühr', per_day: 'pro Tag',
+    ho_teslim: 'ÜBERGABEPROTOKOLL', ho_iade: 'RÜCKGABEPROTOKOLL', ho_time: 'Datum / Uhrzeit', ho_staff: 'Pedalla-Mitarbeiter/in', ho_damage_h: 'Schadensmarkierungen',
+    ho_no: 'Nr.', ho_side: 'Seite', ho_kind: 'Art', ho_note: 'Notiz', ho_state: '', ho_old: 'vorhanden', ho_new: 'NEU', ho_none: 'Keine Schäden markiert.',
+    ho_notes: 'Bemerkungen', ho_photos: 'Fotos', ho_sign_rider_teslim: 'Übernehmende Person', ho_sign_rider_iade: 'Zurückgebende Person', ho_sign_staff: 'Pedalla',
+    ho_confirm_teslim: 'Der Mieter bestätigt, das Fahrrad samt Zubehör in dem oben festgehaltenen Zustand erhalten zu haben.',
+    ho_confirm_iade: 'Beide Seiten bestätigen den oben festgehaltenen Zustand bei Rückgabe. Als NEU markierte Schäden waren bei der Übergabe nicht vorhanden.',
+    ho_left: 'linke Seite', ho_right: 'rechte Seite',
     protocol_h: 'Übergabeprotokoll', protocol: 'Der Mieter bestätigt, das oben genannte Fahrrad samt Zubehör vollständig und in funktionsfähigem Zustand erhalten zu haben. Vorhandene Schäden:',
     sign_lessor: 'Vermieter', sign_renter: 'Mieter', sign_rider: 'Übernehmende Person', place_date: 'Ort, Datum',
     bill_to: 'Rechnungsadresse', invoice_no: 'Rechnungsnummer', date: 'Datum', due: 'Fällig am', contract_no: 'Vertragsnummer',
@@ -55,6 +61,12 @@ const T = {
     est_cost: 'Cost estimate', est_ready: 'Estimated ready', diagnosis: 'Diagnosis', work_done: 'Work carried out',
     received_delivered: 'Received / returned', item: 'Item', qty: 'Qty', unit_price: 'Unit price', labor: 'Labour', hours: 'h',
     total_net: 'Total (net)', technician: 'Technician', received_sig: 'Received by', handed_by: 'Dropped off by', taken_by: 'Received by',
+    ho_teslim: 'HANDOVER PROTOCOL', ho_iade: 'RETURN PROTOCOL', ho_time: 'Date / time', ho_staff: 'Pedalla staff', ho_damage_h: 'Damage marks',
+    ho_no: 'No.', ho_side: 'Side', ho_kind: 'Type', ho_note: 'Note', ho_state: '', ho_old: 'existing', ho_new: 'NEW', ho_none: 'No damage marked.',
+    ho_notes: 'Remarks', ho_photos: 'Photos', ho_sign_rider_teslim: 'Person receiving the bike', ho_sign_rider_iade: 'Person returning the bike', ho_sign_staff: 'Pedalla',
+    ho_confirm_teslim: 'The renter confirms receipt of the bike and accessories in the condition recorded above.',
+    ho_confirm_iade: 'Both parties confirm the condition of the bike at return as recorded above. Damage marked NEW was not present at handover.',
+    ho_left: 'left side', ho_right: 'right side',
   },
 };
 
@@ -68,6 +80,7 @@ const VALUES = {
     'Frenler (ön/arka)': 'Bremsen (vorne/hinten)', 'Lastikler ve hava basıncı': 'Reifen und Luftdruck', 'Zincir / kayış': 'Kette / Riemen', Vites: 'Schaltung',
     'Işıklar (ön/arka)': 'Beleuchtung (vorne/hinten)', 'Zil / korna': 'Klingel', 'Batarya ve şarj soketi': 'Akku und Ladebuchse', 'Ekran / kumanda': 'Display / Bedienteil',
     'Motor desteği': 'Motorunterstützung', 'Kargo kutusu / kilit': 'Transportbox / Schloss', 'Ayaklık (sehpa)': 'Ständer', 'Gövde / boya': 'Rahmen / Lack',
+    'çizik': 'Kratzer', 'ezik': 'Delle', 'kırık': 'Bruch', 'eksik': 'fehlt', 'kir / leke': 'Verschmutzung', 'diğer': 'Sonstiges', sol: 'links', 'sağ': 'rechts',
   },
   en: {
     gün: 'day', hafta: 'week', ay: 'month',
@@ -77,6 +90,7 @@ const VALUES = {
     'Frenler (ön/arka)': 'Brakes (front/rear)', 'Lastikler ve hava basıncı': 'Tyres and pressure', 'Zincir / kayış': 'Chain / belt', Vites: 'Gears',
     'Işıklar (ön/arka)': 'Lights (front/rear)', 'Zil / korna': 'Bell', 'Batarya ve şarj soketi': 'Battery and charging port', 'Ekran / kumanda': 'Display / controls',
     'Motor desteği': 'Motor assist', 'Kargo kutusu / kilit': 'Cargo box / lock', 'Ayaklık (sehpa)': 'Kickstand', 'Gövde / boya': 'Frame / paint',
+    'çizik': 'scratch', 'ezik': 'dent', 'kırık': 'broken', 'eksik': 'missing', 'kir / leke': 'dirt / stain', 'diğer': 'other', sol: 'left', 'sağ': 'right',
   },
 };
 
